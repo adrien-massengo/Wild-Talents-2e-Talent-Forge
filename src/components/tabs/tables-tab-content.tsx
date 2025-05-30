@@ -37,8 +37,8 @@ interface BodyExtraData {
 }
 
 const bodyExtraData: BodyExtraData[] = [
-    { bodyExtra: "Booster", lift: "x10", throwEffect: "x10 weight or +25 yards", damageEffect: "No effect", sprintSpeedJump: "No effect / x2"},
-    { bodyExtra: "No Upward Limit*", lift: "x2", throwEffect: "x2 weight or +10 yards", damageEffect: "No effect", sprintSpeedJump: "No effect / x1.25"},
+    { bodyExtra: "Booster", lift: "x10", throwEffect: "x10 weight or +25 yards", damageEffect: "No effect", sprintSpeedJump: "x2"},
+    { bodyExtra: "No Upward Limit*", lift: "x2", throwEffect: "x2 weight or +10 yards", damageEffect: "No effect", sprintSpeedJump: "x1.25"},
 ];
 
 const bodyExtraNote = "* For doublings beyond Body 10d. Use the Body Effects table for increases up to the equivalent of Body 10d.";
@@ -99,7 +99,7 @@ export function TablesTabContent() {
                       <TableHead>Lift</TableHead>
                       <TableHead>Throw</TableHead>
                       <TableHead>Damage</TableHead>
-                      <TableHead>Sprint / Speed / Jump</TableHead>
+                      <TableHead>Sprint Speed/Jump</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -125,4 +125,3 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
-
