@@ -477,12 +477,16 @@ export default function HomePage() {
                     const defaultExtra: AppliedExtraOrFlaw = {
                         id: `loaded-extra-${Date.now()}-${Math.random().toString(36).substring(7)}`,
                         name: 'Custom Extra',
-                        costModifier: ex.isCustom ? 1 : 0, 
+                        costModifier: 1, 
                         isCustom: true,
                     };
                     let loadedCostModifier = ex.costModifier;
                     if (typeof loadedCostModifier !== 'number' || isNaN(loadedCostModifier)) {
-                        loadedCostModifier = ex.isCustom ? 1 : (PREDEFINED_EXTRAS.find(pEx => pEx.id === ex.definitionId)?.costModifier ?? 0);
+                        const predefinedEx = PREDEFINED_EXTRAS.find(pEx => pEx.id === ex.definitionId);
+                        loadedCostModifier = ex.isCustom ? 1 : (predefinedEx?.costModifier ?? 0);
+                    }
+                    if (isNaN(loadedCostModifier)) { // Final check for NaN
+                        loadedCostModifier = ex.isCustom ? 1 : 0;
                     }
                     return {
                         ...defaultExtra,
@@ -497,12 +501,16 @@ export default function HomePage() {
                     const defaultFlaw: AppliedExtraOrFlaw = {
                         id: `loaded-flaw-${Date.now()}-${Math.random().toString(36).substring(7)}`,
                         name: 'Custom Flaw',
-                        costModifier: fl.isCustom ? -1 : 0, 
+                        costModifier: -1, 
                         isCustom: true,
                     };
                     let loadedCostModifier = fl.costModifier;
                     if (typeof loadedCostModifier !== 'number' || isNaN(loadedCostModifier)) {
-                        loadedCostModifier = fl.isCustom ? -1 : (PREDEFINED_FLAWS.find(pFL => pFL.id === fl.definitionId)?.costModifier ?? 0);
+                        const predefinedFl = PREDEFINED_FLAWS.find(pFL => pFL.id === fl.definitionId);
+                        loadedCostModifier = fl.isCustom ? -1 : (predefinedFl?.costModifier ?? 0);
+                    }
+                    if (isNaN(loadedCostModifier)) { // Final check for NaN
+                        loadedCostModifier = fl.isCustom ? -1 : 0;
                     }
                      return {
                         ...defaultFlaw,

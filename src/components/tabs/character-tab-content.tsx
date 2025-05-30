@@ -391,7 +391,7 @@ export function CharacterTabContent({
               min="0"
               placeholder="0"
               className="w-24"
-              value={characterData.willpower.purchasedBaseWill}
+              value={String(characterData.willpower.purchasedBaseWill)}
               onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))}
             />
           </div>
@@ -403,7 +403,7 @@ export function CharacterTabContent({
               min="0"
               placeholder="0"
               className="w-24"
-              value={characterData.willpower.purchasedWill}
+              value={String(characterData.willpower.purchasedWill)}
               onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))}
             />
           </div>
@@ -572,7 +572,7 @@ export function CharacterTabContent({
                           <Input
                             id={`${quality.id}-levels`}
                             type="number"
-                            value={quality.levels}
+                            value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(quality.levels) : ''}
                             onChange={(e) => onMiracleQualityChange(miracle.id, quality.id, 'levels', parseInt(e.target.value, 10) || 0)}
                             className="text-sm"
                             placeholder="0"
@@ -583,7 +583,7 @@ export function CharacterTabContent({
                             <Input
                                 type="text"
                                 readOnly
-                                value={calculateMiracleQualityCost(quality, miracle, dynamicPqDefs)}
+                                value={String(calculateMiracleQualityCost(quality, miracle, dynamicPqDefs))}
                                 className="text-sm bg-muted cursor-not-allowed"
                             />
                         </div>
@@ -599,7 +599,7 @@ export function CharacterTabContent({
                                 <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
                                 <Input
                                   type="number"
-                                  value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? extra.costModifier : ''}
+                                  value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? String(extra.costModifier) : ''}
                                   onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
                                   className="w-16 h-7 text-xs" placeholder="Cost"
                                 />
@@ -615,7 +615,7 @@ export function CharacterTabContent({
                                 value={selectedExtraToAdd[quality.id] || ""}
                                 onValueChange={val => setSelectedExtraToAdd(prev => ({...prev, [quality.id]: val}))}
                             >
-                                <SelectTrigger className="h-8 text-xs flex-grow" placeholder="Add Extra..."><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Extra..."/></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="custom_extra">Custom Extra</SelectItem>
                                     {PREDEFINED_EXTRAS.map(ex => <SelectItem key={ex.id} value={ex.id}>{ex.name} ({ex.costModifier > 0 ? '+' : ''}{ex.costModifier})</SelectItem>)}
@@ -639,7 +639,7 @@ export function CharacterTabContent({
                                 <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
                                 <Input
                                   type="number"
-                                  value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? flaw.costModifier : ''}
+                                  value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? String(flaw.costModifier) : ''}
                                   onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
                                   className="w-16 h-7 text-xs" placeholder="Cost"
                                 />
@@ -655,7 +655,7 @@ export function CharacterTabContent({
                                 value={selectedFlawToAdd[quality.id] || ""}
                                 onValueChange={val => setSelectedFlawToAdd(prev => ({...prev, [quality.id]: val}))}
                             >
-                                <SelectTrigger className="h-8 text-xs flex-grow" placeholder="Add Flaw..."><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Flaw..." /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="custom_flaw">Custom Flaw</SelectItem>
                                     {PREDEFINED_FLAWS.map(fl => <SelectItem key={fl.id} value={fl.id}>{fl.name} ({fl.costModifier})</SelectItem>)}
