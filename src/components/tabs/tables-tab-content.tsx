@@ -164,6 +164,27 @@ const baseWillDescriptionData: BaseWillDescriptionData[] = [
   { range: "21+", description: "Tremendous fortitude and drive" },
 ];
 
+interface PowerCapacityData {
+  dicepool: string;
+  mass: string;
+  range: string;
+  speed: string;
+  radius: string;
+}
+
+const powerCapacitiesData: PowerCapacityData[] = [
+  { dicepool: "1d", mass: "50 lbs (25 kg)", range: "10 yards", speed: "2 yards", radius: "10 yards" },
+  { dicepool: "2d", mass: "100 lbs (50 kg)", range: "20 yards", speed: "5 yards", radius: "20 yards" },
+  { dicepool: "3d", mass: "200 lbs (100 kg)", range: "40 yards", speed: "10 yards", radius: "40 yards" },
+  { dicepool: "4d", mass: "400 lbs (200 kg)", range: "80 yards", speed: "20 yards", radius: "80 yards" },
+  { dicepool: "5d", mass: "800 lbs (400 kg)", range: "160 yards", speed: "40 yards", radius: "160 yards" },
+  { dicepool: "6d", mass: "1,600 lbs (800 kg)", range: "320 yards", speed: "80 yards", radius: "320 yards" },
+  { dicepool: "7d", mass: "1.6 tons", range: "640 yards", speed: "160 yards", radius: "640 yards" },
+  { dicepool: "8d", mass: "3.2 tons", range: "1,280 yards", speed: "320 yards", radius: "1,280 yards" },
+  { dicepool: "9d", mass: "6.4 tons", range: "2,560 yards", speed: "640 yards", radius: "2,560 yards" },
+  { dicepool: "10d", mass: "12.8 tons", range: "5,120 yards", speed: "1,280 yards", radius: "5,120 yards" },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -176,12 +197,25 @@ export function TablesTabContent() {
     { title: 'Command Effects', data: commandEffectsData, description: "Detailed information and rules for Command Effects." },
     { title: 'Skill Examples', data: skillExamplesData, description: "Examples of what different dice pools in skills might represent in terms of proficiency." },
     { title: 'Base Will Description', data: baseWillDescriptionData, description: "Descriptions for different Base Will ranges." },
-    { title: 'Power Capacities Table', description: "Detailed information and rules for Power Capacities Table." },
+    { title: 'Power Capacities Table', data: powerCapacitiesData, description: "Detailed information and rules for Power Capacities Table." },
     { title: 'Size Modification Tables', description: "Detailed information and rules for Size Modification Tables." },
   ];
 
+  const defaultOpenValues = [
+    "body-effects",
+    "body-extra",
+    "coordination-effects",
+    "sense-effects",
+    "mind-effects",
+    "charm-effects",
+    "command-effects",
+    "skill-examples",
+    "base-will-description",
+    "power-capacities-table",
+  ];
+
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects", "command-effects", "skill-examples", "base-will-description"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={defaultOpenValues}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -356,6 +390,29 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Power Capacities Table' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dicepool</TableHead>
+                      <TableHead>Mass</TableHead>
+                      <TableHead>Range</TableHead>
+                      <TableHead>Speed</TableHead>
+                      <TableHead>Radius</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as PowerCapacityData[]).map((row) => (
+                      <TableRow key={row.dicepool}>
+                        <TableCell>{row.dicepool}</TableCell>
+                        <TableCell>{row.mass}</TableCell>
+                        <TableCell>{row.range}</TableCell>
+                        <TableCell>{row.speed}</TableCell>
+                        <TableCell>{row.radius}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -367,4 +424,3 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
-
