@@ -11,9 +11,14 @@ import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 
 interface SummaryTabContentProps {
   characterData: CharacterData;
+  onArchetypePointsChange: (value: number) => void;
+  onPointLimitChange: (value: number) => void;
 }
 
 const formatStatDisplay = (stat: StatDetail | undefined) => {
@@ -63,8 +68,8 @@ const formatSkillDisplay = (skill: SkillInstance | undefined) => {
   return display;
 }
 
-export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills, miracles } = characterData;
+export function SummaryTabContent({ characterData, onArchetypePointsChange, onPointLimitChange }: SummaryTabContentProps) {
+  const { basicInfo, stats, willpower, skills, miracles, archetypePoints, pointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
 
@@ -82,24 +87,47 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
   const totalWillpowerPoints = calculateWillpowerPoints(willpower);
   const totalSkillPoints = (skills || []).reduce((sum, skill) => sum + calculateSkillPoints(skill), 0);
   const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => sum + calculateMiracleTotalCost(miracle, skills), 0);
-  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints;
+  const currentArchetypePoints = archetypePoints || 0;
+  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + currentArchetypePoints;
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["point-totals", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary", "miracles-summary"]}>
-      <CollapsibleSectionItem title="Point Totals" value="point-totals">
+    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["character-point-summary", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary", "miracles-summary"]}>
+      <CollapsibleSectionItem title="Character Point Summary" value="character-point-summary">
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">Overall Character Cost</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p>Total Stat Points: {totalStatPoints}</p>
-            <p>Total Willpower Points: {totalWillpowerPoints}</p>
-            <p>Total Skill Points: {totalSkillPoints}</p>
-            <p>Total Miracle Points: {totalMiraclePoints}</p>
-            <p className="font-bold text-lg">Grand Total Points: {grandTotalPoints}</p>
-            <p className="text-sm text-muted-foreground">Based on 200 point budget for a starting character.</p>
-            <p className="text-sm text-muted-foreground">Remaining Points: {200 - grandTotalPoints}</p>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="archetype-points" className="font-medium">Archetype Point Cost:</Label>
+              <Input
+                id="archetype-points"
+                type="number"
+                min="0"
+                value={String(currentArchetypePoints)}
+                onChange={(e) => onArchetypePointsChange(parseInt(e.target.value, 10))}
+                className="w-24"
+              />
+            </div>
+            <p>Stat Point Cost: {totalStatPoints}</p>
+            <p>Willpower Point Cost: {totalWillpowerPoints}</p>
+            <p>Skill Point Cost: {totalSkillPoints}</p>
+            <p>Miracle Point Cost: {totalMiraclePoints}</p>
+            <hr className="my-2" />
+            <p className="font-bold text-lg">Current Point Cost: {grandTotalPoints} / {pointLimit}</p>
+             <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="point-limit" className="font-medium">Point Limit:</Label>
+              <Input
+                id="point-limit"
+                type="number"
+                min="0"
+                value={String(pointLimit)}
+                onChange={(e) => onPointLimitChange(parseInt(e.target.value, 10))}
+                className="w-24"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">Remaining Points: {pointLimit - grandTotalPoints}</p>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
@@ -255,3 +283,4 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
     </Accordion>
   );
 }
+

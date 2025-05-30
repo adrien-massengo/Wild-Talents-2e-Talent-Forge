@@ -58,6 +58,8 @@ export interface CharacterData {
   };
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
+  archetypePoints: number;
+  pointLimit: number;
 }
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
@@ -78,6 +80,8 @@ const initialCharacterData: CharacterData = {
   },
   skills: [],
   miracles: [],
+  archetypePoints: 0,
+  pointLimit: 250,
 };
 
 export default function HomePage() {
@@ -386,6 +390,20 @@ export default function HomePage() {
     }));
   };
 
+  const handleArchetypePointsChange = (value: number) => {
+    setCharacterData(prev => ({
+      ...prev,
+      archetypePoints: isNaN(value) ? 0 : Math.max(0, value),
+    }));
+  };
+
+  const handlePointLimitChange = (value: number) => {
+    setCharacterData(prev => ({
+      ...prev,
+      pointLimit: isNaN(value) || value < 0 ? 250 : value,
+    }));
+  };
+
 
   const handleSaveCharacter = () => {
     try {
@@ -471,7 +489,7 @@ export default function HomePage() {
                   ...quality,
                   type: typeof quality.type === 'string' ? quality.type as MiracleQualityType : defaultQuality.type,
                   capacity: typeof quality.capacity === 'string' ? quality.capacity as MiracleCapacityType : defaultQuality.capacity,
-                  levels: typeof quality.levels === 'number' && !isNaN(quality.levels) ? quality.levels : defaultQuality.levels,
+                  levels: (typeof quality.levels === 'number' && !isNaN(quality.levels)) ? quality.levels : defaultQuality.levels,
                   id: defaultQuality.id, 
                   extras: quality.extras ? quality.extras.map(ex => {
                     const defaultExtra: AppliedExtraOrFlaw = {
@@ -485,7 +503,7 @@ export default function HomePage() {
                         const predefinedEx = PREDEFINED_EXTRAS.find(pEx => pEx.id === ex.definitionId);
                         loadedCostModifier = ex.isCustom ? 1 : (predefinedEx?.costModifier ?? 0);
                     }
-                    if (isNaN(loadedCostModifier)) { // Final check for NaN
+                    if (isNaN(loadedCostModifier)) { 
                         loadedCostModifier = ex.isCustom ? 1 : 0;
                     }
                     return {
@@ -509,7 +527,7 @@ export default function HomePage() {
                         const predefinedFl = PREDEFINED_FLAWS.find(pFL => pFL.id === fl.definitionId);
                         loadedCostModifier = fl.isCustom ? -1 : (predefinedFl?.costModifier ?? 0);
                     }
-                    if (isNaN(loadedCostModifier)) { // Final check for NaN
+                    if (isNaN(loadedCostModifier)) { 
                         loadedCostModifier = fl.isCustom ? -1 : 0;
                     }
                      return {
@@ -525,6 +543,8 @@ export default function HomePage() {
               }) : [],
             };
           }) : [],
+          archetypePoints: typeof parsedData.archetypePoints === 'number' ? parsedData.archetypePoints : initialCharacterData.archetypePoints,
+          pointLimit: typeof parsedData.pointLimit === 'number' && parsedData.pointLimit >=0 ? parsedData.pointLimit : initialCharacterData.pointLimit,
         };
 
         for (const statKey in initialCharacterData.stats) {
@@ -630,7 +650,11 @@ export default function HomePage() {
                 <TablesTabContent />
               </TabsContent>
               <TabsContent value="summary" className="mt-0">
-                <SummaryTabContent characterData={characterData} />
+                <SummaryTabContent
+                  characterData={characterData}
+                  onArchetypePointsChange={handleArchetypePointsChange}
+                  onPointLimitChange={handlePointLimitChange}
+                />
               </TabsContent>
             </div>
           </ScrollArea>
@@ -642,3 +666,4 @@ export default function HomePage() {
     </div>
   );
 }
+
