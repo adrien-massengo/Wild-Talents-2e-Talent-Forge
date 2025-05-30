@@ -43,12 +43,30 @@ const bodyExtraData: BodyExtraData[] = [
 
 const bodyExtraNote = "* For doublings beyond Body 10d. Use the Body Effects table for increases up to the equivalent of Body 10d.";
 
+interface CoordinationEffectData {
+  dice: string;
+  notes: string;
+}
+
+const coordinationEffectsData: CoordinationEffectData[] = [
+  { dice: "1d", notes: "You can cross a room safely if there’s nothing in the way." },
+  { dice: "2d", notes: "You play a decent game of darts." },
+  { dice: "3d", notes: "You’re a great juggler." },
+  { dice: "4d", notes: "You’re nimble as an aikido master." },
+  { dice: "5d", notes: "You’re agile as an Olympic gymnast." },
+  { dice: "6d", notes: "You can attempt to dodge or block any attack, even gunshots." },
+  { dice: "7d", notes: "You can move so fast, you’re a blur." },
+  { dice: "8d", notes: "You can catch fast objects such as arrows in flight without rolling—if they’re not aimed at you." },
+  { dice: "9d", notes: "You can literally move faster than people can see." },
+  { dice: "10d", notes: "Every external muscle in your body is under your conscious control." },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
     { title: 'Body Effects', data: bodyEffectsData, description: "Effects are not cumulative for Body; they are cumulative for all other Stats." },
     { title: 'Body Extra', data: bodyExtraData, description: "This table details the effects of Body Extras like Booster and No Upward Limit.", note: bodyExtraNote },
-    { title: 'Coordination Effects', description: "Detailed information and rules for Coordination Effects." },
+    { title: 'Coordination Effects', data: coordinationEffectsData, description: "Detailed information and rules for Coordination Effects." },
     { title: 'Sense Effects', description: "Detailed information and rules for Sense Effects." },
     { title: 'Mind Effects', description: "Detailed information and rules for Mind Effects." },
     { title: 'Charm Effects', description: "Detailed information and rules for Charm Effects." },
@@ -60,7 +78,7 @@ export function TablesTabContent() {
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -114,6 +132,23 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Coordination Effects' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dice</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as CoordinationEffectData[]).map((row) => (
+                      <TableRow key={row.dice}>
+                        <TableCell>{row.dice}</TableCell>
+                        <TableCell>{row.notes}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -125,3 +160,4 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
+
