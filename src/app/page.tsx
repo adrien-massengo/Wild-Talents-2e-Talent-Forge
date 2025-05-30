@@ -10,35 +10,75 @@ import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Define a basic structure for character data
-interface CharacterData {
+// Define a detailed structure for character stats
+export interface StatDetail {
+  dice: string; // e.g., "1D"
+  hardDice: string; // e.g., "0HD"
+  wiggleDice: string; // e.g., "0WD"
+}
+
+// Define the main structure for character data
+export interface CharacterData {
   basicInfo: {
     name: string;
     archetype: string;
     motivation: string;
   };
-  // Add other sections as they are developed
-  // stats: Record<string, any>;
-  // skills: Record<string, any>;
-  // willpower: number;
-  // miracles: any[];
+  stats: {
+    body: StatDetail;
+    coordination: StatDetail;
+    sense: StatDetail;
+    mind: StatDetail;
+    charm: StatDetail;
+    command: StatDetail;
+  };
+  // skills: Record<string, any>; // Add structure as developed
+  // willpower: number; // Add structure as developed
+  // miracles: any[]; // Add structure as developed
 }
+
+const initialStatDetail: StatDetail = { dice: '1D', hardDice: '0HD', wiggleDice: '0WD' };
 
 const initialCharacterData: CharacterData = {
   basicInfo: { name: '', archetype: '', motivation: '' },
+  stats: {
+    body: { ...initialStatDetail },
+    coordination: { ...initialStatDetail },
+    sense: { ...initialStatDetail },
+    mind: { ...initialStatDetail },
+    charm: { ...initialStatDetail },
+    command: { ...initialStatDetail },
+  },
 };
 
 export default function HomePage() {
   const [characterData, setCharacterData] = React.useState<CharacterData>(initialCharacterData);
   const { toast } = useToast();
 
-  const handleCharacterDataChange = (field: keyof CharacterData['basicInfo'], value: string) => {
+  const handleBasicInfoChange = (field: keyof CharacterData['basicInfo'], value: string) => {
     setCharacterData(prev => ({
       ...prev,
       basicInfo: {
         ...prev.basicInfo,
         [field]: value,
       }
+    }));
+  };
+
+  const handleStatChange = (
+    statName: keyof CharacterData['stats'],
+    dieType: keyof StatDetail,
+    value: string
+  ) => {
+    setCharacterData(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        [statName]: {
+          ...prev.stats[statName],
+          [dieType]: value,
+        },
+      },
     }));
   };
 
@@ -64,15 +104,31 @@ export default function HomePage() {
       const savedData = localStorage.getItem("wildTalentsCharacter");
       if (savedData) {
         const parsedData = JSON.parse(savedData) as CharacterData;
-        // Basic validation or migration could be added here
-        if (parsedData && parsedData.basicInfo) {
-           setCharacterData(parsedData);
+        // Basic validation: ensure essential structures like basicInfo and stats exist
+        if (parsedData && parsedData.basicInfo && parsedData.stats) {
+           // Ensure all stat details are present, falling back to initial if missing
+           const validatedStats = { ...initialCharacterData.stats };
+           for (const statKey in validatedStats) {
+             if (parsedData.stats[statKey as keyof CharacterData['stats']]) {
+               validatedStats[statKey as keyof CharacterData['stats']] = {
+                 ...initialStatDetail,
+                 ...parsedData.stats[statKey as keyof CharacterData['stats']],
+               };
+             }
+           }
+           setCharacterData({...parsedData, stats: validatedStats });
             toast({
               title: "Character Loaded",
               description: "Character data has been loaded from local storage.",
             });
         } else {
-            throw new Error("Invalid character data format.");
+            // If data is malformed or very old, reset to initial or provide a more specific error
+            toast({
+              title: "Load Error",
+              description: "Saved character data is not in the expected format. Loading default character.",
+              variant: "destructive",
+            });
+            setCharacterData(initialCharacterData); // Optionally reset
         }
       } else {
         toast({
@@ -88,6 +144,7 @@ export default function HomePage() {
         description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`,
         variant: "destructive",
       });
+       setCharacterData(initialCharacterData); // Optionally reset on critical error
     }
   };
 
@@ -136,7 +193,11 @@ export default function HomePage() {
           <ScrollArea className="h-[calc(100vh-200px)] md:h-[calc(100vh-220px)]"> {/* Adjust height as needed */}
             <div className="p-1"> {/* Padding for scrollbar visibility */}
               <TabsContent value="character" className="mt-0">
-                <CharacterTabContent characterData={characterData} onCharacterDataChange={handleCharacterDataChange} />
+                <CharacterTabContent 
+                  characterData={characterData} 
+                  onBasicInfoChange={handleBasicInfoChange}
+                  onStatChange={handleStatChange}
+                />
               </TabsContent>
               <TabsContent value="tables" className="mt-0">
                 <TablesTabContent />
