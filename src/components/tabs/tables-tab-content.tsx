@@ -28,10 +28,26 @@ const bodyEffectsData: BodyEffectData[] = [
   { dice: "10d", lift: "12.8 tons", throw10Yds: "1.6 tons", baseDamage: "Shock and Killing", sprint: "60 yards", jump: "20 yards / 5 yards" },
 ];
 
+interface BodyExtraData {
+  bodyExtra: string;
+  lift: string;
+  throwDamage: string; // Combined "Throw" and "Damage" from user's request for simplicity in data model
+  sprintSpeed: string; // Combined "Sprint" and "Speed"
+  jump: string;
+}
+
+const bodyExtraData: BodyExtraData[] = [
+    { bodyExtra: "Booster", lift: "x10", throwDamage: "x10 weight or +25 yards", sprintSpeed: "No effect", jump: "x2"},
+    { bodyExtra: "No Upward Limit*", lift: "x2", throwDamage: "x2 weight or +10 yards", sprintSpeed: "No effect", jump: "x1.25"},
+];
+
+const bodyExtraNote = "* For doublings beyond Body 10d. Use the Body Effects table for increases up to the equivalent of Body 10d.";
+
+
 export function TablesTabContent() {
   const allTables = [
     { title: 'Body Effects', data: bodyEffectsData, description: "Effects are not cumulative for Body; they are cumulative for all other Stats." },
-    { title: 'Body Extra', description: "Detailed information and rules for Body Extra." },
+    { title: 'Body Extra', data: bodyExtraData, description: "This table details the effects of Body Extras like Booster and No Upward Limit.", note: bodyExtraNote },
     { title: 'Coordination Effects', description: "Detailed information and rules for Coordination Effects." },
     { title: 'Sense Effects', description: "Detailed information and rules for Sense Effects." },
     { title: 'Mind Effects', description: "Detailed information and rules for Mind Effects." },
@@ -44,12 +60,13 @@ export function TablesTabContent() {
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects"]}>
-      {allTables.map((table) => (
-        <CollapsibleSectionItem key={table.title} title={table.title} value={table.title.toLowerCase().replace(/\s+/g, '-')}>
-          <p className="text-muted-foreground mb-2">{table.description}</p>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra"]}>
+      {allTables.map((tableInfo) => (
+        <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
+          <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
+          {tableInfo.note && <p className="text-xs text-muted-foreground mb-2 italic">{tableInfo.note}</p>}
           <div className="mt-4 p-1 border rounded-md bg-card/50">
-            {table.title === 'Body Effects' && table.data ? (
+            {tableInfo.title === 'Body Effects' && tableInfo.data ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -62,7 +79,7 @@ export function TablesTabContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(table.data as BodyEffectData[]).map((row) => (
+                  {(tableInfo.data as BodyEffectData[]).map((row) => (
                     <TableRow key={row.dice}>
                       <TableCell>{row.dice}</TableCell>
                       <TableCell>{row.lift}</TableCell>
@@ -74,9 +91,32 @@ export function TablesTabContent() {
                   ))}
                 </TableBody>
               </Table>
+            ) : tableInfo.title === 'Body Extra' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Body Extra</TableHead>
+                      <TableHead>Lift</TableHead>
+                      <TableHead>Throw / Damage</TableHead>
+                      <TableHead>Sprint / Speed</TableHead>
+                      <TableHead>Jump</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as BodyExtraData[]).map((row) => (
+                      <TableRow key={row.bodyExtra}>
+                        <TableCell>{row.bodyExtra}</TableCell>
+                        <TableCell>{row.lift}</TableCell>
+                        <TableCell>{row.throwDamage}</TableCell>
+                        <TableCell>{row.sprintSpeed}</TableCell>
+                        <TableCell>{row.jump}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
-                Content for {table.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
+                Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
               </div>
             )}
           </div>
