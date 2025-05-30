@@ -97,6 +97,24 @@ const mindEffectsData: MindEffectData[] = [
   { dice: "10d", notes: "You can consider intellectual problems even while asleep." },
 ];
 
+interface CharmEffectData {
+  dice: string;
+  notes: string;
+}
+
+const charmEffectsData: CharmEffectData[] = [
+  { dice: "1d", notes: "You’re a wallflower." },
+  { dice: "2d", notes: "You get along with most people." },
+  { dice: "3d", notes: "You often defuse tense situations." },
+  { dice: "4d", notes: "Any time there’s a social function, you’re invited." },
+  { dice: "5d", notes: "Your élan is legendary, and others struggle to win your favor." },
+  { dice: "6d", notes: "With a successful roll you can make someone want to do something otherwise completely unpalatable." },
+  { dice: "7d", notes: "You can convince anyone of anything after 5–width days of persuasion." },
+  { dice: "8d", notes: "You can convince anyone of anything in 5–width hours of persuasion." },
+  { dice: "9d", notes: "You can convince anyone of anything in 5–width minutes of persuasion." },
+  { dice: "10d", notes: "You can convince anyone of anything in 5–width rounds of persuasion." },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -105,7 +123,7 @@ export function TablesTabContent() {
     { title: 'Coordination Effects', data: coordinationEffectsData, description: "Detailed information and rules for Coordination Effects." },
     { title: 'Sense Effects', data: senseEffectsData, description: "Detailed information and rules for Sense Effects." },
     { title: 'Mind Effects', data: mindEffectsData, description: "Detailed information and rules for Mind Effects." },
-    { title: 'Charm Effects', description: "Detailed information and rules for Charm Effects." },
+    { title: 'Charm Effects', data: charmEffectsData, description: "Detailed information and rules for Charm Effects." },
     { title: 'Command Effects', description: "Detailed information and rules for Command Effects." },
     { title: 'Skill Examples', description: "Detailed information and rules for Skill Examples." },
     { title: 'Base Will Description', description: "Detailed information and rules for Base Will Description." },
@@ -114,7 +132,7 @@ export function TablesTabContent() {
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -212,6 +230,23 @@ export function TablesTabContent() {
                   </TableHeader>
                   <TableBody>
                     {(tableInfo.data as MindEffectData[]).map((row) => (
+                      <TableRow key={row.dice}>
+                        <TableCell>{row.dice}</TableCell>
+                        <TableCell>{row.notes}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+            ) : tableInfo.title === 'Charm Effects' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dice</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as CharmEffectData[]).map((row) => (
                       <TableRow key={row.dice}>
                         <TableCell>{row.dice}</TableCell>
                         <TableCell>{row.notes}</TableCell>
