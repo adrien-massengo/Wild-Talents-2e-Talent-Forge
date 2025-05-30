@@ -71,11 +71,10 @@ export function CharacterTabContent({
   const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
   const totalWill = totalBaseWill + purchasedWill;
 
-  const getSkillNormalDiceOptions = (linkedAttribute: AttributeName): string[] => {
-    const statDiceValue = characterData.stats[linkedAttribute]?.dice;
-    const statCap = parseInt(statDiceValue?.replace('D', ''), 10) || 0;
-    const maxDice = Math.max(1, Math.min(statCap, 10)); // Cap at stat's dice, min 1, max 10 for safety
-    return Array.from({ length: maxDice }, (_, i) => `${i + 1}D`);
+  const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
+    // Skills' normal dice are capped by the maximum possible normal dice for a stat (1D to 5D).
+    const maxStatNormalDice = 5; 
+    return Array.from({ length: maxStatNormalDice }, (_, i) => `${i + 1}D`);
   };
   
   const handleAddPredefinedSkill = () => {
@@ -90,7 +89,7 @@ export function CharacterTabContent({
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "willpower", "skills"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles"]}>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -172,7 +171,7 @@ export function CharacterTabContent({
           Skill Costs: Normal Dice: 2 points/die. Hard Dice: 4 points/die. Wiggle Dice: 8 points/die.
         </p>
         <p className="text-sm text-muted-foreground mb-4">
-          Normal skill dice are capped by the linked attribute's normal dice value.
+          Normal skill dice are capped by the linked attribute's maximum normal dice value (up to 5D).
         </p>
         <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
           <h4 className="text-lg font-headline mb-3">Add Skill</h4>
@@ -355,3 +354,4 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
