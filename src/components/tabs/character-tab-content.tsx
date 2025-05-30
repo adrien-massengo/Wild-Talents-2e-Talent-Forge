@@ -2,19 +2,28 @@
 // src/components/tabs/character-tab-content.tsx
 "use client";
 
-import type { CharacterData, StatDetail } from "@/app/page";
+import type { CharacterData, StatDetail, SkillInstance } from "@/app/page";
+import type { AttributeName, SkillDefinition } from "@/lib/skills-definitions";
+import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
+import * as React from "react";
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Trash2, PlusCircle } from "lucide-react";
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
   onBasicInfoChange: (field: keyof CharacterData['basicInfo'], value: string) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
+  onAddSkill: (skillDef: SkillDefinition) => void;
+  onAddCustomSkill: () => void;
+  onRemoveSkill: (skillId: string) => void;
+  onSkillChange: (skillId: string, field: keyof SkillInstance, value: string | AttributeName) => void;
 }
 
 interface StatDefinition {
@@ -32,14 +41,28 @@ const statsDefinitions: StatDefinition[] = [
   { name: 'command', label: 'Command', description: 'The Command Stat measures your force of personality, your capacity for leadership, and your composure in the face of crisis. With high Command you remain uncracked under great pressure and people instinctively listen to you in a crisis.' },
 ];
 
-const normalDiceOptions = Array.from({ length: 5 }, (_, i) => `${i + 1}D`); // 1D to 5D
+const normalDiceOptions = Array.from({ length: 5 }, (_, i) => `${i + 1}D`); // 1D to 5D for stats
 const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`); // 0HD to 10HD
 const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`); // 0WD to 10WD
 
-export function CharacterTabContent({ characterData, onBasicInfoChange, onStatChange, onWillpowerChange }: CharacterTabContentProps) {
+const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
+
+
+export function CharacterTabContent({ 
+  characterData, 
+  onBasicInfoChange, 
+  onStatChange, 
+  onWillpowerChange,
+  onAddSkill,
+  onAddCustomSkill,
+  onRemoveSkill,
+  onSkillChange 
+}: CharacterTabContentProps) {
   
-  const charmDiceValue = parseInt(characterData.stats.charm.dice, 10) || 0;
-  const commandDiceValue = parseInt(characterData.stats.command.dice, 10) || 0;
+  const [selectedSkillToAdd, setSelectedSkillToAdd] = React.useState<string>("");
+
+  const charmDiceValue = parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0;
+  const commandDiceValue = parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0;
   const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
 
   const purchasedBaseWill = characterData.willpower.purchasedBaseWill || 0;
@@ -48,8 +71,26 @@ export function CharacterTabContent({ characterData, onBasicInfoChange, onStatCh
   const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
   const totalWill = totalBaseWill + purchasedWill;
 
+  const getSkillNormalDiceOptions = (linkedAttribute: AttributeName): string[] => {
+    const statDiceValue = characterData.stats[linkedAttribute]?.dice;
+    const statCap = parseInt(statDiceValue?.replace('D', ''), 10) || 0;
+    const maxDice = Math.max(1, Math.min(statCap, 10)); // Cap at stat's dice, min 1, max 10 for safety
+    return Array.from({ length: maxDice }, (_, i) => `${i + 1}D`);
+  };
+  
+  const handleAddPredefinedSkill = () => {
+    if (selectedSkillToAdd) {
+      const skillDef = SKILL_DEFINITIONS.find(s => s.id === selectedSkillToAdd);
+      if (skillDef) {
+        onAddSkill(skillDef);
+        setSelectedSkillToAdd(""); // Reset dropdown
+      }
+    }
+  };
+
+
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "willpower"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "willpower", "skills"]}>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -127,13 +168,157 @@ export function CharacterTabContent({ characterData, onBasicInfoChange, onStatCh
       </CollapsibleSectionItem>
 
       <CollapsibleSectionItem title="Skills" value="skills">
-        <p>Placeholder for character skills. This section will allow users to add and define skills associated with stats.</p>
-         <Textarea placeholder="List skills here, e.g., Athletics (Body) 2D, Persuasion (Charm) 3D+1..." />
+        <p className="text-sm text-muted-foreground mb-2">
+          Skill Costs: Normal Dice: 2 points/die. Hard Dice: 4 points/die. Wiggle Dice: 8 points/die.
+        </p>
+        <p className="text-sm text-muted-foreground mb-4">
+          Normal skill dice are capped by the linked attribute's normal dice value.
+        </p>
+        <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
+          <h4 className="text-lg font-headline mb-3">Add Skill</h4>
+          <div className="flex items-end space-x-2 mb-4">
+            <div className="flex-grow">
+              <Label htmlFor="add-skill-select">Select Predefined Skill</Label>
+              <Select value={selectedSkillToAdd} onValueChange={setSelectedSkillToAdd}>
+                <SelectTrigger id="add-skill-select">
+                  <SelectValue placeholder="Choose a skill..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {SKILL_DEFINITIONS.map(def => (
+                    <SelectItem key={def.id} value={def.id}>{def.name} ({def.linkedAttribute})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleAddPredefinedSkill} disabled={!selectedSkillToAdd}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Selected
+            </Button>
+          </div>
+          <Button onClick={onAddCustomSkill} variant="outline">
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Custom Skill
+          </Button>
+        </div>
+
+        {characterData.skills.length === 0 && (
+          <p className="text-muted-foreground">No skills added yet.</p>
+        )}
+
+        <div className="space-y-6">
+          {characterData.skills.map((skill) => (
+            <div key={skill.id} className="p-4 border rounded-lg bg-card/50 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                {skill.isCustom ? (
+                  <Input 
+                    value={skill.name}
+                    onChange={(e) => onSkillChange(skill.id, 'name', e.target.value)}
+                    className="text-lg font-headline mr-2 flex-grow"
+                    placeholder="Custom Skill Name"
+                  />
+                ) : (
+                  <h4 className="text-lg font-headline text-primary">{skill.name}</h4>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => onRemoveSkill(skill.id)} aria-label="Remove skill">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+
+              {skill.isCustom && (
+                 <div className="mb-2">
+                    <Label htmlFor={`${skill.id}-linkedAttribute`} className="text-xs font-semibold">Linked Attribute</Label>
+                    <Select
+                        value={skill.linkedAttribute}
+                        onValueChange={(value) => onSkillChange(skill.id, 'linkedAttribute', value as AttributeName)}
+                    >
+                        <SelectTrigger id={`${skill.id}-linkedAttribute`}>
+                            <SelectValue placeholder="Select attribute"/>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {attributeNames.map(attr => <SelectItem key={attr} value={attr} className="capitalize">{attr}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                 </div>
+              )}
+              
+              {!skill.isCustom && <p className="text-sm text-muted-foreground capitalize mb-1">Linked Attribute: {skill.linkedAttribute}</p>}
+
+              {skill.hasType && (
+                <div className="mb-2">
+                  <Label htmlFor={`${skill.id}-typeSpec`} className="text-xs font-semibold">
+                    {SKILL_DEFINITIONS.find(s => s.id === skill.definitionId)?.typePrompt || 'Specify Type'}
+                  </Label>
+                  <Input 
+                    id={`${skill.id}-typeSpec`}
+                    value={skill.typeSpecification || ""}
+                    onChange={(e) => onSkillChange(skill.id, 'typeSpecification', e.target.value)}
+                    placeholder={SKILL_DEFINITIONS.find(s => s.id === skill.definitionId)?.sampleTypes || "e.g., Sword, Pistol, Computer Hacking"}
+                  />
+                  {skill.notes && <p className="text-xs text-muted-foreground mt-1">{skill.notes}</p>}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-2">
+                <div>
+                  <Label htmlFor={`${skill.id}-dice`} className="text-xs font-semibold">Normal Dice</Label>
+                  <Select
+                    value={skill.dice}
+                    onValueChange={(value) => onSkillChange(skill.id, 'dice', value)}
+                  >
+                    <SelectTrigger id={`${skill.id}-dice`}>
+                      <SelectValue placeholder="Dice" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getSkillNormalDiceOptions(skill.linkedAttribute).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor={`${skill.id}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
+                  <Select
+                    value={skill.hardDice}
+                    onValueChange={(value) => onSkillChange(skill.id, 'hardDice', value)}
+                  >
+                    <SelectTrigger id={`${skill.id}-hardDice`}>
+                      <SelectValue placeholder="HD" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor={`${skill.id}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
+                  <Select
+                    value={skill.wiggleDice}
+                    onValueChange={(value) => onSkillChange(skill.id, 'wiggleDice', value)}
+                  >
+                    <SelectTrigger id={`${skill.id}-wiggleDice`}>
+                      <SelectValue placeholder="WD" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {skill.isCustom ? (
+                 <Textarea 
+                    value={skill.description}
+                    onChange={(e) => onSkillChange(skill.id, 'description', e.target.value)}
+                    placeholder="Custom skill description..."
+                    className="text-sm"
+                  />
+              ) : (
+                <p className="text-sm text-muted-foreground">{skill.description}</p>
+              )}
+
+            </div>
+          ))}
+        </div>
       </CollapsibleSectionItem>
 
       <CollapsibleSectionItem title="Willpower" value="willpower">
         <div className="space-y-3">
-          <p><strong className="font-headline">Base Will (Charm + Command):</strong> {calculatedCharmPlusCommandBaseWill}</p>
+          <p><strong className="font-headline">Base Will (Charm D + Command D):</strong> {calculatedCharmPlusCommandBaseWill}</p>
           <div className="space-y-1">
             <Label htmlFor="purchasedBaseWill" className="font-headline">Purchased Base Will (3pts/pt)</Label>
             <Input 

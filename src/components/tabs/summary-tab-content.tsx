@@ -2,7 +2,7 @@
 // src/components/tabs/summary-tab-content.tsx
 "use client";
 
-import type { CharacterData, StatDetail } from "@/app/page";
+import type { CharacterData, StatDetail, SkillInstance } from "@/app/page";
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,9 +39,30 @@ const calculateWillpowerPoints = (willpower: CharacterData['willpower'] | undefi
   return purchasedBaseWillPoints + purchasedWillPoints;
 };
 
+const calculateSkillPoints = (skill: SkillInstance | undefined): number => {
+  if (!skill) return 0;
+  const normalDice = parseInt(skill.dice?.replace('D', ''), 10) || 0;
+  const hardDice = parseInt(skill.hardDice?.replace('HD', ''), 10) || 0;
+  const wiggleDice = parseInt(skill.wiggleDice?.replace('WD', ''), 10) || 0;
+  // Skill costs: 2 per die, 4 per hard die, 8 per wiggle die
+  return (normalDice * 2) + (hardDice * 4) + (wiggleDice * 8);
+};
+
+const formatSkillDisplay = (skill: SkillInstance | undefined) => {
+  if (!skill) return "N/A";
+  let display = skill.dice || "0D";
+  if (skill.hardDice && skill.hardDice !== "0HD") {
+    display += ` ${skill.hardDice}`;
+  }
+  if (skill.wiggleDice && skill.wiggleDice !== "0WD") {
+    display += ` ${skill.wiggleDice}`;
+  }
+  return display;
+}
+
 
 export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower } = characterData;
+  const { basicInfo, stats, willpower, skills } = characterData;
 
   const charmDiceValue = parseInt(stats?.charm?.dice?.replace('D', '') || '0', 10);
   const commandDiceValue = parseInt(stats?.command?.dice?.replace('D', '') || '0', 10);
@@ -55,11 +76,12 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
 
   const totalStatPoints = Object.values(stats || {}).reduce((sum, stat) => sum + calculateStatPoints(stat), 0);
   const totalWillpowerPoints = calculateWillpowerPoints(willpower);
-  const grandTotalPoints = totalStatPoints + totalWillpowerPoints;
+  const totalSkillPoints = (skills || []).reduce((sum, skill) => sum + calculateSkillPoints(skill), 0);
+  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints;
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["point-totals", "basic-info-summary", "abilities-summary", "willpower-summary"]}>
+    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["point-totals", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary"]}>
       <CollapsibleSectionItem title="Point Totals" value="point-totals">
         <Card>
           <CardHeader>
@@ -68,6 +90,7 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
           <CardContent className="space-y-2">
             <p>Total Stat Points: {totalStatPoints}</p>
             <p>Total Willpower Points: {totalWillpowerPoints}</p>
+            <p>Total Skill Points: {totalSkillPoints}</p>
             <p className="font-bold text-lg">Grand Total Points: {grandTotalPoints}</p>
             <p className="text-sm text-muted-foreground">Based on 200 point budget for a starting character.</p>
             <p className="text-sm text-muted-foreground">Remaining Points: {200 - grandTotalPoints}</p>
@@ -132,7 +155,37 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
       </CollapsibleSectionItem>
 
       <CollapsibleSectionItem title="Skills Summary" value="skills-summary">
-         <p className="text-muted-foreground p-4">Skills summary will appear here once implemented.</p>
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-xl">Skills Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {(!skills || skills.length === 0) ? (
+                    <p className="text-muted-foreground">No skills added yet.</p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Skill</TableHead>
+                                <TableHead>Linked Attribute</TableHead>
+                                <TableHead>Dice</TableHead>
+                                <TableHead>Cost</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {skills.map((skill) => (
+                                <TableRow key={skill.id}>
+                                    <TableCell className="font-medium">{skill.name}</TableCell>
+                                    <TableCell className="capitalize">{skill.linkedAttribute}</TableCell>
+                                    <TableCell>{formatSkillDisplay(skill)}</TableCell>
+                                    <TableCell>{calculateSkillPoints(skill)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
       </CollapsibleSectionItem>
       <CollapsibleSectionItem title="Miracles Summary" value="miracles-summary">
         <p className="text-muted-foreground p-4">Miracles summary will appear here once implemented.</p>

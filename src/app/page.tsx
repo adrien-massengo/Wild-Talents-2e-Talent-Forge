@@ -10,15 +10,32 @@ import { TablesTabContent } from "@/components/tabs/tables-tab-content";
 import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { AttributeName, SkillDefinition } from "@/lib/skills-definitions";
 
-// Define a detailed structure for character stats
+
 export interface StatDetail {
-  dice: string; // e.g., "2D"
-  hardDice: string; // e.g., "0HD"
-  wiggleDice: string; // e.g., "0WD"
+  dice: string; 
+  hardDice: string; 
+  wiggleDice: string; 
 }
 
-// Define the main structure for character data
+export interface SkillInstance {
+  id: string; // Unique instance ID, e.g., timestamp
+  definitionId: string; // Key from SKILL_DEFINITIONS if predefined
+  name: string; // Display name, e.g., "Melee Weapon (Sword)" or custom name
+  baseName: string; // Base name from definition, e.g., "Melee Weapon"
+  linkedAttribute: AttributeName;
+  description: string;
+  dice: string; // e.g., "1D"
+  hardDice: string; // e.g., "0HD"
+  wiggleDice: string; // e.g., "0WD"
+  isCustom: boolean;
+  typeSpecification?: string; // For skills like "Melee Weapon (Sword)" -> "Sword"
+  notes?: string; // From definition, or custom
+  sampleTypes?: string; // From definition
+  hasType?: boolean; // From definition
+}
+
 export interface CharacterData {
   basicInfo: {
     name: string;
@@ -37,7 +54,7 @@ export interface CharacterData {
     purchasedBaseWill: number;
     purchasedWill: number;
   };
-  // skills: Record<string, any>; // Add structure as developed
+  skills: SkillInstance[];
   // miracles: any[]; // Add structure as developed
 }
 
@@ -57,6 +74,7 @@ const initialCharacterData: CharacterData = {
     purchasedBaseWill: 0,
     purchasedWill: 0,
   },
+  skills: [],
 };
 
 export default function HomePage() {
@@ -95,10 +113,78 @@ export default function HomePage() {
       ...prev,
       willpower: {
         ...prev.willpower,
-        [field]: isNaN(value) ? 0 : value, // Ensure value is a number, default to 0 if NaN
+        [field]: isNaN(value) ? 0 : value,
       }
     }));
   };
+
+  const handleAddSkill = (skillDef: SkillDefinition) => {
+    const newSkillInstance: SkillInstance = {
+      id: Date.now().toString(),
+      definitionId: skillDef.id,
+      name: skillDef.hasType ? `${skillDef.name} (Unspecified)` : skillDef.name,
+      baseName: skillDef.name,
+      linkedAttribute: skillDef.linkedAttribute,
+      description: skillDef.description,
+      dice: '1D',
+      hardDice: '0HD',
+      wiggleDice: '0WD',
+      isCustom: false,
+      typeSpecification: '',
+      notes: skillDef.notes,
+      sampleTypes: skillDef.sampleTypes,
+      hasType: skillDef.hasType,
+    };
+    setCharacterData(prev => ({ ...prev, skills: [...prev.skills, newSkillInstance] }));
+  };
+
+  const handleAddCustomSkill = () => {
+    const newCustomSkill: SkillInstance = {
+      id: Date.now().toString(),
+      definitionId: `custom-${Date.now().toString()}`,
+      name: 'Custom Skill',
+      baseName: 'Custom Skill',
+      linkedAttribute: 'body', // Default, user can change
+      description: 'Custom skill description.',
+      dice: '1D',
+      hardDice: '0HD',
+      wiggleDice: '0WD',
+      isCustom: true,
+      typeSpecification: '',
+    };
+    setCharacterData(prev => ({ ...prev, skills: [...prev.skills, newCustomSkill] }));
+  };
+
+  const handleRemoveSkill = (skillIdToRemove: string) => {
+    setCharacterData(prev => ({
+      ...prev,
+      skills: prev.skills.filter(skill => skill.id !== skillIdToRemove),
+    }));
+  };
+
+  const handleSkillChange = (
+    skillId: string,
+    field: keyof SkillInstance,
+    value: string | AttributeName 
+  ) => {
+    setCharacterData(prev => ({
+      ...prev,
+      skills: prev.skills.map(skill => {
+        if (skill.id === skillId) {
+          const updatedSkill = { ...skill, [field]: value };
+          if (field === 'typeSpecification' && skill.hasType) {
+            updatedSkill.name = `${skill.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
+          }
+          if (field === 'name' && skill.isCustom) {
+             updatedSkill.baseName = value as string;
+          }
+          return updatedSkill;
+        }
+        return skill;
+      }),
+    }));
+  };
+
 
   const handleSaveCharacter = () => {
     try {
@@ -121,43 +207,54 @@ export default function HomePage() {
     try {
       const savedData = localStorage.getItem("wildTalentsCharacter");
       if (savedData) {
-        const parsedData = JSON.parse(savedData) as CharacterData;
-        // Basic validation: ensure essential structures exist
-        if (parsedData && parsedData.basicInfo && parsedData.stats) {
-           const validatedStats = { ...initialCharacterData.stats };
-           for (const statKey in validatedStats) {
-             if (parsedData.stats[statKey as keyof CharacterData['stats']]) {
-               validatedStats[statKey as keyof CharacterData['stats']] = {
-                 ...initialStatDetail,
-                 ...parsedData.stats[statKey as keyof CharacterData['stats']],
-               };
-             }
-           }
-           // Ensure willpower exists and has its fields, falling back to initial if missing
-           const validatedWillpower = {
-            ...initialCharacterData.willpower,
-            ...(parsedData.willpower || {}),
-           };
+        const parsedData = JSON.parse(savedData) as Partial<CharacterData>;
+        
+        const validatedData: CharacterData = {
+          ...initialCharacterData,
+          ...parsedData,
+          basicInfo: { ...initialCharacterData.basicInfo, ...(parsedData.basicInfo || {}) },
+          stats: { ...initialCharacterData.stats },
+          willpower: { ...initialCharacterData.willpower, ...(parsedData.willpower || {}) },
+          skills: parsedData.skills ? parsedData.skills.map(skill => ({ // Ensure skills have all fields
+            ...({ // Default structure for a skill instance
+              id: `loaded-${Date.now()}-${Math.random()}`,
+              definitionId: '',
+              name: 'Unnamed Skill',
+              baseName: 'Unnamed Skill',
+              linkedAttribute: 'body' as AttributeName,
+              description: '',
+              dice: '1D',
+              hardDice: '0HD',
+              wiggleDice: '0WD',
+              isCustom: true,
+              typeSpecification: '',
+            }),
+            ...skill,
+          })) : [],
+        };
 
-           setCharacterData({...parsedData, stats: validatedStats, willpower: validatedWillpower });
-            toast({
-              title: "Character Loaded",
-              description: "Character data has been loaded from local storage.",
-            });
-        } else {
-            toast({
-              title: "Load Error",
-              description: "Saved character data is not in the expected format. Loading default character.",
-              variant: "destructive",
-            });
-            setCharacterData(initialCharacterData); 
+        for (const statKey in initialCharacterData.stats) {
+          if (parsedData.stats && parsedData.stats[statKey as keyof CharacterData['stats']]) {
+            validatedData.stats[statKey as keyof CharacterData['stats']] = {
+              ...initialStatDetail,
+              ...parsedData.stats[statKey as keyof CharacterData['stats']],
+            };
+          }
         }
+        
+        setCharacterData(validatedData);
+        toast({
+          title: "Character Loaded",
+          description: "Character data has been loaded from local storage.",
+        });
+
       } else {
         toast({
           title: "No Saved Data",
           description: "No character data found in local storage.",
           variant: "destructive",
         });
+        setCharacterData(initialCharacterData); 
       }
     } catch (error) {
       console.error("Failed to load character:", error);
@@ -220,6 +317,10 @@ export default function HomePage() {
                   onBasicInfoChange={handleBasicInfoChange}
                   onStatChange={handleStatChange}
                   onWillpowerChange={handleWillpowerChange}
+                  onAddSkill={handleAddSkill}
+                  onAddCustomSkill={handleAddCustomSkill}
+                  onRemoveSkill={handleRemoveSkill}
+                  onSkillChange={handleSkillChange}
                 />
               </TabsContent>
               <TabsContent value="tables" className="mt-0">
