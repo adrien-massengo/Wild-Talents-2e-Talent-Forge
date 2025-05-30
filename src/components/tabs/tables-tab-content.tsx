@@ -61,13 +61,31 @@ const coordinationEffectsData: CoordinationEffectData[] = [
   { dice: "10d", notes: "Every external muscle in your body is under your conscious control." },
 ];
 
+interface SenseEffectData {
+  dice: string;
+  notes: string;
+}
+
+const senseEffectsData: SenseEffectData[] = [
+  { dice: "1d", notes: "You notice when someone’s talking to you—sometimes." },
+  { dice: "2d", notes: "Loud noises wake you up." },
+  { dice: "3d", notes: "You’re unusually sharp-eyed." },
+  { dice: "4d", notes: "You’re an uncanny tracker." },
+  { dice: "5d", notes: "You are one with your environment." },
+  { dice: "6d", notes: "You can use your senses to compensate for each other; you can use minute sounds, the touch of air pressure, smells and taste to search a pitch-black room." },
+  { dice: "7d", notes: "With a successful roll, you can sense movement up to a quarter mile away." },
+  { dice: "8d", notes: "You can differentiate between dozens of sounds amidst a cacophony." },
+  { dice: "9d", notes: "You can see in the dark, read by touch, and identify targets by smell." },
+  { dice: "10d", notes: "It takes a Miracle (literally) to sneak up on you." },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
     { title: 'Body Effects', data: bodyEffectsData, description: "Effects are not cumulative for Body; they are cumulative for all other Stats." },
     { title: 'Body Extra', data: bodyExtraData, description: "This table details the effects of Body Extras like Booster and No Upward Limit.", note: bodyExtraNote },
     { title: 'Coordination Effects', data: coordinationEffectsData, description: "Detailed information and rules for Coordination Effects." },
-    { title: 'Sense Effects', description: "Detailed information and rules for Sense Effects." },
+    { title: 'Sense Effects', data: senseEffectsData, description: "Detailed information and rules for Sense Effects." },
     { title: 'Mind Effects', description: "Detailed information and rules for Mind Effects." },
     { title: 'Charm Effects', description: "Detailed information and rules for Charm Effects." },
     { title: 'Command Effects', description: "Detailed information and rules for Command Effects." },
@@ -78,7 +96,7 @@ export function TablesTabContent() {
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -149,6 +167,23 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Sense Effects' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dice</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as SenseEffectData[]).map((row) => (
+                      <TableRow key={row.dice}>
+                        <TableCell>{row.dice}</TableCell>
+                        <TableCell>{row.notes}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -160,4 +195,3 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
-
