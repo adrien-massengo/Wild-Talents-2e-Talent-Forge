@@ -79,6 +79,24 @@ const senseEffectsData: SenseEffectData[] = [
   { dice: "10d", notes: "It takes a Miracle (literally) to sneak up on you." },
 ];
 
+interface MindEffectData {
+  dice: string;
+  notes: string;
+}
+
+const mindEffectsData: MindEffectData[] = [
+  { dice: "1d", notes: "When people call you an intellectual, you can’t always tell they’re joking." },
+  { dice: "2d", notes: "You can get high grades with a lot of work." },
+  { dice: "3d", notes: "You’re notably bright and learning comes easily." },
+  { dice: "4d", notes: "You can have your pick of Ivy-league scholarships." },
+  { dice: "5d", notes: "You have a photographic memory (sight only) with a successful roll." },
+  { dice: "6d", notes: "You have a photographic memory (all senses) with a successful roll. If you need a clue based on something you experienced at any time in the past, it’s yours." },
+  { dice: "7d", notes: "Einstein and Hawking seem somewhat childish to you." },
+  { dice: "8d", notes: "All modern theory is the equivalent of a monkey banging two stones together." },
+  { dice: "9d", notes: "You can recall with perfect clarity anything you previously sensed without rolling." },
+  { dice: "10d", notes: "You can consider intellectual problems even while asleep." },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -86,7 +104,7 @@ export function TablesTabContent() {
     { title: 'Body Extra', data: bodyExtraData, description: "This table details the effects of Body Extras like Booster and No Upward Limit.", note: bodyExtraNote },
     { title: 'Coordination Effects', data: coordinationEffectsData, description: "Detailed information and rules for Coordination Effects." },
     { title: 'Sense Effects', data: senseEffectsData, description: "Detailed information and rules for Sense Effects." },
-    { title: 'Mind Effects', description: "Detailed information and rules for Mind Effects." },
+    { title: 'Mind Effects', data: mindEffectsData, description: "Detailed information and rules for Mind Effects." },
     { title: 'Charm Effects', description: "Detailed information and rules for Charm Effects." },
     { title: 'Command Effects', description: "Detailed information and rules for Command Effects." },
     { title: 'Skill Examples', description: "Detailed information and rules for Skill Examples." },
@@ -96,7 +114,7 @@ export function TablesTabContent() {
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -184,6 +202,23 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Mind Effects' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dice</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as MindEffectData[]).map((row) => (
+                      <TableRow key={row.dice}>
+                        <TableCell>{row.dice}</TableCell>
+                        <TableCell>{row.notes}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -195,3 +230,4 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
+
