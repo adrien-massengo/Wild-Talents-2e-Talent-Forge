@@ -599,7 +599,7 @@ export function CharacterTabContent({
                                 <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
                                 <Input
                                   type="number"
-                                  value={extra.isCustom && isNaN(extra.costModifier) ? '' : extra.costModifier}
+                                  value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? extra.costModifier : ''}
                                   onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
                                   className="w-16 h-7 text-xs" placeholder="Cost"
                                 />
@@ -639,7 +639,7 @@ export function CharacterTabContent({
                                 <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
                                 <Input
                                   type="number"
-                                  value={flaw.isCustom && isNaN(flaw.costModifier) ? '' : flaw.costModifier}
+                                  value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? flaw.costModifier : ''}
                                   onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
                                   className="w-16 h-7 text-xs" placeholder="Cost"
                                 />

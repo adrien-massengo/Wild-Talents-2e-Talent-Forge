@@ -368,7 +368,7 @@ export default function HomePage() {
                 if (item.id === itemId) {
                   let processedValue = value;
                   if (field === 'costModifier') {
-                    const numericValue = Number(value); // Value should be a number from CharacterTabContent
+                    const numericValue = Number(value); 
                     processedValue = isNaN(numericValue) ? 0 : numericValue;
                   }
                   return { ...item, [field]: processedValue };
@@ -431,8 +431,8 @@ export default function HomePage() {
             notes: typeof skill.notes === 'string' ? skill.notes : undefined,
             sampleTypes: typeof skill.sampleTypes === 'string' ? skill.sampleTypes : undefined,
             hasType: typeof skill.hasType === 'boolean' ? skill.hasType : false,
-            ...skill, // spread loaded skill to get all fields, then re-ensure critical ones
-            id: `loaded-skill-${Date.now()}-${Math.random().toString(36).substring(7)}`, // always new id
+            ...skill, 
+            id: `loaded-skill-${Date.now()}-${Math.random().toString(36).substring(7)}`, 
           })) : [],
           miracles: parsedData.miracles ? parsedData.miracles.map(miracle => {
             const defaultMiracle: MiracleDefinition = {
@@ -456,7 +456,7 @@ export default function HomePage() {
               description: typeof miracle.description === 'string' ? miracle.description : defaultMiracle.description,
               isCustom: typeof miracle.isCustom === 'boolean' ? miracle.isCustom : defaultMiracle.isCustom,
               isMandatory: typeof miracle.isMandatory === 'boolean' ? miracle.isMandatory : defaultMiracle.isMandatory,
-              id: defaultMiracle.id, // always new id
+              id: defaultMiracle.id, 
               qualities: miracle.qualities ? miracle.qualities.map(quality => {
                 const defaultQuality: MiracleQuality = {
                   id: `loaded-quality-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -471,20 +471,24 @@ export default function HomePage() {
                   ...quality,
                   type: typeof quality.type === 'string' ? quality.type as MiracleQualityType : defaultQuality.type,
                   capacity: typeof quality.capacity === 'string' ? quality.capacity as MiracleCapacityType : defaultQuality.capacity,
-                  levels: typeof quality.levels === 'number' ? quality.levels : defaultQuality.levels,
-                  id: defaultQuality.id, // always new id
+                  levels: typeof quality.levels === 'number' && !isNaN(quality.levels) ? quality.levels : defaultQuality.levels,
+                  id: defaultQuality.id, 
                   extras: quality.extras ? quality.extras.map(ex => {
                     const defaultExtra: AppliedExtraOrFlaw = {
                         id: `loaded-extra-${Date.now()}-${Math.random().toString(36).substring(7)}`,
                         name: 'Custom Extra',
-                        costModifier: ex.isCustom ? 1 : 0,
+                        costModifier: ex.isCustom ? 1 : 0, 
                         isCustom: true,
                     };
+                    let loadedCostModifier = ex.costModifier;
+                    if (typeof loadedCostModifier !== 'number' || isNaN(loadedCostModifier)) {
+                        loadedCostModifier = ex.isCustom ? 1 : (PREDEFINED_EXTRAS.find(pEx => pEx.id === ex.definitionId)?.costModifier ?? 0);
+                    }
                     return {
                         ...defaultExtra,
                         ...ex,
                         name: typeof ex.name === 'string' ? ex.name : defaultExtra.name,
-                        costModifier: typeof ex.costModifier === 'number' ? ex.costModifier : defaultExtra.costModifier,
+                        costModifier: loadedCostModifier,
                         isCustom: typeof ex.isCustom === 'boolean' ? ex.isCustom : defaultExtra.isCustom,
                         id: defaultExtra.id,
                     };
@@ -493,14 +497,18 @@ export default function HomePage() {
                     const defaultFlaw: AppliedExtraOrFlaw = {
                         id: `loaded-flaw-${Date.now()}-${Math.random().toString(36).substring(7)}`,
                         name: 'Custom Flaw',
-                        costModifier: fl.isCustom ? -1 : 0,
+                        costModifier: fl.isCustom ? -1 : 0, 
                         isCustom: true,
                     };
+                    let loadedCostModifier = fl.costModifier;
+                    if (typeof loadedCostModifier !== 'number' || isNaN(loadedCostModifier)) {
+                        loadedCostModifier = fl.isCustom ? -1 : (PREDEFINED_FLAWS.find(pFL => pFL.id === fl.definitionId)?.costModifier ?? 0);
+                    }
                      return {
                         ...defaultFlaw,
                         ...fl,
                         name: typeof fl.name === 'string' ? fl.name : defaultFlaw.name,
-                        costModifier: typeof fl.costModifier === 'number' ? fl.costModifier : defaultFlaw.costModifier,
+                        costModifier: loadedCostModifier,
                         isCustom: typeof fl.isCustom === 'boolean' ? fl.isCustom : defaultFlaw.isCustom,
                         id: defaultFlaw.id,
                     };
