@@ -31,14 +31,14 @@ const bodyEffectsData: BodyEffectData[] = [
 interface BodyExtraData {
   bodyExtra: string;
   lift: string;
-  throwDamage: string; // Combined "Throw" and "Damage" from user's request for simplicity in data model
-  sprintSpeed: string; // Combined "Sprint" and "Speed"
-  jump: string;
+  throwEffect: string;
+  damageEffect: string;
+  sprintSpeedJump: string;
 }
 
 const bodyExtraData: BodyExtraData[] = [
-    { bodyExtra: "Booster", lift: "x10", throwDamage: "x10 weight or +25 yards", sprintSpeed: "No effect", jump: "x2"},
-    { bodyExtra: "No Upward Limit*", lift: "x2", throwDamage: "x2 weight or +10 yards", sprintSpeed: "No effect", jump: "x1.25"},
+    { bodyExtra: "Booster", lift: "x10", throwEffect: "x10 weight or +25 yards", damageEffect: "No effect", sprintSpeedJump: "No effect / x2"},
+    { bodyExtra: "No Upward Limit*", lift: "x2", throwEffect: "x2 weight or +10 yards", damageEffect: "No effect", sprintSpeedJump: "No effect / x1.25"},
 ];
 
 const bodyExtraNote = "* For doublings beyond Body 10d. Use the Body Effects table for increases up to the equivalent of Body 10d.";
@@ -97,9 +97,9 @@ export function TablesTabContent() {
                     <TableRow>
                       <TableHead>Body Extra</TableHead>
                       <TableHead>Lift</TableHead>
-                      <TableHead>Throw / Damage</TableHead>
-                      <TableHead>Sprint / Speed</TableHead>
-                      <TableHead>Jump</TableHead>
+                      <TableHead>Throw</TableHead>
+                      <TableHead>Damage</TableHead>
+                      <TableHead>Sprint / Speed / Jump</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -107,9 +107,9 @@ export function TablesTabContent() {
                       <TableRow key={row.bodyExtra}>
                         <TableCell>{row.bodyExtra}</TableCell>
                         <TableCell>{row.lift}</TableCell>
-                        <TableCell>{row.throwDamage}</TableCell>
-                        <TableCell>{row.sprintSpeed}</TableCell>
-                        <TableCell>{row.jump}</TableCell>
+                        <TableCell>{row.throwEffect}</TableCell>
+                        <TableCell>{row.damageEffect}</TableCell>
+                        <TableCell>{row.sprintSpeedJump}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -125,3 +125,4 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
+
