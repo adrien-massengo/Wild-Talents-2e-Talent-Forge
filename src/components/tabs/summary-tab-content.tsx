@@ -1,7 +1,8 @@
+
 // src/components/tabs/summary-tab-content.tsx
 "use client";
 
-import type { CharacterData } from "@/app/page"; // Import CharacterData type
+import type { CharacterData } from "@/app/page"; 
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ interface SummaryTabContentProps {
   characterData: CharacterData;
 }
 
-// Helper to format stat display string
 const formatStatDisplay = (stat: CharacterData['stats'][keyof CharacterData['stats']]) => {
   if (!stat) return "N/A";
   let display = stat.dice;
@@ -24,10 +24,20 @@ const formatStatDisplay = (stat: CharacterData['stats'][keyof CharacterData['sta
 };
 
 export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
-  const { basicInfo, stats } = characterData;
+  const { basicInfo, stats, willpower } = characterData;
+
+  const charmDiceValue = parseInt(stats.charm.dice, 10) || 0;
+  const commandDiceValue = parseInt(stats.command.dice, 10) || 0;
+  const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
+
+  const purchasedBaseWill = willpower.purchasedBaseWill || 0;
+  const purchasedWill = willpower.purchasedWill || 0;
+
+  const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
+  const totalWill = totalBaseWill + purchasedWill;
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["point-totals", "basic-info-summary", "abilities-summary"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["point-totals", "basic-info-summary", "abilities-summary", "willpower-summary"]}>
       <CollapsibleSectionItem title="Point Totals" value="point-totals">
         <Card>
           <CardHeader>
@@ -36,6 +46,7 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
           <CardContent className="space-y-2">
             <p><strong>Stat Points:</strong> [Calculated Value]</p>
             <p><strong>Skill Points:</strong> [Calculated Value]</p>
+            <p><strong>Willpower Points:</strong> [Calculated Value]</p>
             <p><strong>Miracle Points:</strong> [Calculated Value]</p>
             <p><strong>Total Points Spent:</strong> [Calculated Value]</p>
             <p className="text-sm text-muted-foreground">Summary of character creation points.</p>
@@ -80,11 +91,26 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
         </Card>
       </CollapsibleSectionItem>
 
+      <CollapsibleSectionItem title="Willpower" value="willpower-summary">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-lg">Willpower Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p><strong>Base Will (Charm + Command):</strong> {calculatedCharmPlusCommandBaseWill}</p>
+            <p><strong>Purchased Base Will:</strong> {purchasedBaseWill}</p>
+            <p><strong>Purchased Will:</strong> {purchasedWill}</p>
+            <p><strong>Total Base Will:</strong> {totalBaseWill}</p>
+            <p><strong>Total Will:</strong> {totalWill}</p>
+          </CardContent>
+        </Card>
+      </CollapsibleSectionItem>
+
       <CollapsibleSectionItem title="Powers" value="powers-summary">
          <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Miracles & Powers</CardTitle>
-          </CardHeader>
+          </Header>
           <CardContent>
             <p className="text-muted-foreground">A summary of the character's miracles and special powers will be listed here.</p>
           </CardContent>

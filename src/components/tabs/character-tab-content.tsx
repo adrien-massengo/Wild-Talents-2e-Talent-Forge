@@ -1,3 +1,4 @@
+
 // src/components/tabs/character-tab-content.tsx
 "use client";
 
@@ -13,6 +14,7 @@ interface CharacterTabContentProps {
   characterData: CharacterData;
   onBasicInfoChange: (field: keyof CharacterData['basicInfo'], value: string) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
+  onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
 }
 
 interface StatDefinition {
@@ -34,10 +36,21 @@ const normalDiceOptions = Array.from({ length: 5 }, (_, i) => `${i + 1}D`); // 1
 const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`); // 0HD to 10HD
 const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`); // 0WD to 10WD
 
-export function CharacterTabContent({ characterData, onBasicInfoChange, onStatChange }: CharacterTabContentProps) {
+export function CharacterTabContent({ characterData, onBasicInfoChange, onStatChange, onWillpowerChange }: CharacterTabContentProps) {
+  
+  const charmDiceValue = parseInt(characterData.stats.charm.dice, 10) || 0;
+  const commandDiceValue = parseInt(characterData.stats.command.dice, 10) || 0;
+  const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
+
+  const purchasedBaseWill = characterData.willpower.purchasedBaseWill || 0;
+  const purchasedWill = characterData.willpower.purchasedWill || 0;
+
+  const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
+  const totalWill = totalBaseWill + purchasedWill;
+
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats"]}>
-      <CollapsibleSectionItem title="Basic Information">
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "willpower"]}>
+      <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="charName" className="font-headline">Name</Label>
@@ -55,7 +68,7 @@ export function CharacterTabContent({ characterData, onBasicInfoChange, onStatCh
         <p className="text-sm text-muted-foreground">Fill in the core details of your character.</p>
       </CollapsibleSectionItem>
 
-      <CollapsibleSectionItem title="Stats">
+      <CollapsibleSectionItem title="Stats" value="stats">
         <p className="text-sm text-muted-foreground mb-4">
           Costs: Normal Dice: 5 points per die. Hard Dice: 10 points per die. Wiggle Dice: 20 points per die.
         </p>
@@ -68,7 +81,7 @@ export function CharacterTabContent({ characterData, onBasicInfoChange, onStatCh
                 <div>
                   <Label htmlFor={`${stat.name}-dice`} className="text-xs font-semibold">Normal Dice</Label>
                   <Select
-                    value={characterData.stats[stat.name]?.dice || '1D'}
+                    value={characterData.stats[stat.name]?.dice || '2D'}
                     onValueChange={(value) => onStatChange(stat.name, 'dice', value)}
                   >
                     <SelectTrigger id={`${stat.name}-dice`} aria-label={`${stat.label} Normal Dice`}>
@@ -113,22 +126,44 @@ export function CharacterTabContent({ characterData, onBasicInfoChange, onStatCh
         </div>
       </CollapsibleSectionItem>
 
-      <CollapsibleSectionItem title="Skills">
+      <CollapsibleSectionItem title="Skills" value="skills">
         <p>Placeholder for character skills. This section will allow users to add and define skills associated with stats.</p>
          <Textarea placeholder="List skills here, e.g., Athletics (Body) 2D, Persuasion (Charm) 3D+1..." />
       </CollapsibleSectionItem>
 
-      <CollapsibleSectionItem title="Willpower">
-        <p>Placeholder for Willpower calculation and tracking.</p>
-        <div className="flex items-center gap-2">
-            <Label className="font-headline">Base Willpower:</Label> <Input type="number" placeholder="0" className="w-20" />
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-            <Label className="font-headline">Current Willpower:</Label> <Input type="number" placeholder="0" className="w-20" />
+      <CollapsibleSectionItem title="Willpower" value="willpower">
+        <div className="space-y-3">
+          <p><strong className="font-headline">Base Will (Charm + Command):</strong> {calculatedCharmPlusCommandBaseWill}</p>
+          <div className="space-y-1">
+            <Label htmlFor="purchasedBaseWill" className="font-headline">Purchased Base Will (3pts/pt)</Label>
+            <Input 
+              id="purchasedBaseWill" 
+              type="number" 
+              min="0"
+              placeholder="0" 
+              className="w-24"
+              value={characterData.willpower.purchasedBaseWill} 
+              onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))} 
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="purchasedWill" className="font-headline">Purchased Will (1pt/pt)</Label>
+            <Input 
+              id="purchasedWill" 
+              type="number" 
+              min="0"
+              placeholder="0" 
+              className="w-24"
+              value={characterData.willpower.purchasedWill} 
+              onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))} 
+            />
+          </div>
+          <p><strong className="font-headline">Total Base Will:</strong> {totalBaseWill}</p>
+          <p><strong className="font-headline">Total Will:</strong> {totalWill}</p>
         </div>
       </CollapsibleSectionItem>
 
-      <CollapsibleSectionItem title="Miracles">
+      <CollapsibleSectionItem title="Miracles" value="miracles">
         <p>Placeholder for defining and managing character Miracles (powers).</p>
         <Textarea placeholder="Describe miracles, their costs, and effects..." />
       </CollapsibleSectionItem>

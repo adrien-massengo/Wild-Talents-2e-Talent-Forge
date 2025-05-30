@@ -1,3 +1,4 @@
+
 // src/app/page.tsx
 "use client";
 
@@ -12,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define a detailed structure for character stats
 export interface StatDetail {
-  dice: string; // e.g., "1D"
+  dice: string; // e.g., "2D"
   hardDice: string; // e.g., "0HD"
   wiggleDice: string; // e.g., "0WD"
 }
@@ -32,8 +33,11 @@ export interface CharacterData {
     charm: StatDetail;
     command: StatDetail;
   };
+  willpower: {
+    purchasedBaseWill: number;
+    purchasedWill: number;
+  };
   // skills: Record<string, any>; // Add structure as developed
-  // willpower: number; // Add structure as developed
   // miracles: any[]; // Add structure as developed
 }
 
@@ -48,6 +52,10 @@ const initialCharacterData: CharacterData = {
     mind: { ...initialStatDetail },
     charm: { ...initialStatDetail },
     command: { ...initialStatDetail },
+  },
+  willpower: {
+    purchasedBaseWill: 0,
+    purchasedWill: 0,
   },
 };
 
@@ -82,6 +90,16 @@ export default function HomePage() {
     }));
   };
 
+  const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
+    setCharacterData(prev => ({
+      ...prev,
+      willpower: {
+        ...prev.willpower,
+        [field]: isNaN(value) ? 0 : value, // Ensure value is a number, default to 0 if NaN
+      }
+    }));
+  };
+
   const handleSaveCharacter = () => {
     try {
       localStorage.setItem("wildTalentsCharacter", JSON.stringify(characterData));
@@ -104,9 +122,8 @@ export default function HomePage() {
       const savedData = localStorage.getItem("wildTalentsCharacter");
       if (savedData) {
         const parsedData = JSON.parse(savedData) as CharacterData;
-        // Basic validation: ensure essential structures like basicInfo and stats exist
+        // Basic validation: ensure essential structures exist
         if (parsedData && parsedData.basicInfo && parsedData.stats) {
-           // Ensure all stat details are present, falling back to initial if missing
            const validatedStats = { ...initialCharacterData.stats };
            for (const statKey in validatedStats) {
              if (parsedData.stats[statKey as keyof CharacterData['stats']]) {
@@ -116,19 +133,24 @@ export default function HomePage() {
                };
              }
            }
-           setCharacterData({...parsedData, stats: validatedStats });
+           // Ensure willpower exists and has its fields, falling back to initial if missing
+           const validatedWillpower = {
+            ...initialCharacterData.willpower,
+            ...(parsedData.willpower || {}),
+           };
+
+           setCharacterData({...parsedData, stats: validatedStats, willpower: validatedWillpower });
             toast({
               title: "Character Loaded",
               description: "Character data has been loaded from local storage.",
             });
         } else {
-            // If data is malformed or very old, reset to initial or provide a more specific error
             toast({
               title: "Load Error",
               description: "Saved character data is not in the expected format. Loading default character.",
               variant: "destructive",
             });
-            setCharacterData(initialCharacterData); // Optionally reset
+            setCharacterData(initialCharacterData); 
         }
       } else {
         toast({
@@ -144,7 +166,7 @@ export default function HomePage() {
         description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`,
         variant: "destructive",
       });
-       setCharacterData(initialCharacterData); // Optionally reset on critical error
+       setCharacterData(initialCharacterData); 
     }
   };
 
@@ -190,13 +212,14 @@ export default function HomePage() {
             <TabsTrigger value="summary">Summary</TabsTrigger>
           </TabsList>
           
-          <ScrollArea className="h-[calc(100vh-200px)] md:h-[calc(100vh-220px)]"> {/* Adjust height as needed */}
-            <div className="p-1"> {/* Padding for scrollbar visibility */}
+          <ScrollArea className="h-[calc(100vh-200px)] md:h-[calc(100vh-220px)]">
+            <div className="p-1">
               <TabsContent value="character" className="mt-0">
                 <CharacterTabContent 
                   characterData={characterData} 
                   onBasicInfoChange={handleBasicInfoChange}
                   onStatChange={handleStatChange}
+                  onWillpowerChange={handleWillpowerChange}
                 />
               </TabsContent>
               <TabsContent value="tables" className="mt-0">
