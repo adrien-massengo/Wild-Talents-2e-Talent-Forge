@@ -2,7 +2,7 @@
 // src/components/tabs/summary-tab-content.tsx
 "use client";
 
-import type { CharacterData } from "@/app/page"; 
+import type { CharacterData } from "@/app/page";
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ const formatStatDisplay = (stat: CharacterData['stats'][keyof CharacterData['sta
 export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
   const { basicInfo, stats, willpower } = characterData;
 
+  // Ensure stats and willpower objects and their nested properties exist before accessing them
   const charmDiceValue = parseInt(stats?.charm?.dice || '0', 10);
   const commandDiceValue = parseInt(stats?.command?.dice || '0', 10);
   const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
@@ -58,7 +59,7 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
          <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Character Overview</CardTitle>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-2">
             <p><strong>Name:</strong> {basicInfo?.name || "N/A"}</p>
             <p><strong>Archetype/Concept:</strong> {basicInfo?.archetype || "N/A"}</p>
@@ -71,7 +72,7 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Stats & Key Skills</CardTitle>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-2">
             <h5 className="font-semibold mb-1">Stats:</h5>
             {stats ? (
@@ -95,7 +96,7 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Willpower Details</CardTitle>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-2">
             <p><strong>Base Will (Charm + Command):</strong> {calculatedCharmPlusCommandBaseWill}</p>
             <p><strong>Purchased Base Will:</strong> {purchasedBaseWill}</p>
