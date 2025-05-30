@@ -231,10 +231,8 @@ export function TablesTabContent() {
     { title: 'Size Modification Tables', data: { reduced: reducedSizeData, increased: increasedSizeData }, description: "Detailed information and rules for Size Modification Tables." },
   ];
 
-  const defaultOpenValues = allTables.map(table => table.title.toLowerCase().replace(/\s+/g, '-'));
-
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={defaultOpenValues}>
+    <Accordion type="multiple" className="w-full space-y-6">
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
