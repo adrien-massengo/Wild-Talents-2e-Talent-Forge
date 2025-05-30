@@ -133,6 +133,25 @@ const commandEffectsData: CommandEffectData[] = [
   { dice: "10d", notes: "On a successful roll, you can bark an order in a voice that causes a person to obey before considering the consequences, as long as it takes no more than a single round." },
 ];
 
+interface SkillExampleData {
+  dice: string;
+  skillLevel: string;
+  proficiencyExample: string;
+}
+
+const skillExamplesData: SkillExampleData[] = [
+  { dice: "1d", skillLevel: "Basic training (Athletics)", proficiencyExample: "Can barely dog paddle." },
+  { dice: "2d", skillLevel: "Moderate training and some experience (Athletics)", proficiencyExample: "Can throw a football 20 yards accurately." },
+  { dice: "3d", skillLevel: "Extensive training and experience (Perception)", proficiencyExample: "Can detect a tap on the phone line." },
+  { dice: "4d", skillLevel: "Expert training (Knowledge (Chess))", proficiencyExample: "Nationally-ranked chess champion." },
+  { dice: "5d", skillLevel: "Master (human perfection) (Lie)", proficiencyExample: "Can talk your way into a military facility." },
+  { dice: "6d", skillLevel: "Superhuman (Intimidate)", proficiencyExample: "Can bully the heavyweight boxing champion." },
+  { dice: "7d", skillLevel: "Extraordinary (Athletics)", proficiencyExample: "Can leap from limb to limb 40 feet up in a tree." },
+  { dice: "8d", skillLevel: "Astonishing (Dodge)", proficiencyExample: "Can catch arrows in mid-air." },
+  { dice: "9d", skillLevel: "Unparalleled (Perception)", proficiencyExample: "Can see in near-complete darkness." },
+  { dice: "10d", skillLevel: "Supreme (Knowledge (Education))", proficiencyExample: "Can teach any subject from memory." },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -143,14 +162,14 @@ export function TablesTabContent() {
     { title: 'Mind Effects', data: mindEffectsData, description: "Detailed information and rules for Mind Effects." },
     { title: 'Charm Effects', data: charmEffectsData, description: "Detailed information and rules for Charm Effects." },
     { title: 'Command Effects', data: commandEffectsData, description: "Detailed information and rules for Command Effects." },
-    { title: 'Skill Examples', description: "Detailed information and rules for Skill Examples." },
+    { title: 'Skill Examples', data: skillExamplesData, description: "Examples of what different dice pools in skills might represent in terms of proficiency." },
     { title: 'Base Will Description', description: "Detailed information and rules for Base Will Description." },
     { title: 'Power Capacities Table', description: "Detailed information and rules for Power Capacities Table." },
     { title: 'Size Modification Tables', description: "Detailed information and rules for Size Modification Tables." },
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects", "command-effects"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects", "command-effects", "skill-examples"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -289,6 +308,25 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Skill Examples' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dice</TableHead>
+                      <TableHead>Skill Level</TableHead>
+                      <TableHead>Proficiency Example</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as SkillExampleData[]).map((row) => (
+                      <TableRow key={row.dice}>
+                        <TableCell>{row.dice}</TableCell>
+                        <TableCell>{row.skillLevel}</TableCell>
+                        <TableCell>{row.proficiencyExample}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -300,4 +338,3 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
-
