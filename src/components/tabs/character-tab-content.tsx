@@ -2,11 +2,13 @@
 // src/components/tabs/character-tab-content.tsx
 "use client";
 
-import type { CharacterData, StatDetail, SkillInstance } from "@/app/page";
+import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/page";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
+import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, ALLERGY_SUBSTANCES, ALLERGY_EFFECTS, calculateAllergyPoints, type IntrinsicMetaQuality } from "@/lib/character-definitions";
+
 
 import * as React from "react";
 import { Accordion } from "@/components/ui/accordion";
@@ -16,12 +18,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Trash2, PlusCircle, Cog } from "lucide-react";
+import { Trash2, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
-  onBasicInfoChange: (field: keyof CharacterData['basicInfo'], value: string) => void;
+  onBasicInfoChange: (field: keyof BasicInfo, value: any) => void;
+  onIntrinsicConfigChange: (configKey: keyof BasicInfo, field: string, value: any) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
   onAddSkill: (skillDef: PredefinedSkillDef) => void;
@@ -55,13 +59,12 @@ const statsDefinitions: StatDefinition[] = [
   { name: 'command', label: 'Command', description: 'The Command Stat measures your force of personality, your capacity for leadership, and your composure in the face of crisis. With high Command you remain uncracked under great pressure and people instinctively listen to you in a crisis.' },
 ];
 
-const normalDiceOptions = Array.from({ length: 10 }, (_, i) => `${i + 1}D`); // 1D to 10D for miracle/quality dice
-const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`); // 0HD to 10HD
-const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`); // 0WD to 10WD
+const normalDiceOptions = Array.from({ length: 10 }, (_, i) => `${i + 1}D`); 
+const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`); 
+const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`); 
 
 const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
 
-// Calculate points for a single Miracle Quality
 export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: MiracleDefinition, allPowerQualityDefinitions: PowerQualityDefinition[]): number => {
   const NDice = parseInt(miracle.dice.replace('D', '')) || 0;
   const HDice = parseInt(miracle.hardDice.replace('HD', '')) || 0;
@@ -71,12 +74,10 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   if (!qualityDef) return 0;
 
   const baseCostFactor = qualityDef.baseCostFactor;
-
   let totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
-  let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0); // Flaw costs are negative
+  let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0); 
 
   const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
-
   const costND = NDice * Math.max(0, baseCostFactor + effectiveCostModifier);
   const costHD = HDice * Math.max(0, (baseCostFactor * 2) + effectiveCostModifier);
   const costWD = WDice * Math.max(0, (baseCostFactor * 4) + effectiveCostModifier);
@@ -84,7 +85,6 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   return costND + costHD + costWD;
 };
 
-// Calculate total points for a Miracle
 export const calculateMiracleTotalCost = (miracle: MiracleDefinition, skills: SkillInstance[]): number => {
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
   return miracle.qualities.reduce((sum, quality) => sum + calculateMiracleQualityCost(quality, miracle, dynamicPqDefs), 0);
@@ -94,6 +94,7 @@ export const calculateMiracleTotalCost = (miracle: MiracleDefinition, skills: Sk
 export function CharacterTabContent({
   characterData,
   onBasicInfoChange,
+  onIntrinsicConfigChange,
   onStatChange,
   onWillpowerChange,
   onAddSkill,
@@ -153,24 +154,181 @@ export function CharacterTabContent({
   const mandatoryMiracles = characterData.miracles.filter(m => m.isMandatory);
   const regularMiracles = characterData.miracles.filter(m => !m.isMandatory);
 
+  const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
+  const selectedIntrinsic = INTRINSIC_META_QUALITIES.find(intr => intr.id === characterData.basicInfo.selectedIntrinsicMQId);
+
   return (
     <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles"]}>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div>
             <Label htmlFor="charName" className="font-headline">Name</Label>
             <Input id="charName" placeholder="e.g., John Doe" value={characterData.basicInfo.name} onChange={(e) => onBasicInfoChange('name', e.target.value)} />
           </div>
+          
           <div>
-            <Label htmlFor="charArchetype" className="font-headline">Archetype / Concept</Label>
-            <Input id="charArchetype" placeholder="e.g., Gritty Detective, Star-crossed Inventor" value={characterData.basicInfo.archetype} onChange={(e) => onBasicInfoChange('archetype', e.target.value)} />
+            <Label htmlFor="archetype" className="font-headline">Archetype</Label>
+            <Select value={characterData.basicInfo.selectedArchetypeId} onValueChange={(value) => onBasicInfoChange('selectedArchetypeId', value)}>
+              <SelectTrigger id="archetype"><SelectValue placeholder="Select Archetype..." /></SelectTrigger>
+              <SelectContent>
+                {ARCHETYPES.map(arch => <SelectItem key={arch.id} value={arch.id}>{arch.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {selectedArchetype && (
+              <Card className="mt-2 p-3 bg-muted/50 text-sm">
+                <p><strong>Source:</strong> {selectedArchetype.sourceText}</p>
+                <p><strong>Permission:</strong> {selectedArchetype.permissionText}</p>
+                {selectedArchetype.intrinsicsText && <p><strong>Intrinsics:</strong> {selectedArchetype.intrinsicsText}</p>}
+                <p className="mt-1">{selectedArchetype.description}</p>
+                {selectedArchetype.mandatoryPowerText && <p className="mt-1"><strong>Mandatory Power:</strong> {selectedArchetype.mandatoryPowerText}</p>}
+                {selectedArchetype.additions && <p className="mt-1 text-xs italic">{selectedArchetype.additions}</p>}
+              </Card>
+            )}
           </div>
-        </div>
-        <div>
+
+          <div>
+            <Label htmlFor="sourceMQ" className="font-headline">Source Meta-Quality</Label>
+            <Select value={characterData.basicInfo.selectedSourceMQId} onValueChange={(value) => onBasicInfoChange('selectedSourceMQId', value)}>
+              <SelectTrigger id="sourceMQ"><SelectValue placeholder="Select Source Meta-Quality..." /></SelectTrigger>
+              <SelectContent>
+                {SOURCE_META_QUALITIES.map(mq => <SelectItem key={mq.id} value={mq.id}>{mq.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {SOURCE_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedSourceMQId)?.description && (
+              <p className="text-xs text-muted-foreground mt-1">{SOURCE_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedSourceMQId)?.description}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="permissionMQ" className="font-headline">Permission Meta-Quality</Label>
+            <Select value={characterData.basicInfo.selectedPermissionMQId} onValueChange={(value) => onBasicInfoChange('selectedPermissionMQId', value)}>
+              <SelectTrigger id="permissionMQ"><SelectValue placeholder="Select Permission Meta-Quality..." /></SelectTrigger>
+              <SelectContent>
+                {PERMISSION_META_QUALITIES.map(mq => <SelectItem key={mq.id} value={mq.id}>{mq.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {PERMISSION_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedPermissionMQId)?.description && (
+              <p className="text-xs text-muted-foreground mt-1">{PERMISSION_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedPermissionMQId)?.description}</p>
+            )}
+          </div>
+          
+          <div>
+            <Label htmlFor="intrinsicMQ" className="font-headline">Intrinsic Meta-Quality</Label>
+            <Select value={characterData.basicInfo.selectedIntrinsicMQId} onValueChange={(value) => onBasicInfoChange('selectedIntrinsicMQId', value)}>
+              <SelectTrigger id="intrinsicMQ"><SelectValue placeholder="Select Intrinsic Meta-Quality..." /></SelectTrigger>
+              <SelectContent>
+                {INTRINSIC_META_QUALITIES.map(mq => <SelectItem key={mq.id} value={mq.id}>{mq.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {selectedIntrinsic?.description && (
+              <p className="text-xs text-muted-foreground mt-1">{selectedIntrinsic.description}</p>
+            )}
+            {selectedIntrinsic && selectedIntrinsic.configKey && (
+              <Card className="mt-2 p-3 space-y-2 bg-muted/50">
+                {selectedIntrinsic.configKey === 'allergyConfig' && (
+                  <>
+                    <div>
+                      <Label htmlFor="allergySubstance" className="text-sm">Allergy Substance</Label>
+                      <Select 
+                        value={characterData.basicInfo.intrinsicAllergyConfig.substance} 
+                        onValueChange={(val) => onIntrinsicConfigChange('intrinsicAllergyConfig', 'substance', val)}
+                      >
+                        <SelectTrigger id="allergySubstance"><SelectValue placeholder="Select substance..."/></SelectTrigger>
+                        <SelectContent>
+                          {ALLERGY_SUBSTANCES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="allergyEffect" className="text-sm">Allergy Effect</Label>
+                      <Select 
+                        value={characterData.basicInfo.intrinsicAllergyConfig.effect}
+                        onValueChange={(val) => onIntrinsicConfigChange('intrinsicAllergyConfig', 'effect', val)}
+                      >
+                        <SelectTrigger id="allergyEffect"><SelectValue placeholder="Select effect..."/></SelectTrigger>
+                        <SelectContent>
+                          {ALLERGY_EFFECTS.map(e => <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+                {selectedIntrinsic.configKey === 'bruteFrailConfig' && (
+                  <div>
+                    <Label className="text-sm">Type</Label>
+                    <RadioGroup 
+                      value={characterData.basicInfo.intrinsicBruteFrailConfig.type} 
+                      onValueChange={(val) => onIntrinsicConfigChange('intrinsicBruteFrailConfig', 'type', val)}
+                      className="flex space-x-4 mt-1"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="brute" id="brute"/>
+                        <Label htmlFor="brute">Brute</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="frail" id="frail"/>
+                        <Label htmlFor="frail">Frail</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+                 {selectedIntrinsic.configKey === 'customStatsConfig' && (
+                  <div>
+                    <Label className="text-sm">Discard Attribute</Label>
+                    <RadioGroup
+                      value={characterData.basicInfo.intrinsicCustomStatsConfig.discardedAttribute}
+                      onValueChange={(val) => onIntrinsicConfigChange('intrinsicCustomStatsConfig', 'discardedAttribute', val)}
+                      className="mt-1 space-y-1"
+                    >
+                      {selectedIntrinsic.customStatsDiscardOptions?.map(opt => (
+                        <div key={opt.value} className="flex items-center space-x-2">
+                          <RadioGroupItem value={opt.value} id={`cs-${opt.value}`} />
+                          <Label htmlFor={`cs-${opt.value}`} className="font-normal">{opt.label}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                    {characterData.basicInfo.intrinsicCustomStatsConfig.discardedAttribute && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">
+                            {selectedIntrinsic.customStatsDiscardOptions?.find(opt => opt.value === characterData.basicInfo.intrinsicCustomStatsConfig.discardedAttribute)?.description}
+                        </p>
+                    )}
+                  </div>
+                )}
+                {selectedIntrinsic.configKey === 'mandatoryPowerConfig' && (
+                  <div>
+                    <Label htmlFor="mandatoryPowerCount" className="text-sm">Number of Mandatory Powers</Label>
+                    <Input 
+                      id="mandatoryPowerCount" 
+                      type="number" 
+                      min="0" 
+                      value={characterData.basicInfo.intrinsicMandatoryPowerConfig.count}
+                      onChange={(e) => onIntrinsicConfigChange('intrinsicMandatoryPowerConfig', 'count', parseInt(e.target.value) || 0)}
+                      className="w-20 mt-1"
+                    />
+                  </div>
+                )}
+                {selectedIntrinsic.configKey === 'vulnerableConfig' && (
+                   <div>
+                    <Label htmlFor="vulnerableExtraBoxes" className="text-sm">Number of Extra Brain Boxes</Label>
+                    <Input 
+                      id="vulnerableExtraBoxes" 
+                      type="number" 
+                      min="0" 
+                      value={characterData.basicInfo.intrinsicVulnerableConfig.extraBoxes}
+                      onChange={(e) => onIntrinsicConfigChange('intrinsicVulnerableConfig', 'extraBoxes', parseInt(e.target.value) || 0)}
+                      className="w-20 mt-1"
+                    />
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+
+          <div>
             <Label htmlFor="charMotivation" className="font-headline">Motivation / Goals</Label>
             <Textarea id="charMotivation" placeholder="What drives your character?" value={characterData.basicInfo.motivation} onChange={(e) => onBasicInfoChange('motivation', e.target.value)} />
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">Fill in the core details of your character.</p>
       </CollapsibleSectionItem>
 
       <CollapsibleSectionItem title="Stats" value="stats">
@@ -450,15 +608,19 @@ export function CharacterTabContent({
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex justify-between items-center">
                     {miracle.name}
-                    <Button variant="ghost" size="sm" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                     { !(miracle.definitionId?.startsWith('archetype-mandatory-')) &&
+                        <Button variant="ghost" size="sm" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                    }
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {/* Simplified view for mandatory, details in regular list if needed or edit there */}
                   <p className="text-sm text-muted-foreground">Base Dice: {miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</p>
                   <p className="text-sm">Total Cost: {calculateMiracleTotalCost(miracle, characterData.skills)} points</p>
+                   {miracle.definitionId?.startsWith('archetype-mandatory-') && 
+                    <p className="text-xs italic text-muted-foreground mt-1">This miracle is mandated by an archetype intrinsic and cannot be removed here. Its "Mandatory" status cannot be unchecked.</p>
+                   }
                 </CardContent>
               </Card>
             ))}
@@ -495,7 +657,8 @@ export function CharacterTabContent({
                         id={`${miracle.id}-mandatory`}
                         checked={miracle.isMandatory}
                         onChange={(e) => onMiracleChange(miracle.id, 'isMandatory', e.target.checked)}
-                        className="form-checkbox h-4 w-4 text-primary rounded"
+                        disabled={miracle.definitionId?.startsWith('archetype-mandatory-')}
+                        className="form-checkbox h-4 w-4 text-primary rounded disabled:opacity-50"
                     />
                     <Label htmlFor={`${miracle.id}-mandatory`} className="text-xs">Mandatory</Label>
                 </div>
@@ -679,3 +842,5 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
+    

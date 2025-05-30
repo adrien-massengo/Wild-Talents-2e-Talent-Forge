@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
-import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
+import { PREDEFINED_MIRACLES_TEMPLATES, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
+import type { AllergyEffectType, AllergySubstanceType } from "@/lib/character-definitions";
 
 
 export interface StatDetail {
@@ -38,12 +39,33 @@ export interface SkillInstance {
   hasType?: boolean;
 }
 
-export interface CharacterData {
-  basicInfo: {
-    name: string;
-    archetype: string;
-    motivation: string;
+export interface BasicInfo {
+  name: string;
+  motivation: string;
+  selectedArchetypeId?: string;
+  selectedSourceMQId?: string;
+  selectedPermissionMQId?: string;
+  selectedIntrinsicMQId?: string;
+  intrinsicAllergyConfig: {
+    substance?: AllergySubstanceType;
+    effect?: AllergyEffectType;
   };
+  intrinsicBruteFrailConfig: {
+    type?: 'brute' | 'frail';
+  };
+  intrinsicCustomStatsConfig: {
+    discardedAttribute?: 'body' | 'coordination' | 'sense' | 'command' | 'charm';
+  };
+  intrinsicMandatoryPowerConfig: {
+    count: number;
+  };
+  intrinsicVulnerableConfig: {
+    extraBoxes: number;
+  };
+}
+
+export interface CharacterData {
+  basicInfo: BasicInfo;
   stats: {
     body: StatDetail;
     coordination: StatDetail;
@@ -64,8 +86,22 @@ export interface CharacterData {
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
 
+const initialBasicInfo: BasicInfo = {
+  name: '',
+  motivation: '',
+  selectedArchetypeId: undefined,
+  selectedSourceMQId: undefined,
+  selectedPermissionMQId: undefined,
+  selectedIntrinsicMQId: undefined,
+  intrinsicAllergyConfig: { substance: undefined, effect: undefined },
+  intrinsicBruteFrailConfig: { type: undefined },
+  intrinsicCustomStatsConfig: { discardedAttribute: undefined },
+  intrinsicMandatoryPowerConfig: { count: 0 },
+  intrinsicVulnerableConfig: { extraBoxes: 0 },
+};
+
 const initialCharacterData: CharacterData = {
-  basicInfo: { name: '', archetype: '', motivation: '' },
+  basicInfo: { ...initialBasicInfo },
   stats: {
     body: { ...initialStatDetail },
     coordination: { ...initialStatDetail },
@@ -88,7 +124,7 @@ export default function HomePage() {
   const [characterData, setCharacterData] = React.useState<CharacterData>(initialCharacterData);
   const { toast } = useToast();
 
-  const handleBasicInfoChange = (field: keyof CharacterData['basicInfo'], value: string) => {
+  const handleBasicInfoChange = (field: keyof BasicInfo, value: any) => {
     setCharacterData(prev => ({
       ...prev,
       basicInfo: {
@@ -97,6 +133,62 @@ export default function HomePage() {
       }
     }));
   };
+  
+  const handleIntrinsicConfigChange = (
+    configKey: keyof BasicInfo,
+    field: string,
+    value: any
+  ) => {
+    setCharacterData(prev => ({
+      ...prev,
+      basicInfo: {
+        ...prev.basicInfo,
+        [configKey]: {
+          // @ts-ignore
+          ...prev.basicInfo[configKey],
+          [field]: value,
+        }
+      }
+    }));
+
+    if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
+        const newCount = Math.max(0, Number(value) || 0);
+        const currentMandatoryMiracles = prev.miracles.filter(m => m.isMandatory && m.definitionId?.startsWith('archetype-mandatory-'));
+        const difference = newCount - currentMandatoryMiracles.length;
+
+        let updatedMiracles = [...prev.miracles];
+
+        if (difference > 0) { // Add miracles
+            for (let i = 0; i < difference; i++) {
+                const newMandatoryMiracle: MiracleDefinition = {
+                    id: `miracle-archetype-mandatory-${Date.now()}-${i}`,
+                    definitionId: `archetype-mandatory-${Date.now()}-${i}`,
+                    name: 'Mandatory Archetype Power',
+                    dice: '1D',
+                    hardDice: '0HD',
+                    wiggleDice: '0WD',
+                    qualities: [],
+                    description: 'This power is mandated by an archetype intrinsic.',
+                    isCustom: true, // Or false if it's based on a non-editable template
+                    isMandatory: true,
+                };
+                updatedMiracles.push(newMandatoryMiracle);
+            }
+        } else if (difference < 0) { // Remove miracles
+            const miraclesToRemove = Math.abs(difference);
+            let removedCount = 0;
+            updatedMiracles = updatedMiracles.filter(m => {
+                if (m.isMandatory && m.definitionId?.startsWith('archetype-mandatory-') && removedCount < miraclesToRemove) {
+                    removedCount++;
+                    return false;
+                }
+                return true;
+            });
+        }
+        setCharacterData(prevData => ({ ...prevData, miracles: updatedMiracles }));
+    }
+  };
+
 
   const handleStatChange = (
     statName: keyof CharacterData['stats'],
@@ -232,6 +324,13 @@ export default function HomePage() {
   };
 
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
+     // Prevent unchecking 'isMandatory' for archetype-mandated miracles
+     const miracle = characterData.miracles.find(m => m.id === miracleId);
+     if (miracle && miracle.definitionId?.startsWith('archetype-mandatory-') && field === 'isMandatory' && !value) {
+       toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic.", variant: "destructive"});
+       return;
+     }
+
     setCharacterData(prev => ({
       ...prev,
       miracles: prev.miracles.map(m => m.id === miracleId ? { ...m, [field]: value } : m),
@@ -431,8 +530,17 @@ export default function HomePage() {
         const validatedData: CharacterData = {
           ...initialCharacterData,
           ...parsedData,
-          basicInfo: { ...initialCharacterData.basicInfo, ...(parsedData.basicInfo || {}) },
-          stats: { ...initialCharacterData.stats }, // Ensures all stats exist
+          basicInfo: { 
+            ...initialBasicInfo, 
+            ...(parsedData.basicInfo || {}),
+            // Ensure nested config objects exist
+            intrinsicAllergyConfig: { ...initialBasicInfo.intrinsicAllergyConfig, ...(parsedData.basicInfo?.intrinsicAllergyConfig || {}) },
+            intrinsicBruteFrailConfig: { ...initialBasicInfo.intrinsicBruteFrailConfig, ...(parsedData.basicInfo?.intrinsicBruteFrailConfig || {}) },
+            intrinsicCustomStatsConfig: { ...initialBasicInfo.intrinsicCustomStatsConfig, ...(parsedData.basicInfo?.intrinsicCustomStatsConfig || {}) },
+            intrinsicMandatoryPowerConfig: { ...initialBasicInfo.intrinsicMandatoryPowerConfig, ...(parsedData.basicInfo?.intrinsicMandatoryPowerConfig || {}) },
+            intrinsicVulnerableConfig: { ...initialBasicInfo.intrinsicVulnerableConfig, ...(parsedData.basicInfo?.intrinsicVulnerableConfig || {}) },
+          },
+          stats: { ...initialCharacterData.stats }, 
           willpower: { ...initialCharacterData.willpower, ...(parsedData.willpower || {}) },
           skills: parsedData.skills ? parsedData.skills.map(skill => ({
             id: `loaded-skill-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -629,6 +737,7 @@ export default function HomePage() {
                 <CharacterTabContent
                   characterData={characterData}
                   onBasicInfoChange={handleBasicInfoChange}
+                  onIntrinsicConfigChange={handleIntrinsicConfigChange}
                   onStatChange={handleStatChange}
                   onWillpowerChange={handleWillpowerChange}
                   onAddSkill={handleAddSkill}
@@ -667,3 +776,5 @@ export default function HomePage() {
   );
 }
 
+
+    
