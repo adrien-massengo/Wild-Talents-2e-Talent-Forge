@@ -10,7 +10,9 @@ import { TablesTabContent } from "@/components/tabs/tables-tab-content";
 import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { AttributeName, SkillDefinition } from "@/lib/skills-definitions";
+import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
+import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
+import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
 
 
 export interface StatDetail {
@@ -20,20 +22,20 @@ export interface StatDetail {
 }
 
 export interface SkillInstance {
-  id: string; // Unique instance ID, e.g., timestamp
-  definitionId: string; // Key from SKILL_DEFINITIONS if predefined
-  name: string; // Display name, e.g., "Melee Weapon (Sword)" or custom name
-  baseName: string; // Base name from definition, e.g., "Melee Weapon"
+  id: string; 
+  definitionId: string; 
+  name: string; 
+  baseName: string; 
   linkedAttribute: AttributeName;
   description: string;
-  dice: string; // e.g., "1D"
-  hardDice: string; // e.g., "0HD"
-  wiggleDice: string; // e.g., "0WD"
+  dice: string; 
+  hardDice: string; 
+  wiggleDice: string; 
   isCustom: boolean;
-  typeSpecification?: string; // For skills like "Melee Weapon (Sword)" -> "Sword"
-  notes?: string; // From definition, or custom
-  sampleTypes?: string; // From definition
-  hasType?: boolean; // From definition
+  typeSpecification?: string; 
+  notes?: string; 
+  sampleTypes?: string; 
+  hasType?: boolean; 
 }
 
 export interface CharacterData {
@@ -55,7 +57,7 @@ export interface CharacterData {
     purchasedWill: number;
   };
   skills: SkillInstance[];
-  // miracles: any[]; // Add structure as developed
+  miracles: MiracleDefinition[];
 }
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
@@ -75,6 +77,7 @@ const initialCharacterData: CharacterData = {
     purchasedWill: 0,
   },
   skills: [],
+  miracles: [],
 };
 
 export default function HomePage() {
@@ -118,7 +121,7 @@ export default function HomePage() {
     }));
   };
 
-  const handleAddSkill = (skillDef: SkillDefinition) => {
+  const handleAddSkill = (skillDef: PredefinedSkillDef) => {
     const newSkillInstance: SkillInstance = {
       id: Date.now().toString(),
       definitionId: skillDef.id,
@@ -144,7 +147,7 @@ export default function HomePage() {
       definitionId: `custom-${Date.now().toString()}`,
       name: 'Custom Skill',
       baseName: 'Custom Skill',
-      linkedAttribute: 'body', // Default, user can change
+      linkedAttribute: 'body', 
       description: 'Custom skill description.',
       dice: '1D',
       hardDice: '0HD',
@@ -185,6 +188,196 @@ export default function HomePage() {
     }));
   };
 
+  // Miracle Handlers
+  const handleAddMiracle = (type: 'custom' | string) => { // string for predefined miracle definitionId
+    let newMiracle: MiracleDefinition;
+    if (type === 'custom') {
+      newMiracle = {
+        id: `miracle-${Date.now()}`,
+        name: 'New Custom Miracle',
+        dice: '1D',
+        hardDice: '0HD',
+        wiggleDice: '0WD',
+        qualities: [],
+        description: 'Custom miracle description.',
+        isCustom: true,
+        isMandatory: false,
+      };
+    } else {
+      const template = PREDEFINED_MIRACLES_TEMPLATES.find(m => m.definitionId === type);
+      if (!template) return;
+      newMiracle = {
+        ...template,
+        id: `miracle-${template.definitionId}-${Date.now()}`,
+        dice: '1D', // Default dice for predefined, can be adjusted
+        hardDice: '0HD',
+        wiggleDice: '0WD',
+        qualities: template.qualities.map(q => ({...q, id: `${q.id}-${Date.now()}`})), // ensure unique quality IDs
+        isCustom: false,
+        isMandatory: false, // Default, can be changed
+      };
+    }
+    setCharacterData(prev => ({ ...prev, miracles: [...prev.miracles, newMiracle] }));
+  };
+
+  const handleRemoveMiracle = (miracleId: string) => {
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.filter(m => m.id !== miracleId),
+    }));
+  };
+
+  const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => m.id === miracleId ? { ...m, [field]: value } : m),
+    }));
+  };
+
+  const handleAddMiracleQuality = (miracleId: string) => {
+    const newQuality: MiracleQuality = {
+      id: `quality-${Date.now()}`,
+      type: 'attacks', // Default type
+      capacity: 'touch', // Default capacity
+      levels: 0,
+      extras: [],
+      flaws: [],
+    };
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => 
+        m.id === miracleId ? { ...m, qualities: [...m.qualities, newQuality] } : m
+      ),
+    }));
+  };
+
+  const handleRemoveMiracleQuality = (miracleId: string, qualityId: string) => {
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => 
+        m.id === miracleId ? { ...m, qualities: m.qualities.filter(q => q.id !== qualityId) } : m
+      ),
+    }));
+  };
+
+  const handleMiracleQualityChange = (
+    miracleId: string, 
+    qualityId: string, 
+    field: keyof MiracleQuality, 
+    value: any
+  ) => {
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => 
+        m.id === miracleId ? { 
+          ...m, 
+          qualities: m.qualities.map(q => 
+            q.id === qualityId ? { ...q, [field]: value } : q
+          ) 
+        } : m
+      ),
+    }));
+  };
+  
+  const handleAddExtraOrFlawToQuality = (
+    miracleId: string, 
+    qualityId: string, 
+    itemType: 'extra' | 'flaw',
+    definitionId?: string
+  ) => {
+    let newItem: AppliedExtraOrFlaw;
+    if (definitionId) {
+      const collection = itemType === 'extra' ? PREDEFINED_EXTRAS : PREDEFINED_FLAWS;
+      const definition = collection.find(item => item.id === definitionId);
+      if (!definition) return;
+      newItem = {
+        id: `${itemType}-def-${definition.id}-${Date.now()}`,
+        definitionId: definition.id,
+        name: definition.name,
+        costModifier: definition.costModifier,
+        isCustom: false,
+      };
+    } else { // Custom
+      newItem = {
+        id: `custom-${itemType}-${Date.now()}`,
+        name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
+        costModifier: itemType === 'extra' ? 1 : -1, // Default custom costs
+        isCustom: true,
+      };
+    }
+
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => 
+        m.id === miracleId ? { 
+          ...m, 
+          qualities: m.qualities.map(q => {
+            if (q.id === qualityId) {
+              return itemType === 'extra' 
+                ? { ...q, extras: [...q.extras, newItem] }
+                : { ...q, flaws: [...q.flaws, newItem] };
+            }
+            return q;
+          }) 
+        } : m
+      ),
+    }));
+  };
+
+  const handleRemoveExtraOrFlawFromQuality = (
+    miracleId: string, 
+    qualityId: string, 
+    itemType: 'extra' | 'flaw',
+    itemId: string
+  ) => {
+    setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => 
+        m.id === miracleId ? { 
+          ...m, 
+          qualities: m.qualities.map(q => {
+            if (q.id === qualityId) {
+              return itemType === 'extra'
+                ? { ...q, extras: q.extras.filter(ex => ex.id !== itemId) }
+                : { ...q, flaws: q.flaws.filter(fl => fl.id !== itemId) };
+            }
+            return q;
+          })
+        } : m
+      ),
+    }));
+  };
+  
+  const handleExtraOrFlawChange = (
+    miracleId: string,
+    qualityId: string,
+    itemType: 'extra' | 'flaw',
+    itemId: string,
+    field: keyof AppliedExtraOrFlaw,
+    value: string | number
+  ) => {
+     setCharacterData(prev => ({
+      ...prev,
+      miracles: prev.miracles.map(m => 
+        m.id === miracleId ? { 
+          ...m, 
+          qualities: m.qualities.map(q => {
+            if (q.id === qualityId) {
+              const listToUpdate = itemType === 'extra' ? q.extras : q.flaws;
+              const updatedList = listToUpdate.map(item => 
+                item.id === itemId ? { ...item, [field]: value } : item
+              );
+              return itemType === 'extra' 
+                ? { ...q, extras: updatedList } 
+                : { ...q, flaws: updatedList };
+            }
+            return q;
+          })
+        } : m
+      ),
+    }));
+  };
+
 
   const handleSaveCharacter = () => {
     try {
@@ -213,23 +406,44 @@ export default function HomePage() {
           ...initialCharacterData,
           ...parsedData,
           basicInfo: { ...initialCharacterData.basicInfo, ...(parsedData.basicInfo || {}) },
-          stats: { ...initialCharacterData.stats },
+          stats: { ...initialCharacterData.stats }, // Ensures all stats exist
           willpower: { ...initialCharacterData.willpower, ...(parsedData.willpower || {}) },
-          skills: parsedData.skills ? parsedData.skills.map(skill => ({ // Ensure skills have all fields
-            ...({ // Default structure for a skill instance
-              id: `loaded-${Date.now()}-${Math.random()}`,
-              definitionId: '',
-              name: 'Unnamed Skill',
-              baseName: 'Unnamed Skill',
-              linkedAttribute: 'body' as AttributeName,
-              description: '',
-              dice: '1D',
-              hardDice: '0HD',
-              wiggleDice: '0WD',
-              isCustom: true,
-              typeSpecification: '',
-            }),
+          skills: parsedData.skills ? parsedData.skills.map(skill => ({ 
+            id: `loaded-skill-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            definitionId: '',
+            name: 'Unnamed Skill',
+            baseName: 'Unnamed Skill',
+            linkedAttribute: 'body' as AttributeName,
+            description: '',
+            dice: '1D',
+            hardDice: '0HD',
+            wiggleDice: '0WD',
+            isCustom: true,
+            typeSpecification: '',
             ...skill,
+          })) : [],
+          miracles: parsedData.miracles ? parsedData.miracles.map(miracle => ({
+            id: `loaded-miracle-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            name: 'Unnamed Miracle',
+            dice: '1D',
+            hardDice: '0HD',
+            wiggleDice: '0WD',
+            qualities: [],
+            description: '',
+            isCustom: true,
+            isMandatory: false,
+            ...miracle,
+            qualities: miracle.qualities ? miracle.qualities.map(quality => ({
+              id: `loaded-quality-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              type: 'useful' as MiracleQualityType,
+              capacity: 'touch' as MiracleCapacityType,
+              levels: 0,
+              extras: [],
+              flaws: [],
+              ...quality,
+              extras: quality.extras ? quality.extras.map(ex => ({ ...ex, id: `loaded-extra-${Date.now()}-${Math.random().toString(36).substring(7)}` })) : [],
+              flaws: quality.flaws ? quality.flaws.map(fl => ({ ...fl, id: `loaded-flaw-${Date.now()}-${Math.random().toString(36).substring(7)}` })) : [],
+            })) : [],
           })) : [],
         };
 
@@ -321,6 +535,15 @@ export default function HomePage() {
                   onAddCustomSkill={handleAddCustomSkill}
                   onRemoveSkill={handleRemoveSkill}
                   onSkillChange={handleSkillChange}
+                  onAddMiracle={handleAddMiracle}
+                  onRemoveMiracle={handleRemoveMiracle}
+                  onMiracleChange={handleMiracleChange}
+                  onAddMiracleQuality={handleAddMiracleQuality}
+                  onRemoveMiracleQuality={handleRemoveMiracleQuality}
+                  onMiracleQualityChange={handleMiracleQualityChange}
+                  onAddExtraOrFlawToQuality={handleAddExtraOrFlawToQuality}
+                  onRemoveExtraOrFlawFromQuality={handleRemoveExtraOrFlawFromQuality}
+                  onExtraOrFlawChange={handleExtraOrFlawChange}
                 />
               </TabsContent>
               <TabsContent value="tables" className="mt-0">

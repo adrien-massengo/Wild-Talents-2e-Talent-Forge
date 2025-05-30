@@ -3,6 +3,10 @@
 "use client";
 
 import type { CharacterData, StatDetail, SkillInstance } from "@/app/page";
+import type { MiracleDefinition, MiracleQuality, PowerQualityDefinition } from "@/lib/miracles-definitions";
+import { getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
+import { calculateMiracleQualityCost, calculateMiracleTotalCost } from "@/components/tabs/character-tab-content"; // Import calculation functions
+
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +48,6 @@ const calculateSkillPoints = (skill: SkillInstance | undefined): number => {
   const normalDice = parseInt(skill.dice?.replace('D', ''), 10) || 0;
   const hardDice = parseInt(skill.hardDice?.replace('HD', ''), 10) || 0;
   const wiggleDice = parseInt(skill.wiggleDice?.replace('WD', ''), 10) || 0;
-  // Skill costs: 2 per die, 4 per hard die, 8 per wiggle die
   return (normalDice * 2) + (hardDice * 4) + (wiggleDice * 8);
 };
 
@@ -60,9 +63,10 @@ const formatSkillDisplay = (skill: SkillInstance | undefined) => {
   return display;
 }
 
-
 export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills } = characterData;
+  const { basicInfo, stats, willpower, skills, miracles } = characterData;
+  const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
+
 
   const charmDiceValue = parseInt(stats?.charm?.dice?.replace('D', '') || '0', 10);
   const commandDiceValue = parseInt(stats?.command?.dice?.replace('D', '') || '0', 10);
@@ -77,11 +81,12 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
   const totalStatPoints = Object.values(stats || {}).reduce((sum, stat) => sum + calculateStatPoints(stat), 0);
   const totalWillpowerPoints = calculateWillpowerPoints(willpower);
   const totalSkillPoints = (skills || []).reduce((sum, skill) => sum + calculateSkillPoints(skill), 0);
-  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints;
+  const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => sum + calculateMiracleTotalCost(miracle, skills), 0);
+  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints;
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["point-totals", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary"]}>
+    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["point-totals", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary", "miracles-summary"]}>
       <CollapsibleSectionItem title="Point Totals" value="point-totals">
         <Card>
           <CardHeader>
@@ -91,6 +96,7 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
             <p>Total Stat Points: {totalStatPoints}</p>
             <p>Total Willpower Points: {totalWillpowerPoints}</p>
             <p>Total Skill Points: {totalSkillPoints}</p>
+            <p>Total Miracle Points: {totalMiraclePoints}</p>
             <p className="font-bold text-lg">Grand Total Points: {grandTotalPoints}</p>
             <p className="text-sm text-muted-foreground">Based on 200 point budget for a starting character.</p>
             <p className="text-sm text-muted-foreground">Remaining Points: {200 - grandTotalPoints}</p>
@@ -187,8 +193,64 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
             </CardContent>
         </Card>
       </CollapsibleSectionItem>
+
       <CollapsibleSectionItem title="Miracles Summary" value="miracles-summary">
-        <p className="text-muted-foreground p-4">Miracles summary will appear here once implemented.</p>
+         <Card>
+            <CardHeader>
+                <CardTitle className="text-xl">Miracles Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {(!miracles || miracles.length === 0) ? (
+                    <p className="text-muted-foreground">No miracles added yet.</p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Miracle</TableHead>
+                                <TableHead>Base Dice</TableHead>
+                                <TableHead>Total Cost</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {miracles.map((miracle) => (
+                                <TableRow key={miracle.id}>
+                                    <TableCell className="font-medium">{miracle.name}</TableCell>
+                                    <TableCell>{miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</TableCell>
+                                    <TableCell>{calculateMiracleTotalCost(miracle, skills)}</TableCell>
+                                </TableRow>
+                            ))}
+                             <TableRow className="font-bold">
+                                <TableCell colSpan={2} className="text-right">Total Miracle Points:</TableCell>
+                                <TableCell>{totalMiraclePoints}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                )}
+                 {miracles.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        {miracles.map(miracle => (
+                            <div key={`${miracle.id}-detail`} className="p-2 border rounded-md">
+                                <h4 className="font-semibold text-md">{miracle.name} - Qualities:</h4>
+                                {miracle.qualities.length === 0 && <p className="text-xs text-muted-foreground">No qualities.</p>}
+                                <ul className="list-disc pl-5 text-sm">
+                                    {miracle.qualities.map(quality => {
+                                        const qualityDef = dynamicPqDefs.find(def => def.key === quality.type);
+                                        const qualityCost = calculateMiracleQualityCost(quality, miracle, dynamicPqDefs);
+                                        return (
+                                            <li key={quality.id}>
+                                                {qualityDef?.label || quality.type} ({quality.capacity}) - Levels: {quality.levels} - Cost: {qualityCost}pts
+                                                {quality.extras.length > 0 && <div className="pl-4 text-xs">Extras: {quality.extras.map(ex => `${ex.name} (${ex.costModifier > 0 ? '+' : ''}${ex.costModifier})`).join(', ')}</div>}
+                                                {quality.flaws.length > 0 && <div className="pl-4 text-xs">Flaws: {quality.flaws.map(fl => `${fl.name} (${fl.costModifier})`).join(', ')}</div>}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
       </CollapsibleSectionItem>
     </Accordion>
   );
