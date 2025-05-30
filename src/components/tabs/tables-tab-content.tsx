@@ -115,6 +115,24 @@ const charmEffectsData: CharmEffectData[] = [
   { dice: "10d", notes: "You can convince anyone of anything in 5–width rounds of persuasion." },
 ];
 
+interface CommandEffectData {
+  dice: string;
+  notes: string;
+}
+
+const commandEffectsData: CommandEffectData[] = [
+  { dice: "1d", notes: "You are easily startled." },
+  { dice: "2d", notes: "You’re a regular Joe or Jane." },
+  { dice: "3d", notes: "You’re charismatic and graceful under pressure." },
+  { dice: "4d", notes: "You’re a born leader and seemingly immune to stress." },
+  { dice: "5d", notes: "Your presence commands attention and respect." },
+  { dice: "6d", notes: "You don’t suffer the usual penalty die from injury or distraction." },
+  { dice: "7d", notes: "You can use the Command Stat instead of Body with the Endurance Skill." },
+  { dice: "8d", notes: "You are completely immune to pain and discomfort." },
+  { dice: "9d", notes: "All your feelings and autonomic physical responses (breathing, heartbeat) are under your conscious control without a roll. You never need to make Trauma Checks." },
+  { dice: "10d", notes: "On a successful roll, you can bark an order in a voice that causes a person to obey before considering the consequences, as long as it takes no more than a single round." },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -124,7 +142,7 @@ export function TablesTabContent() {
     { title: 'Sense Effects', data: senseEffectsData, description: "Detailed information and rules for Sense Effects." },
     { title: 'Mind Effects', data: mindEffectsData, description: "Detailed information and rules for Mind Effects." },
     { title: 'Charm Effects', data: charmEffectsData, description: "Detailed information and rules for Charm Effects." },
-    { title: 'Command Effects', description: "Detailed information and rules for Command Effects." },
+    { title: 'Command Effects', data: commandEffectsData, description: "Detailed information and rules for Command Effects." },
     { title: 'Skill Examples', description: "Detailed information and rules for Skill Examples." },
     { title: 'Base Will Description', description: "Detailed information and rules for Base Will Description." },
     { title: 'Power Capacities Table', description: "Detailed information and rules for Power Capacities Table." },
@@ -132,7 +150,7 @@ export function TablesTabContent() {
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects", "command-effects"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -247,6 +265,23 @@ export function TablesTabContent() {
                   </TableHeader>
                   <TableBody>
                     {(tableInfo.data as CharmEffectData[]).map((row) => (
+                      <TableRow key={row.dice}>
+                        <TableCell>{row.dice}</TableCell>
+                        <TableCell>{row.notes}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+            ) : tableInfo.title === 'Command Effects' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Dice</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as CommandEffectData[]).map((row) => (
                       <TableRow key={row.dice}>
                         <TableCell>{row.dice}</TableCell>
                         <TableCell>{row.notes}</TableCell>
