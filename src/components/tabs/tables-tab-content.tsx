@@ -152,6 +152,18 @@ const skillExamplesData: SkillExampleData[] = [
   { dice: "10d", skillLevel: "Supreme (Knowledge (Education))", proficiencyExample: "Can teach any subject from memory." },
 ];
 
+interface BaseWillDescriptionData {
+  range: string;
+  description: string;
+}
+
+const baseWillDescriptionData: BaseWillDescriptionData[] = [
+  { range: "1–3", description: "Weak-willed" },
+  { range: "4–10", description: "Typical to above-average inner strength" },
+  { range: "11–20", description: "Strong-willed" },
+  { range: "21+", description: "Tremendous fortitude and drive" },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -163,13 +175,13 @@ export function TablesTabContent() {
     { title: 'Charm Effects', data: charmEffectsData, description: "Detailed information and rules for Charm Effects." },
     { title: 'Command Effects', data: commandEffectsData, description: "Detailed information and rules for Command Effects." },
     { title: 'Skill Examples', data: skillExamplesData, description: "Examples of what different dice pools in skills might represent in terms of proficiency." },
-    { title: 'Base Will Description', description: "Detailed information and rules for Base Will Description." },
+    { title: 'Base Will Description', data: baseWillDescriptionData, description: "Descriptions for different Base Will ranges." },
     { title: 'Power Capacities Table', description: "Detailed information and rules for Power Capacities Table." },
     { title: 'Size Modification Tables', description: "Detailed information and rules for Size Modification Tables." },
   ];
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects", "command-effects", "skill-examples"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["body-effects", "body-extra", "coordination-effects", "sense-effects", "mind-effects", "charm-effects", "command-effects", "skill-examples", "base-will-description"]}>
       {allTables.map((tableInfo) => (
         <CollapsibleSectionItem key={tableInfo.title} title={tableInfo.title} value={tableInfo.title.toLowerCase().replace(/\s+/g, '-')}>
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
@@ -327,6 +339,23 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Base Will Description' && tableInfo.data ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Range</TableHead>
+                      <TableHead>Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tableInfo.data as BaseWillDescriptionData[]).map((row) => (
+                      <TableRow key={row.range}>
+                        <TableCell>{row.range}</TableCell>
+                        <TableCell>{row.description}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -338,3 +367,4 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
+
