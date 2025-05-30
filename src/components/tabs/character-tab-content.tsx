@@ -28,7 +28,7 @@ interface CharacterTabContentProps {
   onAddCustomSkill: () => void;
   onRemoveSkill: (skillId: string) => void;
   onSkillChange: (skillId: string, field: keyof SkillInstance, value: string | AttributeName) => void;
-  
+
   onAddMiracle: (type: 'custom' | string) => void;
   onRemoveMiracle: (miracleId: string) => void;
   onMiracleChange: (miracleId: string, field: keyof MiracleDefinition, value: any) => void;
@@ -71,7 +71,7 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   if (!qualityDef) return 0;
 
   const baseCostFactor = qualityDef.baseCostFactor;
-  
+
   let totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
   let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0); // Flaw costs are negative
 
@@ -80,7 +80,7 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   const costND = NDice * Math.max(0, baseCostFactor + effectiveCostModifier);
   const costHD = HDice * Math.max(0, (baseCostFactor * 2) + effectiveCostModifier);
   const costWD = WDice * Math.max(0, (baseCostFactor * 4) + effectiveCostModifier);
-  
+
   return costND + costHD + costWD;
 };
 
@@ -91,10 +91,10 @@ export const calculateMiracleTotalCost = (miracle: MiracleDefinition, skills: Sk
 };
 
 
-export function CharacterTabContent({ 
-  characterData, 
-  onBasicInfoChange, 
-  onStatChange, 
+export function CharacterTabContent({
+  characterData,
+  onBasicInfoChange,
+  onStatChange,
   onWillpowerChange,
   onAddSkill,
   onAddCustomSkill,
@@ -110,7 +110,7 @@ export function CharacterTabContent({
   onRemoveExtraOrFlawFromQuality,
   onExtraOrFlawChange,
 }: CharacterTabContentProps) {
-  
+
   const [selectedSkillToAdd, setSelectedSkillToAdd] = React.useState<string>("");
   const [selectedMiracleToAdd, setSelectedMiracleToAdd] = React.useState<string>("");
   const [selectedExtraToAdd, setSelectedExtraToAdd] = React.useState<{ [qualityId: string]: string }>({});
@@ -129,20 +129,20 @@ export function CharacterTabContent({
   const totalWill = totalBaseWill + purchasedWill;
 
   const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
-    const maxStatNormalDice = 5; 
+    const maxStatNormalDice = 5;
     return Array.from({ length: maxStatNormalDice }, (_, i) => `${i + 1}D`);
   };
-  
+
   const handleAddPredefinedSkill = () => {
     if (selectedSkillToAdd) {
       const skillDef = SKILL_DEFINITIONS.find(s => s.id === selectedSkillToAdd);
       if (skillDef) {
         onAddSkill(skillDef);
-        setSelectedSkillToAdd(""); 
+        setSelectedSkillToAdd("");
       }
     }
   };
-  
+
   const handleAddSelectedMiracle = () => {
     if (selectedMiracleToAdd) {
       onAddMiracle(selectedMiracleToAdd);
@@ -272,7 +272,7 @@ export function CharacterTabContent({
             <div key={skill.id} className="p-4 border rounded-lg bg-card/50 shadow-sm">
               <div className="flex justify-between items-start mb-2">
                 {skill.isCustom ? (
-                  <Input 
+                  <Input
                     value={skill.name}
                     onChange={(e) => onSkillChange(skill.id, 'name', e.target.value)}
                     className="text-lg font-headline mr-2 flex-grow"
@@ -302,7 +302,7 @@ export function CharacterTabContent({
                     </Select>
                  </div>
               )}
-              
+
               {!skill.isCustom && <p className="text-sm text-muted-foreground capitalize mb-1">Linked Attribute: {skill.linkedAttribute}</p>}
 
               {skill.hasType && (
@@ -310,7 +310,7 @@ export function CharacterTabContent({
                   <Label htmlFor={`${skill.id}-typeSpec`} className="text-xs font-semibold">
                     {SKILL_DEFINITIONS.find(s => s.id === skill.definitionId)?.typePrompt || 'Specify Type'}
                   </Label>
-                  <Input 
+                  <Input
                     id={`${skill.id}-typeSpec`}
                     value={skill.typeSpecification || ""}
                     onChange={(e) => onSkillChange(skill.id, 'typeSpecification', e.target.value)}
@@ -365,7 +365,7 @@ export function CharacterTabContent({
                 </div>
               </div>
               {skill.isCustom ? (
-                 <Textarea 
+                 <Textarea
                     value={skill.description}
                     onChange={(e) => onSkillChange(skill.id, 'description', e.target.value)}
                     placeholder="Custom skill description..."
@@ -385,26 +385,26 @@ export function CharacterTabContent({
           <p><strong className="font-headline">Base Will (Charm D + Command D):</strong> {calculatedCharmPlusCommandBaseWill}</p>
           <div className="space-y-1">
             <Label htmlFor="purchasedBaseWill" className="font-headline">Purchased Base Will (3pts/pt)</Label>
-            <Input 
-              id="purchasedBaseWill" 
-              type="number" 
+            <Input
+              id="purchasedBaseWill"
+              type="number"
               min="0"
-              placeholder="0" 
+              placeholder="0"
               className="w-24"
-              value={characterData.willpower.purchasedBaseWill} 
-              onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))} 
+              value={characterData.willpower.purchasedBaseWill}
+              onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))}
             />
           </div>
           <div className="space-y-1">
             <Label htmlFor="purchasedWill" className="font-headline">Purchased Will (1pt/pt)</Label>
-            <Input 
-              id="purchasedWill" 
-              type="number" 
+            <Input
+              id="purchasedWill"
+              type="number"
               min="0"
-              placeholder="0" 
+              placeholder="0"
               className="w-24"
-              value={characterData.willpower.purchasedWill} 
-              onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))} 
+              value={characterData.willpower.purchasedWill}
+              onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))}
             />
           </div>
           <p><strong className="font-headline">Total Base Will:</strong> {totalBaseWill}</p>
@@ -418,7 +418,7 @@ export function CharacterTabContent({
         <p className="text-sm text-muted-foreground mb-1">Power Quality (Attacks, Defends, Useful) costs 2 points per Normal Die.</p>
         <p className="text-sm text-muted-foreground mb-1">Hyperstat qualities cost 4 points per Normal Die.</p>
         <p className="text-sm text-muted-foreground mb-4">Hyperskill qualities cost 1 point per Normal Die. (Hard/Wiggle dice cost 2x/4x respectively for all types). Levels, Extras, and Flaws modify these costs.</p>
-        
+
         <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
           <h4 className="text-lg font-headline mb-3">Add Miracle</h4>
           <div className="flex items-end space-x-2 mb-4">
@@ -441,7 +441,7 @@ export function CharacterTabContent({
             </Button>
           </div>
         </div>
-        
+
         {mandatoryMiracles.length > 0 && (
           <div className="mb-6">
             <h4 className="text-xl font-headline text-accent mb-3">Mandatory Miracles</h4>
@@ -490,11 +490,11 @@ export function CharacterTabContent({
                   </Button>
                 </div>
                  <div className="flex items-center space-x-1 mt-1">
-                    <input 
-                        type="checkbox" 
-                        id={`${miracle.id}-mandatory`} 
-                        checked={miracle.isMandatory} 
-                        onChange={(e) => onMiracleChange(miracle.id, 'isMandatory', e.target.checked)} 
+                    <input
+                        type="checkbox"
+                        id={`${miracle.id}-mandatory`}
+                        checked={miracle.isMandatory}
+                        onChange={(e) => onMiracleChange(miracle.id, 'isMandatory', e.target.checked)}
                         className="form-checkbox h-4 w-4 text-primary rounded"
                     />
                     <Label htmlFor={`${miracle.id}-mandatory`} className="text-xs">Mandatory</Label>
@@ -529,7 +529,7 @@ export function CharacterTabContent({
                     className="text-sm"
                   />
                 </div>
-                
+
                 <p className="font-semibold">Total Miracle Cost: {calculateMiracleTotalCost(miracle, characterData.skills)} points</p>
 
                 <div className="space-y-3 mt-3">
@@ -569,7 +569,7 @@ export function CharacterTabContent({
                         </div>
                         <div>
                           <Label htmlFor={`${quality.id}-levels`} className="text-xs">Power Quality Levels</Label>
-                          <Input 
+                          <Input
                             id={`${quality.id}-levels`}
                             type="number"
                             value={quality.levels}
@@ -580,15 +580,15 @@ export function CharacterTabContent({
                         </div>
                          <div>
                             <Label className="text-xs block">Quality Cost (Points)</Label>
-                            <Input 
-                                type="text" 
-                                readOnly 
-                                value={calculateMiracleQualityCost(quality, miracle, dynamicPqDefs)} 
+                            <Input
+                                type="text"
+                                readOnly
+                                value={calculateMiracleQualityCost(quality, miracle, dynamicPqDefs)}
                                 className="text-sm bg-muted cursor-not-allowed"
                             />
                         </div>
                       </div>
-                      
+
                       {/* Extras Section */}
                       <div className="mt-3 pt-2 border-t border-dashed">
                         <Label className="text-xs font-semibold">Extras</Label>
@@ -597,7 +597,12 @@ export function CharacterTabContent({
                             {extra.isCustom ? (
                               <>
                                 <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
-                                <Input type="number" value={extra.costModifier} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)} className="w-16 h-7 text-xs" placeholder="Cost"/>
+                                <Input
+                                  type="number"
+                                  value={extra.isCustom && isNaN(extra.costModifier) ? '' : extra.costModifier}
+                                  onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
+                                  className="w-16 h-7 text-xs" placeholder="Cost"
+                                />
                               </>
                             ) : (
                               <span className="flex-grow">{extra.name} ({extra.costModifier > 0 ? '+' : ''}{extra.costModifier})</span>
@@ -606,7 +611,7 @@ export function CharacterTabContent({
                           </div>
                         ))}
                         <div className="flex items-end space-x-1 mt-1">
-                            <Select 
+                            <Select
                                 value={selectedExtraToAdd[quality.id] || ""}
                                 onValueChange={val => setSelectedExtraToAdd(prev => ({...prev, [quality.id]: val}))}
                             >
@@ -632,7 +637,12 @@ export function CharacterTabContent({
                             {flaw.isCustom ? (
                               <>
                                 <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
-                                <Input type="number" value={flaw.costModifier} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)} className="w-16 h-7 text-xs" placeholder="Cost"/>
+                                <Input
+                                  type="number"
+                                  value={flaw.isCustom && isNaN(flaw.costModifier) ? '' : flaw.costModifier}
+                                  onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
+                                  className="w-16 h-7 text-xs" placeholder="Cost"
+                                />
                               </>
                             ) : (
                               <span className="flex-grow">{flaw.name} ({flaw.costModifier})</span>
