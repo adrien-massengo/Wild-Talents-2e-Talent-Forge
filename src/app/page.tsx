@@ -37,7 +37,7 @@ export interface CharacterData {
   // miracles: any[]; // Add structure as developed
 }
 
-const initialStatDetail: StatDetail = { dice: '1D', hardDice: '0HD', wiggleDice: '0WD' };
+const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
 
 const initialCharacterData: CharacterData = {
   basicInfo: { name: '', archetype: '', motivation: '' },
