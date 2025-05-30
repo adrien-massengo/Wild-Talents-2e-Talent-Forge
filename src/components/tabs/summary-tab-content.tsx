@@ -26,12 +26,12 @@ const formatStatDisplay = (stat: CharacterData['stats'][keyof CharacterData['sta
 export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
   const { basicInfo, stats, willpower } = characterData;
 
-  const charmDiceValue = parseInt(stats.charm.dice, 10) || 0;
-  const commandDiceValue = parseInt(stats.command.dice, 10) || 0;
+  const charmDiceValue = parseInt(stats?.charm?.dice || '0', 10);
+  const commandDiceValue = parseInt(stats?.command?.dice || '0', 10);
   const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
 
-  const purchasedBaseWill = willpower.purchasedBaseWill || 0;
-  const purchasedWill = willpower.purchasedWill || 0;
+  const purchasedBaseWill = willpower?.purchasedBaseWill || 0;
+  const purchasedWill = willpower?.purchasedWill || 0;
 
   const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
   const totalWill = totalBaseWill + purchasedWill;
@@ -60,9 +60,9 @@ export function SummaryTabContent({ characterData }: SummaryTabContentProps) {
             <CardTitle className="font-headline text-lg">Character Overview</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p><strong>Name:</strong> {basicInfo.name || "N/A"}</p>
-            <p><strong>Archetype/Concept:</strong> {basicInfo.archetype || "N/A"}</p>
-            <p><strong>Motivation:</strong> {basicInfo.motivation || "N/A"}</p>
+            <p><strong>Name:</strong> {basicInfo?.name || "N/A"}</p>
+            <p><strong>Archetype/Concept:</strong> {basicInfo?.archetype || "N/A"}</p>
+            <p><strong>Motivation:</strong> {basicInfo?.motivation || "N/A"}</p>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
