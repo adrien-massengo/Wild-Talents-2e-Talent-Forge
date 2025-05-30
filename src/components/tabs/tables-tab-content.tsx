@@ -185,6 +185,36 @@ const powerCapacitiesData: PowerCapacityData[] = [
   { dicepool: "10d", mass: "12.8 tons", range: "5,120 yards", speed: "1,280 yards", radius: "5,120 yards" },
 ];
 
+interface SizeModificationData {
+  width: string;
+  mass: string;
+  height: string;
+}
+
+const reducedSizeData: SizeModificationData[] = [
+  { width: "2", mass: "80 lbs (40 kg)", height: "4 ft" },
+  { width: "3", mass: "40 lbs (20 kg)", height: "3.5 ft" },
+  { width: "4", mass: "20 lbs (10 kg)", height: "3 ft" },
+  { width: "5", mass: "10 lbs (5 kg)", height: "2.5 ft" },
+  { width: "6", mass: "5 lbs (2.5 kg)", height: "2 ft" },
+  { width: "7", mass: "2.5 lbs (1.25 kg)", height: "1.5 ft" },
+  { width: "8", mass: "1.25 lbs (620 g)", height: "1 ft" },
+  { width: "9", mass: "10 oz (310 g)", height: "10 in" },
+  { width: "10", mass: "5 oz (155 g)", height: "8 in" },
+];
+
+const increasedSizeData: SizeModificationData[] = [
+  { width: "2", mass: "400 lbs (200 kg)", height: "8 ft (2.5 m)" },
+  { width: "3", mass: "800 lbs (400 kg)", height: "9 ft (3 m)" },
+  { width: "4", mass: "1,600 lbs (800 kg)", height: "12 ft (4 m)" },
+  { width: "5", mass: "1.6 tons", height: "15 ft (5 m)" },
+  { width: "6", mass: "3.2 tons", height: "18 ft (6 m)" },
+  { width: "7", mass: "6.4 tons", height: "25 ft (8 m)" },
+  { width: "8", mass: "12.8 tons", height: "32 ft (10 m)" },
+  { width: "9", mass: "25 tons", height: "40 ft (12 m)" },
+  { width: "10", mass: "50 tons", height: "50 ft (16 m)" },
+];
+
 
 export function TablesTabContent() {
   const allTables = [
@@ -198,21 +228,10 @@ export function TablesTabContent() {
     { title: 'Skill Examples', data: skillExamplesData, description: "Examples of what different dice pools in skills might represent in terms of proficiency." },
     { title: 'Base Will Description', data: baseWillDescriptionData, description: "Descriptions for different Base Will ranges." },
     { title: 'Power Capacities Table', data: powerCapacitiesData, description: "Detailed information and rules for Power Capacities Table." },
-    { title: 'Size Modification Tables', description: "Detailed information and rules for Size Modification Tables." },
+    { title: 'Size Modification Tables', data: { reduced: reducedSizeData, increased: increasedSizeData }, description: "Detailed information and rules for Size Modification Tables." },
   ];
 
-  const defaultOpenValues = [
-    "body-effects",
-    "body-extra",
-    "coordination-effects",
-    "sense-effects",
-    "mind-effects",
-    "charm-effects",
-    "command-effects",
-    "skill-examples",
-    "base-will-description",
-    "power-capacities-table",
-  ];
+  const defaultOpenValues = allTables.map(table => table.title.toLowerCase().replace(/\s+/g, '-'));
 
   return (
     <Accordion type="multiple" className="w-full space-y-6" defaultValue={defaultOpenValues}>
@@ -221,7 +240,7 @@ export function TablesTabContent() {
           <p className="text-muted-foreground mb-2">{tableInfo.description}</p>
           {tableInfo.note && <p className="text-xs text-muted-foreground mb-2 italic">{tableInfo.note}</p>}
           <div className="mt-4 p-1 border rounded-md bg-card/50">
-            {tableInfo.title === 'Body Effects' && tableInfo.data ? (
+            {tableInfo.title === 'Body Effects' && Array.isArray(tableInfo.data) ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -246,7 +265,7 @@ export function TablesTabContent() {
                   ))}
                 </TableBody>
               </Table>
-            ) : tableInfo.title === 'Body Extra' && tableInfo.data ? (
+            ) : tableInfo.title === 'Body Extra' && Array.isArray(tableInfo.data) ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -269,7 +288,7 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
-            ) : tableInfo.title === 'Coordination Effects' && tableInfo.data ? (
+            ) : (tableInfo.title === 'Coordination Effects' || tableInfo.title === 'Sense Effects' || tableInfo.title === 'Mind Effects' || tableInfo.title === 'Charm Effects' || tableInfo.title === 'Command Effects') && Array.isArray(tableInfo.data) ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -278,7 +297,7 @@ export function TablesTabContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(tableInfo.data as CoordinationEffectData[]).map((row) => (
+                    {(tableInfo.data as (CoordinationEffectData | SenseEffectData | MindEffectData | CharmEffectData | CommandEffectData)[]).map((row) => (
                       <TableRow key={row.dice}>
                         <TableCell>{row.dice}</TableCell>
                         <TableCell>{row.notes}</TableCell>
@@ -286,75 +305,7 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
-            ) : tableInfo.title === 'Sense Effects' && tableInfo.data ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dice</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(tableInfo.data as SenseEffectData[]).map((row) => (
-                      <TableRow key={row.dice}>
-                        <TableCell>{row.dice}</TableCell>
-                        <TableCell>{row.notes}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-            ) : tableInfo.title === 'Mind Effects' && tableInfo.data ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dice</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(tableInfo.data as MindEffectData[]).map((row) => (
-                      <TableRow key={row.dice}>
-                        <TableCell>{row.dice}</TableCell>
-                        <TableCell>{row.notes}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-            ) : tableInfo.title === 'Charm Effects' && tableInfo.data ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dice</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(tableInfo.data as CharmEffectData[]).map((row) => (
-                      <TableRow key={row.dice}>
-                        <TableCell>{row.dice}</TableCell>
-                        <TableCell>{row.notes}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-            ) : tableInfo.title === 'Command Effects' && tableInfo.data ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dice</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(tableInfo.data as CommandEffectData[]).map((row) => (
-                      <TableRow key={row.dice}>
-                        <TableCell>{row.dice}</TableCell>
-                        <TableCell>{row.notes}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-            ) : tableInfo.title === 'Skill Examples' && tableInfo.data ? (
+            ) : tableInfo.title === 'Skill Examples' && Array.isArray(tableInfo.data) ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -373,7 +324,7 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
-            ) : tableInfo.title === 'Base Will Description' && tableInfo.data ? (
+            ) : tableInfo.title === 'Base Will Description' && Array.isArray(tableInfo.data) ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -390,7 +341,7 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
-            ) : tableInfo.title === 'Power Capacities Table' && tableInfo.data ? (
+            ) : tableInfo.title === 'Power Capacities Table' && Array.isArray(tableInfo.data) ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -413,6 +364,53 @@ export function TablesTabContent() {
                     ))}
                   </TableBody>
                 </Table>
+            ) : tableInfo.title === 'Size Modification Tables' && typeof tableInfo.data === 'object' && tableInfo.data && 'reduced' in tableInfo.data && 'increased' in tableInfo.data ? (
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2">Reduced Size</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Width</TableHead>
+                          <TableHead>Mass</TableHead>
+                          <TableHead>Height</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(tableInfo.data.reduced as SizeModificationData[]).map((row) => (
+                          <TableRow key={`reduced-${row.width}`}>
+                            <TableCell>{row.width}</TableCell>
+                            <TableCell>{row.mass}</TableCell>
+                            <TableCell>{row.height}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <p className="text-xs text-muted-foreground mt-1 italic">And so on. For each 1/8 mass, or each instance of the Booster Extra, halve height.</p>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2">Increased Size</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Width</TableHead>
+                          <TableHead>Mass</TableHead>
+                          <TableHead>Height</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(tableInfo.data.increased as SizeModificationData[]).map((row) => (
+                          <TableRow key={`increased-${row.width}`}>
+                            <TableCell>{row.width}</TableCell>
+                            <TableCell>{row.mass}</TableCell>
+                            <TableCell>{row.height}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <p className="text-xs text-muted-foreground mt-1 italic">And so on. For each x8 mass, or each instance of the Booster Extra, double height.</p>
+                  </div>
+                </div>
             ) : (
               <div className="p-4 min-h-[100px]">
                 Content for {tableInfo.title} will be displayed here. This could include actual tables, descriptions, or interactive elements in a future version.
@@ -424,3 +422,4 @@ export function TablesTabContent() {
     </Accordion>
   );
 }
+
