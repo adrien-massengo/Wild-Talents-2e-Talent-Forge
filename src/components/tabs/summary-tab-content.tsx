@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 interface SummaryTabContentProps {
   characterData: CharacterData;
   onPointLimitChange: (value: number) => void;
-  onArchetypePointsChange: (value: number) => void; // Kept for potential direct override if needed, though calculation is primary
 }
 
 const formatStatDisplay = (stat: StatDetail | undefined) => {
@@ -82,8 +81,8 @@ const getEffectiveNormalDiceForEffects = (item: StatDetail | SkillInstance | und
 };
 
 
-export function SummaryTabContent({ characterData, onPointLimitChange, onArchetypePointsChange }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills, miracles, pointLimit, archetypePoints } = characterData;
+export function SummaryTabContent({ characterData, onPointLimitChange }: SummaryTabContentProps) {
+  const { basicInfo, stats, willpower, skills, miracles, pointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
 
@@ -160,10 +159,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange, onArchety
             <CardTitle className="text-xl">Overall Character Cost</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 items-center gap-2">
-                <p className="font-medium">Archetype Point Cost:</p>
-                <p>{currentArchetypePointCost}</p>
-            </div>
+            <p><span className="font-medium">Archetype Point Cost:</span> {currentArchetypePointCost}</p>
             <p>Stat Point Cost: {totalStatPoints}</p>
             <p>Willpower Point Cost: {totalWillpowerPoints}</p>
             <p>Skill Point Cost: {totalSkillPoints}</p>

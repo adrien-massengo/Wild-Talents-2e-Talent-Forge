@@ -110,7 +110,7 @@ interface MQCollapsibleProps {
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
   title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
 }) => {
-  const [isOpen, setIsOpen] = React.useState(true);
+  const [isOpen, setIsOpen] = React.useState(false); // Default to closed
 
   return (
     <Card className="bg-card/50 shadow-sm">
