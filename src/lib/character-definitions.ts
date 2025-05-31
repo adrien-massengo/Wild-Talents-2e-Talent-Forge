@@ -11,16 +11,23 @@ export interface ArchetypeDefinition {
   intrinsicsText?: string;
   additions?: string;
   mandatoryPowerText?: string;
+  // New fields to link to specific MQ IDs
+  sourceMQIds?: string[];
+  permissionMQIds?: string[];
+  intrinsicMQIds?: string[];
 }
 
 export const ARCHETYPES: ArchetypeDefinition[] = [
   {
     id: 'custom',
     name: 'Custom Archetype',
-    points: 0,
+    points: 0, // Base points for custom, actual cost from MQs
     sourceText: 'N/A',
     permissionText: 'N/A',
     description: 'You are building a custom archetype. Select Meta-Qualities below. The first positive-cost Source Meta-Quality is free.',
+    sourceMQIds: [],
+    permissionMQIds: [],
+    intrinsicMQIds: [],
   },
   {
     id: 'adept',
@@ -29,6 +36,9 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Source: Life Force',
     permissionText: 'Permission: Hypertrained',
     description: 'Your tireless study of some esoteric practice has allowed you to transcend the limitations of the human condition. By channeling your life force you have attained superhuman mastery of otherwise ordinary human abilities, allowing you to buy any number of Hyperskills and maintain a Willpower score.',
+    sourceMQIds: ['life_force'],
+    permissionMQIds: ['hypertrained'],
+    intrinsicMQIds: [],
   },
   {
     id: 'alien',
@@ -37,15 +47,22 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Source: Extraterrestrial/Extradimensional',
     permissionText: 'Permission: Power Theme',
     description: 'You are not of the Earth. Whether you are from an alternate dimension, another planet, or a paranormal continuum, you’re just not human. In this most basic form, you are assumed to be humanoid and your hit locations and wound boxes are assigned just like a normal human. If you wish to be completely alien, purchase the Custom Stats or Globular Meta-Qualities.',
+    sourceMQIds: ['extraterrestrial_extradimensional'],
+    permissionMQIds: ['power_theme'],
+    intrinsicMQIds: [],
   },
   {
     id: 'anachronist',
     name: 'Anachronist (20 Points)',
     points: 20,
-    sourceText: 'Source: Genetic, Life Force, Paranormal, Technological, or Extradimensional/Extraterrestrial (pick one)',
+    sourceText: 'Source: Genetic, Life Force, Paranormal, Technological, or Extradimensional/Extraterrestrial (pick one)', // User will pick one of these when selecting this archetype
     permissionText: 'Permission: Inventor',
     intrinsicsText: 'Intrinsic: Mutable',
     description: 'You are an inventor: one part Einstein’s brilliance, one part Tesla’s innovation, with a dash of Edison’s persistence for flavor. In your laboratory you construct devices that beggar the imagination of the world’s most accomplished scientific minds. Whether your creations are mystical or scientific in nature, they transcend what is considered the extent of human ability.',
+    // For "pick one" sources, we might need a UI hint or a default. For now, let's pre-select 'technological' as an example if chosen.
+    sourceMQIds: ['technological'], // Defaulting to technological, UI might need to allow user to pick from the list if this archetype is selected. This is complex. Let's simplify: anachronist provides one. For now, not pre-selecting a specific source. User must pick.
+    permissionMQIds: ['inventor'],
+    intrinsicMQIds: ['mutable'],
   },
   {
     id: 'artificial',
@@ -55,33 +72,46 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     permissionText: 'Permission: Super',
     intrinsicsText: 'Intrinsics: No Base Will, Mutable, Unhealing',
     description: 'You are not natural. Someone or something made you. Artificials are usually made in imitation of their creator’s race; you are assumed to be humanoid and your hit locations and wound boxes are those of a normal human, but when damaged you must be repaired rather than healing naturally.',
+    sourceMQIds: ['construct_source'],
+    permissionMQIds: ['super_permission'],
+    intrinsicMQIds: ['no_base_will', 'mutable', 'unhealing'],
   },
   {
     id: 'godlike_talent',
     name: 'Godlike Talent (0 Points)',
-    points: 0,
+    points: 0, // The archetype itself is 0, mandatory power costs separately.
     sourceText: 'Source: Psi',
     permissionText: 'Permission: Super',
     intrinsicsText: 'Intrinsics: Mandatory Power, Willpower Contest, No Willpower No Way',
     mandatoryPowerText: 'Perceive Godlike Talents 2hd (U; Flaw: See It First –1; costs 4 Points)',
     description: 'Talents from Godlike are humans with the peculiar ability to change reality with the power of their minds alone. They possess several unique abilities and limitations—such as the ability to detect and resist the powers of others of their kind. There is no physiological aspect to the phenomena; they are wholly psychic in nature. In Godlike, Talents are usually built on 25 Points with normal Stats and Skills provided free. Using Wild Talents rules such characters are built on 125 Points.',
     additions: 'For postwar Wild Talents in the Godlike world, build them normally without this Archetype. You can pick or create any other Archetype you like; they have transcended the limitations of their predecessors and are now truly superhuman.',
+    sourceMQIds: ['psi_source'],
+    permissionMQIds: ['super_permission'],
+    intrinsicMQIds: ['mandatory_power', 'willpower_contest', 'no_willpower_no_way'],
+    // Note: The Mandatory Power for Godlike Talent (Perceive Godlike Talents) would be added as a miracle by the 'mandatory_power' intrinsic logic.
   },
   {
     id: 'godling',
     name: 'Godling (20 Points)',
     points: 20,
-    sourceText: 'Sources: Divine, Paranormal',
+    sourceText: 'Sources: Divine, Paranormal', // User picks one
     permissionText: 'Permissions: Super',
     description: 'You’re not the God, but a god, surely; or perhaps you are related to a divine entity of some sort and have been exiled to spend your unnaturally long life in the mortal realm.',
+    sourceMQIds: ['divine'], // Defaulting, similar to Anachronist
+    permissionMQIds: ['super_permission'],
+    intrinsicMQIds: [],
   },
   {
     id: 'human_plus',
     name: 'Human+ (15 Points)',
     points: 15,
-    sourceText: 'Source: Genetic, Psi or Technological',
+    sourceText: 'Source: Genetic, Psi or Technological', // User picks one
     permissionText: 'Permission: Super',
     description: 'You’re a human modified by science, or something else, to be something more. Whatever experiment or accident befell you, it granted you powers beyond the rank and file of humanity.',
+    sourceMQIds: ['genetic_source'], // Defaulting
+    permissionMQIds: ['super_permission'],
+    intrinsicMQIds: [],
   },
   {
     id: 'mutant',
@@ -90,6 +120,9 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Source: Genetic',
     permissionText: 'Permission: Power Theme',
     description: 'You’re the next phase of evolution. Due to some sort of radiation-induced or genetic mutation, you are physiologically different from normal members of your species.',
+    sourceMQIds: ['genetic_source'],
+    permissionMQIds: ['power_theme'],
+    intrinsicMQIds: [],
   },
   {
     id: 'mystic',
@@ -99,6 +132,9 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     permissionText: 'Permissions: One Power (Cosmic Power), Inventor',
     intrinsicsText: 'Intrinsic: Mutable',
     description: 'You have discovered the secrets of magic. With your exceptional Willpower you focus mystical energies to create numerous superhuman effects and create magical items. (Your powers take a supernatural, magical form; instead of traditional Cosmic Power and Gadgeteering, you practice spellcasting and enchant objects.)',
+    sourceMQIds: ['paranormal_source'],
+    permissionMQIds: ['one_power', 'inventor'], // Multiple permissions
+    intrinsicMQIds: ['mutable'],
   },
   {
     id: 'super_normal',
@@ -107,6 +143,9 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Source: Driven',
     permissionText: 'Permission: Peak Performer',
     description: 'You’re an exceptional member of your species, so exceptional you’re considered superhuman by the rank and file of your native population.',
+    sourceMQIds: ['driven'],
+    permissionMQIds: ['peak_performer'],
+    intrinsicMQIds: [],
   },
 ];
 
@@ -114,7 +153,7 @@ export interface MetaQualityBase {
   id: string;
   name: string; // Full name e.g., "Source: Conduit (5 Points)"
   label: string; // Short name e.g., "Conduit"
-  points: number | ((config: any) => number);
+  points: number | ((config?: any) => number); // config can be optional for MQs without specific configs
   description?: string;
 }
 
@@ -160,12 +199,16 @@ export const ALLERGY_EFFECTS: AllergyOption[] = [
   { value: 'kills', label: 'Kills' },
   { value: 'drains_willpower', label: 'Drains Willpower' },
 ];
-export type AllergySubstanceType = typeof ALLERGY_SUBSTANCES[number]['value'];
-export type AllergyEffectType = typeof ALLERGY_EFFECTS[number]['value'];
+export type AllergySubstanceType = typeof ALLERGY_SUBSTANCES[number]['value'] | undefined;
+export type AllergyEffectType = typeof ALLERGY_EFFECTS[number]['value'] | undefined;
+
+export type BruteFrailType = 'brute' | 'frail' | undefined;
+export type DiscardedAttributeType = 'body' | 'coordination' | 'sense' | 'command' | 'charm' | undefined;
+
 
 export interface IntrinsicMetaQuality extends MetaQualityBase {
-  configKey?: 'allergyConfig' | 'bruteFrailConfig' | 'customStatsConfig' | 'mandatoryPowerConfig' | 'vulnerableConfig';
-  customStatsDiscardOptions?: Array<{ value: string; label: string; description: string }>;
+  configKey?: 'intrinsicAllergyConfig' | 'intrinsicBruteFrailConfig' | 'intrinsicCustomStatsConfig' | 'intrinsicMandatoryPowerConfig' | 'intrinsicVulnerableConfig';
+  customStatsDiscardOptions?: Array<{ value: Exclude<DiscardedAttributeType, undefined>; label: string; description: string }>;
 }
 
 export function calculateAllergyPoints(substance?: AllergySubstanceType, effect?: AllergyEffectType): number {
@@ -196,19 +239,19 @@ export function calculateAllergyPoints(substance?: AllergySubstanceType, effect?
 export const INTRINSIC_META_QUALITIES: IntrinsicMetaQuality[] = [
   {
     id: 'allergy', name: 'Intrinsic: Allergy (variable cost)', label: 'Allergy',
-    points: (config: any) => calculateAllergyPoints(config?.substance, config?.effect),
+    points: (config?: { substance?: AllergySubstanceType; effect?: AllergyEffectType }) => calculateAllergyPoints(config?.substance, config?.effect),
     description: 'You’re allergic to a substance. Exposure to it is enough to drain Willpower, incapacitate or even kill you.',
-    configKey: 'allergyConfig',
+    configKey: 'intrinsicAllergyConfig',
   },
   {
     id: 'brute_frail', name: 'Intrinsic: Brute/Frail (–8 Points)', label: 'Brute/Frail', points: -8,
     description: 'All your physical actions (including powers) are limited to a maximum width of 2 for initiative purposes only (this does not affect damage or other functions of width). This represents either overwhelming physical power (which makes it difficult to focus on small or swift targets), or a natural frailty that makes it difficult to move too fast. Pick one.',
-    configKey: 'bruteFrailConfig',
+    configKey: 'intrinsicBruteFrailConfig',
   },
   {
     id: 'custom_stats', name: 'Intrinsic: Custom Stats (5 Points)', label: 'Custom Stats', points: 5,
     description: 'Select an attribute to discard. Its box\'s contents will be replaced with specific effects.',
-    configKey: 'customStatsConfig',
+    configKey: 'intrinsicCustomStatsConfig',
     customStatsDiscardOptions: [
       { value: 'body', label: 'Body', description: 'You are immaterial and can’t interact with the physical world in any way. This includes any powers you possess—even non-physical ones. To interact with the world, you must purchase a Miracle such as Alternate Forms or Sidekick that has a Body Stat. All Body rolls made against you must be made against your Alternate Forms or Sidekick dice pool.' },
       { value: 'coordination', label: 'Coordination', description: 'You are completely motionless; you can’t move unless you purchase a power to transport you or have a buddy to carry you around.' },
@@ -228,7 +271,7 @@ export const INTRINSIC_META_QUALITIES: IntrinsicMetaQuality[] = [
   {
     id: 'mandatory_power', name: 'Intrinsic: Mandatory Power (0 Points)', label: 'Mandatory Power', points: 0,
     description: 'Some particular power is an essential part of this Archetype. This Intrinsic does not give you extra Points like other restrictive Intrinsics, but each power that’s mandatory is automatically covered by your Archetype’s Sources, at no extra cost.',
-    configKey: 'mandatoryPowerConfig',
+    configKey: 'intrinsicMandatoryPowerConfig',
   },
   {
     id: 'mutable', name: 'Intrinsic: Mutable (15 Points)', label: 'Mutable', points: 15,
@@ -252,14 +295,13 @@ export const INTRINSIC_META_QUALITIES: IntrinsicMetaQuality[] = [
   },
   {
     id: 'vulnerable', name: 'Intrinsic: Vulnerable (–2 Points per Extra Brain Box)', label: 'Vulnerable',
-    points: (config: any) => (config?.extraBoxes || 0) * -2,
+    points: (config?: { extraBoxes?: number }) => (config?.extraBoxes || 0) * -2,
     description: 'For each level of this Intrinsic you must designate one additional wound box somewhere on your body as a brain box (see Intrinsic: Globular, page 100), in addition to the basic four. If any four of your various brain boxes are filled with Shock damage, you’re rendered unconscious. If any four are filled with Killing, you’re dead. Be cautious with this Intrinsic—it makes you much more vulnerable to attack.',
-    configKey: 'vulnerableConfig',
+    configKey: 'intrinsicVulnerableConfig',
   },
   {
     id: 'willpower_contest', name: 'Intrinsic: Willpower Contest (–10 Points)', label: 'Willpower Contest', points: -10,
     description: 'Any time you use your powers on a character with Willpower and the target is aware of the attack, you must beat him in a Willpower contest. Both of you “bid” Willpower points during the resolution phase of combat, after you’ve declared and rolled. This is a “blind” bid—each side jots down the bid on scratch paper, then compare the bids. If you bid more than your target, your power works normally. If your target bids more, your power fails. Either way, you each lose the Willpower points that you’ve bid.',
   },
 ];
-
-    
+  

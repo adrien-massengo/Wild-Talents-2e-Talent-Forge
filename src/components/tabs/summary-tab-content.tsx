@@ -2,10 +2,12 @@
 // src/components/tabs/summary-tab-content.tsx
 "use client";
 
-import type { CharacterData, StatDetail, SkillInstance } from "@/app/page";
+import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/page";
 import type { MiracleDefinition, MiracleQuality, PowerQualityDefinition } from "@/lib/miracles-definitions";
 import { getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
-import { calculateMiracleQualityCost, calculateMiracleTotalCost } from "@/components/tabs/character-tab-content"; // Import calculation functions
+import { calculateMiracleQualityCost, calculateMiracleTotalCost } from "@/components/tabs/character-tab-content"; 
+import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, calculateAllergyPoints, MetaQualityBase } from "@/lib/character-definitions";
+
 
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
@@ -17,7 +19,6 @@ import { Label } from "@/components/ui/label";
 
 interface SummaryTabContentProps {
   characterData: CharacterData;
-  onArchetypePointsChange: (value: number) => void;
   onPointLimitChange: (value: number) => void;
 }
 
@@ -68,8 +69,56 @@ const formatSkillDisplay = (skill: SkillInstance | undefined) => {
   return display;
 }
 
-export function SummaryTabContent({ characterData, onArchetypePointsChange, onPointLimitChange }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills, miracles, archetypePoints, pointLimit } = characterData;
+const calculateMetaQualitiesPointCost = (
+  basicInfo: BasicInfo,
+): number => {
+  let totalCost = 0;
+  let firstPositiveSourceMQFree = false;
+
+  // Source MQs
+  for (const mqId of basicInfo.selectedSourceMQIds) {
+    const mqDef = SOURCE_META_QUALITIES.find(m => m.id === mqId);
+    if (mqDef) {
+      const points = typeof mqDef.points === 'function' ? 0 : mqDef.points; // Configurable points not used for Source MQs here
+      if (points > 0 && !firstPositiveSourceMQFree) {
+        firstPositiveSourceMQFree = true; // First positive cost Source MQ is free
+      } else {
+        totalCost += points;
+      }
+    }
+  }
+
+  // Permission MQs
+  for (const mqId of basicInfo.selectedPermissionMQIds) {
+    const mqDef = PERMISSION_META_QUALITIES.find(m => m.id === mqId);
+    if (mqDef) {
+      totalCost += typeof mqDef.points === 'function' ? 0 : mqDef.points; // Configurable points not used for Permission MQs here
+    }
+  }
+
+  // Intrinsic MQs
+  for (const mqId of basicInfo.selectedIntrinsicMQIds) {
+    const mqDef = INTRINSIC_META_QUALITIES.find(m => m.id === mqId);
+    if (mqDef) {
+      if (typeof mqDef.points === 'function') {
+        let config = {};
+        if (mqDef.configKey === 'intrinsicAllergyConfig') config = basicInfo.intrinsicAllergyConfig[mqId];
+        else if (mqDef.configKey === 'intrinsicBruteFrailConfig') config = basicInfo.intrinsicBruteFrailConfig[mqId];
+        else if (mqDef.configKey === 'intrinsicCustomStatsConfig') config = basicInfo.intrinsicCustomStatsConfig[mqId];
+        else if (mqDef.configKey === 'intrinsicMandatoryPowerConfig') config = basicInfo.intrinsicMandatoryPowerConfig[mqId];
+        else if (mqDef.configKey === 'intrinsicVulnerableConfig') config = basicInfo.intrinsicVulnerableConfig[mqId];
+        totalCost += mqDef.points(config);
+      } else {
+        totalCost += mqDef.points;
+      }
+    }
+  }
+  return totalCost;
+};
+
+
+export function SummaryTabContent({ characterData, onPointLimitChange }: SummaryTabContentProps) {
+  const { basicInfo, stats, willpower, skills, miracles, pointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
 
@@ -87,8 +136,13 @@ export function SummaryTabContent({ characterData, onArchetypePointsChange, onPo
   const totalWillpowerPoints = calculateWillpowerPoints(willpower);
   const totalSkillPoints = (skills || []).reduce((sum, skill) => sum + calculateSkillPoints(skill), 0);
   const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => sum + calculateMiracleTotalCost(miracle, skills), 0);
-  const currentArchetypePoints = archetypePoints || 0;
-  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + currentArchetypePoints;
+  
+  const selectedArchetypeDef = ARCHETYPES.find(arch => arch.id === basicInfo.selectedArchetypeId);
+  const archetypePointCost = selectedArchetypeDef && selectedArchetypeDef.id !== 'custom' 
+    ? selectedArchetypeDef.points 
+    : calculateMetaQualitiesPointCost(basicInfo);
+
+  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + archetypePointCost;
 
 
   return (
@@ -100,15 +154,8 @@ export function SummaryTabContent({ characterData, onArchetypePointsChange, onPo
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 items-center gap-2">
-              <Label htmlFor="archetype-points" className="font-medium">Archetype Point Cost:</Label>
-              <Input
-                id="archetype-points"
-                type="number"
-                min="0"
-                value={String(currentArchetypePoints)}
-                onChange={(e) => onArchetypePointsChange(parseInt(e.target.value, 10))}
-                className="w-24"
-              />
+              <p className="font-medium">Archetype Point Cost:</p>
+              <p>{archetypePointCost}</p>
             </div>
             <p>Stat Point Cost: {totalStatPoints}</p>
             <p>Willpower Point Cost: {totalWillpowerPoints}</p>
@@ -123,7 +170,7 @@ export function SummaryTabContent({ characterData, onArchetypePointsChange, onPo
                 type="number"
                 min="0"
                 value={String(pointLimit)}
-                onChange={(e) => onPointLimitChange(parseInt(e.target.value, 10))}
+                onChange={(e) => onPointLimitChange(parseInt(e.target.value, 10) || 250)}
                 className="w-24"
               />
             </div>
@@ -138,8 +185,21 @@ export function SummaryTabContent({ characterData, onArchetypePointsChange, onPo
             <CardTitle className="text-xl">{basicInfo?.name || "Unnamed Character"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p><strong>Archetype:</strong> {basicInfo?.archetype || "N/A"}</p>
+             <p><strong>Archetype:</strong> {selectedArchetypeDef?.name || "Custom"}</p>
             <p><strong>Motivation:</strong> {basicInfo?.motivation || "N/A"}</p>
+             <h4 className="font-semibold mt-2">Selected Meta-Qualities:</h4>
+            {basicInfo.selectedSourceMQIds.length > 0 && (
+                <div><strong>Source:</strong> {basicInfo.selectedSourceMQIds.map(id => SOURCE_META_QUALITIES.find(mq => mq.id === id)?.label).join(', ')}</div>
+            )}
+            {basicInfo.selectedPermissionMQIds.length > 0 && (
+                <div><strong>Permission:</strong> {basicInfo.selectedPermissionMQIds.map(id => PERMISSION_META_QUALITIES.find(mq => mq.id === id)?.label).join(', ')}</div>
+            )}
+            {basicInfo.selectedIntrinsicMQIds.length > 0 && (
+                <div><strong>Intrinsic:</strong> {basicInfo.selectedIntrinsicMQIds.map(id => INTRINSIC_META_QUALITIES.find(mq => mq.id === id)?.label).join(', ')}</div>
+            )}
+            {(basicInfo.selectedSourceMQIds.length === 0 && basicInfo.selectedPermissionMQIds.length === 0 && basicInfo.selectedIntrinsicMQIds.length === 0 && basicInfo.selectedArchetypeId === 'custom') && (
+                <p className="text-xs text-muted-foreground">No meta-qualities selected for custom archetype.</p>
+            )}
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
@@ -283,4 +343,4 @@ export function SummaryTabContent({ characterData, onArchetypePointsChange, onPo
     </Accordion>
   );
 }
-
+  

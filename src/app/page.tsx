@@ -13,7 +13,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
-import type { AllergyEffectType, AllergySubstanceType } from "@/lib/character-definitions";
+import type { AllergyEffectType, AllergySubstanceType, BruteFrailType, DiscardedAttributeType, ArchetypeDefinition } from "@/lib/character-definitions";
+import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES } from "@/lib/character-definitions";
 
 
 export interface StatDetail {
@@ -43,24 +44,34 @@ export interface BasicInfo {
   name: string;
   motivation: string;
   selectedArchetypeId?: string;
-  selectedSourceMQId?: string;
-  selectedPermissionMQId?: string;
-  selectedIntrinsicMQId?: string;
+  selectedSourceMQIds: string[];
+  selectedPermissionMQIds: string[];
+  selectedIntrinsicMQIds: string[];
   intrinsicAllergyConfig: {
-    substance?: AllergySubstanceType;
-    effect?: AllergyEffectType;
+    [intrinsicId: string]: { // Keyed by the intrinsic ID that uses this config
+        substance?: AllergySubstanceType;
+        effect?: AllergyEffectType;
+    }
   };
   intrinsicBruteFrailConfig: {
-    type?: 'brute' | 'frail';
+    [intrinsicId: string]: {
+        type?: BruteFrailType;
+    }
   };
   intrinsicCustomStatsConfig: {
-    discardedAttribute?: 'body' | 'coordination' | 'sense' | 'command' | 'charm';
+    [intrinsicId: string]: {
+        discardedAttribute?: DiscardedAttributeType;
+    }
   };
   intrinsicMandatoryPowerConfig: {
-    count: number;
+    [intrinsicId: string]: {
+        count: number;
+    }
   };
   intrinsicVulnerableConfig: {
-    extraBoxes: number;
+    [intrinsicId: string]: {
+        extraBoxes: number;
+    }
   };
 }
 
@@ -80,7 +91,6 @@ export interface CharacterData {
   };
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
-  archetypePoints: number;
   pointLimit: number;
 }
 
@@ -89,15 +99,15 @@ const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice:
 const initialBasicInfo: BasicInfo = {
   name: '',
   motivation: '',
-  selectedArchetypeId: undefined,
-  selectedSourceMQId: undefined,
-  selectedPermissionMQId: undefined,
-  selectedIntrinsicMQId: undefined,
-  intrinsicAllergyConfig: { substance: undefined, effect: undefined },
-  intrinsicBruteFrailConfig: { type: undefined },
-  intrinsicCustomStatsConfig: { discardedAttribute: undefined },
-  intrinsicMandatoryPowerConfig: { count: 0 },
-  intrinsicVulnerableConfig: { extraBoxes: 0 },
+  selectedArchetypeId: 'custom', // Default to custom
+  selectedSourceMQIds: [],
+  selectedPermissionMQIds: [],
+  selectedIntrinsicMQIds: [],
+  intrinsicAllergyConfig: {},
+  intrinsicBruteFrailConfig: {},
+  intrinsicCustomStatsConfig: {},
+  intrinsicMandatoryPowerConfig: {},
+  intrinsicVulnerableConfig: {},
 };
 
 const initialCharacterData: CharacterData = {
@@ -116,7 +126,6 @@ const initialCharacterData: CharacterData = {
   },
   skills: [],
   miracles: [],
-  archetypePoints: 0,
   pointLimit: 250,
 };
 
@@ -125,68 +134,157 @@ export default function HomePage() {
   const { toast } = useToast();
 
   const handleBasicInfoChange = (field: keyof BasicInfo, value: any) => {
-    setCharacterData(prev => ({
-      ...prev,
-      basicInfo: {
-        ...prev.basicInfo,
-        [field]: value,
+    setCharacterData(prev => {
+      const newBasicInfo = { ...prev.basicInfo, [field]: value };
+
+      if (field === 'selectedArchetypeId') {
+        const archetype = ARCHETYPES.find(arch => arch.id === value);
+        if (archetype && archetype.id !== 'custom') {
+          newBasicInfo.selectedSourceMQIds = archetype.sourceMQIds || [];
+          newBasicInfo.selectedPermissionMQIds = archetype.permissionMQIds || [];
+          newBasicInfo.selectedIntrinsicMQIds = archetype.intrinsicMQIds || [];
+          // Reset specific configs for intrinsics not in the new archetype
+          // This is a simplification; a more robust solution would track configs per MQ ID
+          const currentIntrinsicConfigs = {
+            intrinsicAllergyConfig: { ...newBasicInfo.intrinsicAllergyConfig },
+            intrinsicBruteFrailConfig: { ...newBasicInfo.intrinsicBruteFrailConfig },
+            intrinsicCustomStatsConfig: { ...newBasicInfo.intrinsicCustomStatsConfig },
+            intrinsicMandatoryPowerConfig: { ...newBasicInfo.intrinsicMandatoryPowerConfig },
+            intrinsicVulnerableConfig: { ...newBasicInfo.intrinsicVulnerableConfig },
+          };
+          newBasicInfo.intrinsicAllergyConfig = {};
+          newBasicInfo.intrinsicBruteFrailConfig = {};
+          newBasicInfo.intrinsicCustomStatsConfig = {};
+          newBasicInfo.intrinsicMandatoryPowerConfig = {};
+          newBasicInfo.intrinsicVulnerableConfig = {};
+
+          (archetype.intrinsicMQIds || []).forEach(mqId => {
+            const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
+            if (intrinsicDef?.configKey) {
+                // @ts-ignore
+                newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey][mqId] || (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' || intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {count:0, extraBoxes:0} : {});
+                 if (intrinsicDef.id === 'mandatory_power') {
+                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
+                    handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, prev.miracles);
+                }
+            }
+          });
+
+
+        } else if (value === 'custom') {
+          // If switching to custom, retain manually selected MQs.
+          // No specific action needed here as manual changes handle this.
+        }
       }
-    }));
+      return { ...prev, basicInfo: newBasicInfo };
+    });
+  };
+
+  const handleMQSelectionChange = (
+    mqType: 'source' | 'permission' | 'intrinsic',
+    mqId: string,
+    isSelected: boolean
+  ) => {
+    setCharacterData(prev => {
+      const newBasicInfo = { ...prev.basicInfo };
+      let currentSelection: string[] = [];
+
+      if (mqType === 'source') currentSelection = [...newBasicInfo.selectedSourceMQIds];
+      else if (mqType === 'permission') currentSelection = [...newBasicInfo.selectedPermissionMQIds];
+      else if (mqType === 'intrinsic') currentSelection = [...newBasicInfo.selectedIntrinsicMQIds];
+
+      if (isSelected) {
+        if (!currentSelection.includes(mqId)) {
+          currentSelection.push(mqId);
+        }
+      } else {
+        currentSelection = currentSelection.filter(id => id !== mqId);
+        // If an intrinsic is deselected, remove its config
+        if (mqType === 'intrinsic') {
+            const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
+            if (intrinsicDef?.configKey) {
+                 // @ts-ignore
+                delete newBasicInfo[intrinsicDef.configKey][mqId];
+                 if (intrinsicDef.id === 'mandatory_power') {
+                    handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, prev.miracles); // Remove mandatory powers
+                }
+            }
+        }
+      }
+
+      if (mqType === 'source') newBasicInfo.selectedSourceMQIds = currentSelection;
+      else if (mqType === 'permission') newBasicInfo.selectedPermissionMQIds = currentSelection;
+      else if (mqType === 'intrinsic') newBasicInfo.selectedIntrinsicMQIds = currentSelection;
+      
+      // If any MQ is changed, archetype becomes custom
+      newBasicInfo.selectedArchetypeId = 'custom';
+
+      return { ...prev, basicInfo: newBasicInfo };
+    });
   };
   
   const handleIntrinsicConfigChange = (
-    configKey: keyof BasicInfo,
+    intrinsicId: string, // ID of the specific intrinsic MQ being configured
+    configKey: keyof Omit<BasicInfo, 'name'|'motivation'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>,
     field: string,
-    value: any
+    value: any,
+    currentMiracles?: MiracleDefinition[] // Pass current miracles for mandatory power logic
   ) => {
-    setCharacterData(prev => ({
-      ...prev,
-      basicInfo: {
-        ...prev.basicInfo,
-        [configKey]: {
-          // @ts-ignore
-          ...prev.basicInfo[configKey],
-          [field]: value,
-        }
+    setCharacterData(prev => {
+        const miraclesToUpdate = currentMiracles || prev.miracles;
+        const newBasicInfo = {
+         ...prev.basicInfo,
+         [configKey]: {
+           ...prev.basicInfo[configKey],
+           [intrinsicId]: {
+             // @ts-ignore
+             ...(prev.basicInfo[configKey][intrinsicId] || {}),
+             [field]: value,
+           }
+         }
+       };
+
+      if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
+          const newCount = Math.max(0, Number(value) || 0);
+          // Filter for mandatory miracles associated with *this specific* intrinsic instance
+          const mandatoryMiraclesForThisIntrinsic = miraclesToUpdate.filter(m => 
+            m.isMandatory && m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`)
+          );
+          const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
+
+          let updatedMiracles = [...miraclesToUpdate];
+
+          if (difference > 0) { // Add miracles
+              for (let i = 0; i < difference; i++) {
+                  const newMandatoryMiracle: MiracleDefinition = {
+                      id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
+                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, // Include intrinsicId
+                      name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'Intrinsic'})`,
+                      dice: '1D',
+                      hardDice: '0HD',
+                      wiggleDice: '0WD',
+                      qualities: [],
+                      description: `This power is mandated by the ${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'selected'} intrinsic.`,
+                      isCustom: true, 
+                      isMandatory: true,
+                  };
+                  updatedMiracles.push(newMandatoryMiracle);
+              }
+          } else if (difference < 0) { // Remove miracles
+              const miraclesToRemove = Math.abs(difference);
+              let removedCount = 0;
+              updatedMiracles = updatedMiracles.filter(m => {
+                  if (m.isMandatory && m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) && removedCount < miraclesToRemove) {
+                      removedCount++;
+                      return false;
+                  }
+                  return true;
+              });
+          }
+          return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
       }
-    }));
-
-    if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
-        const newCount = Math.max(0, Number(value) || 0);
-        const currentMandatoryMiracles = prev.miracles.filter(m => m.isMandatory && m.definitionId?.startsWith('archetype-mandatory-'));
-        const difference = newCount - currentMandatoryMiracles.length;
-
-        let updatedMiracles = [...prev.miracles];
-
-        if (difference > 0) { // Add miracles
-            for (let i = 0; i < difference; i++) {
-                const newMandatoryMiracle: MiracleDefinition = {
-                    id: `miracle-archetype-mandatory-${Date.now()}-${i}`,
-                    definitionId: `archetype-mandatory-${Date.now()}-${i}`,
-                    name: 'Mandatory Archetype Power',
-                    dice: '1D',
-                    hardDice: '0HD',
-                    wiggleDice: '0WD',
-                    qualities: [],
-                    description: 'This power is mandated by an archetype intrinsic.',
-                    isCustom: true, // Or false if it's based on a non-editable template
-                    isMandatory: true,
-                };
-                updatedMiracles.push(newMandatoryMiracle);
-            }
-        } else if (difference < 0) { // Remove miracles
-            const miraclesToRemove = Math.abs(difference);
-            let removedCount = 0;
-            updatedMiracles = updatedMiracles.filter(m => {
-                if (m.isMandatory && m.definitionId?.startsWith('archetype-mandatory-') && removedCount < miraclesToRemove) {
-                    removedCount++;
-                    return false;
-                }
-                return true;
-            });
-        }
-        setCharacterData(prevData => ({ ...prevData, miracles: updatedMiracles }));
-    }
+      return { ...prev, basicInfo: newBasicInfo };
+    });
   };
 
 
@@ -305,12 +403,12 @@ export default function HomePage() {
       newMiracle = {
         ...template,
         id: `miracle-${template.definitionId}-${Date.now()}`,
-        dice: '1D', // Default dice for predefined, can be adjusted
+        dice: '1D', 
         hardDice: '0HD',
         wiggleDice: '0WD',
-        qualities: template.qualities.map(q => ({...q, id: `${q.id}-${Date.now()}`})), // ensure unique quality IDs
+        qualities: template.qualities.map(q => ({...q, id: `${q.id}-${Date.now()}`})), 
         isCustom: false,
-        isMandatory: false, // Default, can be changed
+        isMandatory: false, 
       };
     }
     setCharacterData(prev => ({ ...prev, miracles: [...prev.miracles, newMiracle] }));
@@ -324,7 +422,6 @@ export default function HomePage() {
   };
 
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
-     // Prevent unchecking 'isMandatory' for archetype-mandated miracles
      const miracle = characterData.miracles.find(m => m.id === miracleId);
      if (miracle && miracle.definitionId?.startsWith('archetype-mandatory-') && field === 'isMandatory' && !value) {
        toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic.", variant: "destructive"});
@@ -340,8 +437,8 @@ export default function HomePage() {
   const handleAddMiracleQuality = (miracleId: string) => {
     const newQuality: MiracleQuality = {
       id: `quality-${Date.now()}`,
-      type: 'attacks', // Default type
-      capacity: 'touch', // Default capacity
+      type: 'useful', 
+      capacity: 'touch', 
       levels: 0,
       extras: [],
       flaws: [],
@@ -400,11 +497,11 @@ export default function HomePage() {
         costModifier: definition.costModifier,
         isCustom: false,
       };
-    } else { // Custom
+    } else { 
       newItem = {
         id: `custom-${itemType}-${Date.now()}`,
         name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
-        costModifier: itemType === 'extra' ? 1 : -1, // Default custom costs
+        costModifier: itemType === 'extra' ? 1 : -1, 
         isCustom: true,
       };
     }
@@ -488,14 +585,7 @@ export default function HomePage() {
       ),
     }));
   };
-
-  const handleArchetypePointsChange = (value: number) => {
-    setCharacterData(prev => ({
-      ...prev,
-      archetypePoints: isNaN(value) ? 0 : Math.max(0, value),
-    }));
-  };
-
+  
   const handlePointLimitChange = (value: number) => {
     setCharacterData(prev => ({
       ...prev,
@@ -527,19 +617,36 @@ export default function HomePage() {
       if (savedData) {
         const parsedData = JSON.parse(savedData) as Partial<CharacterData>;
 
+        // Ensure basicInfo and its nested config objects exist and are properly typed
+        const loadedBasicInfo: BasicInfo = {
+            ...initialCharacterData.basicInfo, // Start with defaults
+            ...(parsedData.basicInfo || {}), // Spread loaded basicInfo
+            selectedSourceMQIds: Array.isArray(parsedData.basicInfo?.selectedSourceMQIds) ? parsedData.basicInfo.selectedSourceMQIds : [],
+            selectedPermissionMQIds: Array.isArray(parsedData.basicInfo?.selectedPermissionMQIds) ? parsedData.basicInfo.selectedPermissionMQIds : [],
+            selectedIntrinsicMQIds: Array.isArray(parsedData.basicInfo?.selectedIntrinsicMQIds) ? parsedData.basicInfo.selectedIntrinsicMQIds : [],
+            intrinsicAllergyConfig: {...(parsedData.basicInfo?.intrinsicAllergyConfig || {})},
+            intrinsicBruteFrailConfig: {...(parsedData.basicInfo?.intrinsicBruteFrailConfig || {})},
+            intrinsicCustomStatsConfig: {...(parsedData.basicInfo?.intrinsicCustomStatsConfig || {})},
+            intrinsicMandatoryPowerConfig: {...(parsedData.basicInfo?.intrinsicMandatoryPowerConfig || {})},
+            intrinsicVulnerableConfig: {...(parsedData.basicInfo?.intrinsicVulnerableConfig || {})},
+        };
+         // Ensure count/extraBoxes are numbers
+        Object.keys(loadedBasicInfo.intrinsicMandatoryPowerConfig).forEach(key => {
+            if (typeof loadedBasicInfo.intrinsicMandatoryPowerConfig[key].count !== 'number') {
+                loadedBasicInfo.intrinsicMandatoryPowerConfig[key].count = 0;
+            }
+        });
+        Object.keys(loadedBasicInfo.intrinsicVulnerableConfig).forEach(key => {
+             if (typeof loadedBasicInfo.intrinsicVulnerableConfig[key].extraBoxes !== 'number') {
+                loadedBasicInfo.intrinsicVulnerableConfig[key].extraBoxes = 0;
+            }
+        });
+
+
         const validatedData: CharacterData = {
           ...initialCharacterData,
           ...parsedData,
-          basicInfo: { 
-            ...initialBasicInfo, 
-            ...(parsedData.basicInfo || {}),
-            // Ensure nested config objects exist
-            intrinsicAllergyConfig: { ...initialBasicInfo.intrinsicAllergyConfig, ...(parsedData.basicInfo?.intrinsicAllergyConfig || {}) },
-            intrinsicBruteFrailConfig: { ...initialBasicInfo.intrinsicBruteFrailConfig, ...(parsedData.basicInfo?.intrinsicBruteFrailConfig || {}) },
-            intrinsicCustomStatsConfig: { ...initialBasicInfo.intrinsicCustomStatsConfig, ...(parsedData.basicInfo?.intrinsicCustomStatsConfig || {}) },
-            intrinsicMandatoryPowerConfig: { ...initialBasicInfo.intrinsicMandatoryPowerConfig, ...(parsedData.basicInfo?.intrinsicMandatoryPowerConfig || {}) },
-            intrinsicVulnerableConfig: { ...initialBasicInfo.intrinsicVulnerableConfig, ...(parsedData.basicInfo?.intrinsicVulnerableConfig || {}) },
-          },
+          basicInfo: loadedBasicInfo,
           stats: { ...initialCharacterData.stats }, 
           willpower: { ...initialCharacterData.willpower, ...(parsedData.willpower || {}) },
           skills: parsedData.skills ? parsedData.skills.map(skill => ({
@@ -651,7 +758,6 @@ export default function HomePage() {
               }) : [],
             };
           }) : [],
-          archetypePoints: typeof parsedData.archetypePoints === 'number' ? parsedData.archetypePoints : initialCharacterData.archetypePoints,
           pointLimit: typeof parsedData.pointLimit === 'number' && parsedData.pointLimit >=0 ? parsedData.pointLimit : initialCharacterData.pointLimit,
         };
 
@@ -737,6 +843,7 @@ export default function HomePage() {
                 <CharacterTabContent
                   characterData={characterData}
                   onBasicInfoChange={handleBasicInfoChange}
+                  onMQSelectionChange={handleMQSelectionChange}
                   onIntrinsicConfigChange={handleIntrinsicConfigChange}
                   onStatChange={handleStatChange}
                   onWillpowerChange={handleWillpowerChange}
@@ -761,7 +868,6 @@ export default function HomePage() {
               <TabsContent value="summary" className="mt-0">
                 <SummaryTabContent
                   characterData={characterData}
-                  onArchetypePointsChange={handleArchetypePointsChange}
                   onPointLimitChange={handlePointLimitChange}
                 />
               </TabsContent>
@@ -775,6 +881,4 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-    
+  

@@ -7,7 +7,12 @@ import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
-import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, ALLERGY_SUBSTANCES, ALLERGY_EFFECTS, calculateAllergyPoints, type IntrinsicMetaQuality } from "@/lib/character-definitions";
+import { 
+  ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, 
+  ALLERGY_SUBSTANCES, ALLERGY_EFFECTS,
+  type IntrinsicMetaQuality, type SourceMetaQuality, type PermissionMetaQuality,
+  type AllergySubstanceType, type AllergyEffectType, type BruteFrailType, type DiscardedAttributeType
+} from "@/lib/character-definitions";
 
 
 import * as React from "react";
@@ -18,14 +23,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Trash2, PlusCircle } from "lucide-react";
+import { Trash2, PlusCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
   onBasicInfoChange: (field: keyof BasicInfo, value: any) => void;
-  onIntrinsicConfigChange: (configKey: keyof BasicInfo, field: string, value: any) => void;
+  onMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
+  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivation'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
   onAddSkill: (skillDef: PredefinedSkillDef) => void;
@@ -90,10 +97,152 @@ export const calculateMiracleTotalCost = (miracle: MiracleDefinition, skills: Sk
   return miracle.qualities.reduce((sum, quality) => sum + calculateMiracleQualityCost(quality, miracle, dynamicPqDefs), 0);
 };
 
+interface MQCollapsibleProps {
+  title: string;
+  mqList: (SourceMetaQuality | PermissionMetaQuality | IntrinsicMetaQuality)[];
+  selectedMQIds: string[];
+  onMQSelectionChange: (mqId: string, isSelected: boolean) => void;
+  basicInfo: BasicInfo;
+  onIntrinsicConfigChange: CharacterTabContentProps['onIntrinsicConfigChange'];
+  mqType: 'source' | 'permission' | 'intrinsic';
+}
+
+const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
+  title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
+}) => {
+  const [isOpen, setIsOpen] = React.useState(true);
+
+  return (
+    <Card className="bg-card/50 shadow-sm">
+      <CardHeader 
+        className="flex flex-row items-center justify-between p-3 cursor-pointer hover:bg-accent/5"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <CardTitle className="text-lg font-headline">{title}</CardTitle>
+        {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+      </CardHeader>
+      {isOpen && (
+        <CardContent className="p-3 space-y-3">
+          {mqList.map(mq => (
+            <div key={mq.id} className="p-2 border rounded-md bg-background/70">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id={`${mqType}-${mq.id}`}
+                  checked={selectedMQIds.includes(mq.id)}
+                  onCheckedChange={(checked) => onMQSelectionChange(mq.id, !!checked)}
+                />
+                <Label htmlFor={`${mqType}-${mq.id}`} className="text-sm font-medium flex-grow">
+                  {mq.name}
+                </Label>
+              </div>
+              {selectedMQIds.includes(mq.id) && (
+                <div className="mt-2 pl-6 text-xs space-y-2">
+                  <p className="text-muted-foreground">{mq.description}</p>
+                  {mqType === 'intrinsic' && (mq as IntrinsicMetaQuality).configKey && (
+                    <div className="p-2 border rounded-md bg-muted/30 space-y-2">
+                      <h5 className="text-xs font-semibold">Configuration:</h5>
+                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicAllergyConfig' && (
+                        <>
+                          <div>
+                            <Label htmlFor={`${mq.id}-allergySubstance`} className="text-xs">Allergy Substance</Label>
+                            <Select
+                              value={basicInfo.intrinsicAllergyConfig[mq.id]?.substance}
+                              onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicAllergyConfig', 'substance', val as AllergySubstanceType)}
+                            >
+                              <SelectTrigger id={`${mq.id}-allergySubstance`} className="h-8 text-xs"><SelectValue placeholder="Select substance..."/></SelectTrigger>
+                              <SelectContent>
+                                {ALLERGY_SUBSTANCES.map(s => <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor={`${mq.id}-allergyEffect`} className="text-xs">Allergy Effect</Label>
+                            <Select
+                              value={basicInfo.intrinsicAllergyConfig[mq.id]?.effect}
+                              onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicAllergyConfig', 'effect', val as AllergyEffectType)}
+                            >
+                              <SelectTrigger id={`${mq.id}-allergyEffect`} className="h-8 text-xs"><SelectValue placeholder="Select effect..."/></SelectTrigger>
+                              <SelectContent>
+                                {ALLERGY_EFFECTS.map(e => <SelectItem key={e.value} value={e.value} className="text-xs">{e.label}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicBruteFrailConfig' && (
+                        <div>
+                          <Label className="text-xs">Type</Label>
+                          <RadioGroup
+                            value={basicInfo.intrinsicBruteFrailConfig[mq.id]?.type}
+                            onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicBruteFrailConfig', 'type', val as BruteFrailType)}
+                            className="flex space-x-3 mt-1"
+                          >
+                            <div className="flex items-center space-x-1"><RadioGroupItem value="brute" id={`${mq.id}-brute`} className="h-3 w-3"/><Label htmlFor={`${mq.id}-brute`} className="text-xs font-normal">Brute</Label></div>
+                            <div className="flex items-center space-x-1"><RadioGroupItem value="frail" id={`${mq.id}-frail`} className="h-3 w-3"/><Label htmlFor={`${mq.id}-frail`} className="text-xs font-normal">Frail</Label></div>
+                          </RadioGroup>
+                        </div>
+                      )}
+                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicCustomStatsConfig' && (
+                        <div>
+                          <Label className="text-xs">Discard Attribute</Label>
+                          <RadioGroup
+                            value={basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute}
+                            onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicCustomStatsConfig', 'discardedAttribute', val as DiscardedAttributeType)}
+                            className="mt-1 space-y-1"
+                          >
+                            {(mq as IntrinsicMetaQuality).customStatsDiscardOptions?.map(opt => (
+                              <div key={opt.value} className="flex items-center space-x-1">
+                                <RadioGroupItem value={opt.value} id={`${mq.id}-cs-${opt.value}`} className="h-3 w-3"/>
+                                <Label htmlFor={`${mq.id}-cs-${opt.value}`} className="text-xs font-normal">{opt.label}</Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                           {basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">
+                                  {(mq as IntrinsicMetaQuality).customStatsDiscardOptions?.find(opt => opt.value === basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute)?.description}
+                              </p>
+                          )}
+                        </div>
+                      )}
+                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicMandatoryPowerConfig' && (
+                        <div>
+                          <Label htmlFor={`${mq.id}-mandatoryPowerCount`} className="text-xs">Number of Mandatory Powers</Label>
+                          <Input
+                            id={`${mq.id}-mandatoryPowerCount`} type="number" min="0"
+                            value={basicInfo.intrinsicMandatoryPowerConfig[mq.id]?.count ?? 0}
+                            onChange={(e) => onIntrinsicConfigChange(mq.id, 'intrinsicMandatoryPowerConfig', 'count', parseInt(e.target.value) || 0)}
+                            className="w-16 h-8 mt-1 text-xs"
+                          />
+                        </div>
+                      )}
+                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicVulnerableConfig' && (
+                         <div>
+                          <Label htmlFor={`${mq.id}-vulnerableExtraBoxes`} className="text-xs">Number of Extra Brain Boxes</Label>
+                          <Input
+                            id={`${mq.id}-vulnerableExtraBoxes`} type="number" min="0"
+                            value={basicInfo.intrinsicVulnerableConfig[mq.id]?.extraBoxes ?? 0}
+                            onChange={(e) => onIntrinsicConfigChange(mq.id, 'intrinsicVulnerableConfig', 'extraBoxes', parseInt(e.target.value) || 0)}
+                            className="w-16 h-8 mt-1 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
 
 export function CharacterTabContent({
   characterData,
   onBasicInfoChange,
+  onMQSelectionChange,
   onIntrinsicConfigChange,
   onStatChange,
   onWillpowerChange,
@@ -155,8 +304,7 @@ export function CharacterTabContent({
   const regularMiracles = characterData.miracles.filter(m => !m.isMandatory);
 
   const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
-  const selectedIntrinsic = INTRINSIC_META_QUALITIES.find(intr => intr.id === characterData.basicInfo.selectedIntrinsicMQId);
-
+  
   return (
     <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles"]}>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
@@ -167,7 +315,7 @@ export function CharacterTabContent({
           </div>
           
           <div>
-            <Label htmlFor="archetype" className="font-headline">Archetype</Label>
+            <Label htmlFor="archetype" className="font-headline">Sample Archetype</Label>
             <Select value={characterData.basicInfo.selectedArchetypeId} onValueChange={(value) => onBasicInfoChange('selectedArchetypeId', value)}>
               <SelectTrigger id="archetype"><SelectValue placeholder="Select Archetype..." /></SelectTrigger>
               <SelectContent>
@@ -186,144 +334,36 @@ export function CharacterTabContent({
             )}
           </div>
 
-          <div>
-            <Label htmlFor="sourceMQ" className="font-headline">Source Meta-Quality</Label>
-            <Select value={characterData.basicInfo.selectedSourceMQId} onValueChange={(value) => onBasicInfoChange('selectedSourceMQId', value)}>
-              <SelectTrigger id="sourceMQ"><SelectValue placeholder="Select Source Meta-Quality..." /></SelectTrigger>
-              <SelectContent>
-                {SOURCE_META_QUALITIES.map(mq => <SelectItem key={mq.id} value={mq.id}>{mq.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {SOURCE_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedSourceMQId)?.description && (
-              <p className="text-xs text-muted-foreground mt-1">{SOURCE_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedSourceMQId)?.description}</p>
-            )}
-          </div>
+          <MetaQualityCollapsible
+            title="Source Meta-Qualities"
+            mqList={SOURCE_META_QUALITIES}
+            selectedMQIds={characterData.basicInfo.selectedSourceMQIds}
+            onMQSelectionChange={(mqId, isSelected) => onMQSelectionChange('source', mqId, isSelected)}
+            basicInfo={characterData.basicInfo}
+            onIntrinsicConfigChange={onIntrinsicConfigChange}
+            mqType="source"
+          />
 
-          <div>
-            <Label htmlFor="permissionMQ" className="font-headline">Permission Meta-Quality</Label>
-            <Select value={characterData.basicInfo.selectedPermissionMQId} onValueChange={(value) => onBasicInfoChange('selectedPermissionMQId', value)}>
-              <SelectTrigger id="permissionMQ"><SelectValue placeholder="Select Permission Meta-Quality..." /></SelectTrigger>
-              <SelectContent>
-                {PERMISSION_META_QUALITIES.map(mq => <SelectItem key={mq.id} value={mq.id}>{mq.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {PERMISSION_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedPermissionMQId)?.description && (
-              <p className="text-xs text-muted-foreground mt-1">{PERMISSION_META_QUALITIES.find(mq => mq.id === characterData.basicInfo.selectedPermissionMQId)?.description}</p>
-            )}
-          </div>
+          <MetaQualityCollapsible
+            title="Permission Meta-Qualities"
+            mqList={PERMISSION_META_QUALITIES}
+            selectedMQIds={characterData.basicInfo.selectedPermissionMQIds}
+            onMQSelectionChange={(mqId, isSelected) => onMQSelectionChange('permission', mqId, isSelected)}
+            basicInfo={characterData.basicInfo}
+            onIntrinsicConfigChange={onIntrinsicConfigChange}
+            mqType="permission"
+          />
+
+          <MetaQualityCollapsible
+            title="Intrinsic Meta-Qualities"
+            mqList={INTRINSIC_META_QUALITIES}
+            selectedMQIds={characterData.basicInfo.selectedIntrinsicMQIds}
+            onMQSelectionChange={(mqId, isSelected) => onMQSelectionChange('intrinsic', mqId, isSelected)}
+            basicInfo={characterData.basicInfo}
+            onIntrinsicConfigChange={onIntrinsicConfigChange}
+            mqType="intrinsic"
+          />
           
-          <div>
-            <Label htmlFor="intrinsicMQ" className="font-headline">Intrinsic Meta-Quality</Label>
-            <Select value={characterData.basicInfo.selectedIntrinsicMQId} onValueChange={(value) => onBasicInfoChange('selectedIntrinsicMQId', value)}>
-              <SelectTrigger id="intrinsicMQ"><SelectValue placeholder="Select Intrinsic Meta-Quality..." /></SelectTrigger>
-              <SelectContent>
-                {INTRINSIC_META_QUALITIES.map(mq => <SelectItem key={mq.id} value={mq.id}>{mq.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {selectedIntrinsic?.description && (
-              <p className="text-xs text-muted-foreground mt-1">{selectedIntrinsic.description}</p>
-            )}
-            {selectedIntrinsic && selectedIntrinsic.configKey && (
-              <Card className="mt-2 p-3 space-y-2 bg-muted/50">
-                {selectedIntrinsic.configKey === 'allergyConfig' && (
-                  <>
-                    <div>
-                      <Label htmlFor="allergySubstance" className="text-sm">Allergy Substance</Label>
-                      <Select 
-                        value={characterData.basicInfo.intrinsicAllergyConfig.substance} 
-                        onValueChange={(val) => onIntrinsicConfigChange('intrinsicAllergyConfig', 'substance', val)}
-                      >
-                        <SelectTrigger id="allergySubstance"><SelectValue placeholder="Select substance..."/></SelectTrigger>
-                        <SelectContent>
-                          {ALLERGY_SUBSTANCES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="allergyEffect" className="text-sm">Allergy Effect</Label>
-                      <Select 
-                        value={characterData.basicInfo.intrinsicAllergyConfig.effect}
-                        onValueChange={(val) => onIntrinsicConfigChange('intrinsicAllergyConfig', 'effect', val)}
-                      >
-                        <SelectTrigger id="allergyEffect"><SelectValue placeholder="Select effect..."/></SelectTrigger>
-                        <SelectContent>
-                          {ALLERGY_EFFECTS.map(e => <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
-                {selectedIntrinsic.configKey === 'bruteFrailConfig' && (
-                  <div>
-                    <Label className="text-sm">Type</Label>
-                    <RadioGroup 
-                      value={characterData.basicInfo.intrinsicBruteFrailConfig.type} 
-                      onValueChange={(val) => onIntrinsicConfigChange('intrinsicBruteFrailConfig', 'type', val)}
-                      className="flex space-x-4 mt-1"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="brute" id="brute"/>
-                        <Label htmlFor="brute">Brute</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="frail" id="frail"/>
-                        <Label htmlFor="frail">Frail</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                )}
-                 {selectedIntrinsic.configKey === 'customStatsConfig' && (
-                  <div>
-                    <Label className="text-sm">Discard Attribute</Label>
-                    <RadioGroup
-                      value={characterData.basicInfo.intrinsicCustomStatsConfig.discardedAttribute}
-                      onValueChange={(val) => onIntrinsicConfigChange('intrinsicCustomStatsConfig', 'discardedAttribute', val)}
-                      className="mt-1 space-y-1"
-                    >
-                      {selectedIntrinsic.customStatsDiscardOptions?.map(opt => (
-                        <div key={opt.value} className="flex items-center space-x-2">
-                          <RadioGroupItem value={opt.value} id={`cs-${opt.value}`} />
-                          <Label htmlFor={`cs-${opt.value}`} className="font-normal">{opt.label}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                    {characterData.basicInfo.intrinsicCustomStatsConfig.discardedAttribute && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">
-                            {selectedIntrinsic.customStatsDiscardOptions?.find(opt => opt.value === characterData.basicInfo.intrinsicCustomStatsConfig.discardedAttribute)?.description}
-                        </p>
-                    )}
-                  </div>
-                )}
-                {selectedIntrinsic.configKey === 'mandatoryPowerConfig' && (
-                  <div>
-                    <Label htmlFor="mandatoryPowerCount" className="text-sm">Number of Mandatory Powers</Label>
-                    <Input 
-                      id="mandatoryPowerCount" 
-                      type="number" 
-                      min="0" 
-                      value={characterData.basicInfo.intrinsicMandatoryPowerConfig.count}
-                      onChange={(e) => onIntrinsicConfigChange('intrinsicMandatoryPowerConfig', 'count', parseInt(e.target.value) || 0)}
-                      className="w-20 mt-1"
-                    />
-                  </div>
-                )}
-                {selectedIntrinsic.configKey === 'vulnerableConfig' && (
-                   <div>
-                    <Label htmlFor="vulnerableExtraBoxes" className="text-sm">Number of Extra Brain Boxes</Label>
-                    <Input 
-                      id="vulnerableExtraBoxes" 
-                      type="number" 
-                      min="0" 
-                      value={characterData.basicInfo.intrinsicVulnerableConfig.extraBoxes}
-                      onChange={(e) => onIntrinsicConfigChange('intrinsicVulnerableConfig', 'extraBoxes', parseInt(e.target.value) || 0)}
-                      className="w-20 mt-1"
-                    />
-                  </div>
-                )}
-              </Card>
-            )}
-          </div>
-
           <div>
             <Label htmlFor="charMotivation" className="font-headline">Motivation / Goals</Label>
             <Textarea id="charMotivation" placeholder="What drives your character?" value={characterData.basicInfo.motivation} onChange={(e) => onBasicInfoChange('motivation', e.target.value)} />
@@ -842,5 +882,4 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
-
-    
+  
