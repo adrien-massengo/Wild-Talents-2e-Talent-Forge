@@ -136,6 +136,18 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     intrinsicMQIds: ['mutable'],
   },
   {
+    id: 'pinioned',
+    name: 'Pinioned (15 Points)',
+    points: 15,
+    sourceText: 'Source: Technological',
+    permissionText: 'Permission: Power Theme',
+    intrinsicsText: 'Intrinsics: Mutable, No Willpower No Way',
+    description: 'This is the archetype for characters who came out of the U.S. government’s defunct, top-secret “super soldier” program, Project PINION. It aimed to create superhumans like mutants but built to specification. It didn’t always work out like that. Only a handful of subjects survived with their bodies and minds intact.\nA character with this archetype has a set of superpowers that are typically related to each other or to some core theme or concept, and usually that concept is tied somehow to the character’s self-image. Sometimes that self-image is private, and sometimes it’s subconscious, not even known to the character. Since psyche and Talent are so closely linked, the powers sometimes change and evolve. But by the same token, when these characters are at their emotional worst their powers fail them entirely.',
+    sourceMQIds: ['technological'],
+    permissionMQIds: ['power_theme'],
+    intrinsicMQIds: ['mutable', 'no_willpower_no_way'],
+  },
+  {
     id: 'super_normal',
     name: 'Super-Normal (5 Points)',
     points: 5,
@@ -312,10 +324,9 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   basicInfo.selectedSourceMQIds.forEach(id => {
     const mq = SOURCE_META_QUALITIES.find(m => m.id === id);
     if (mq) {
-      const points = typeof mq.points === 'function' ? mq.points({}) : mq.points; // Pass empty config if not needed
+      const points = typeof mq.points === 'function' ? mq.points({}) : mq.points; 
       if (points > 0 && !firstPositiveSourceCostApplied && basicInfo.selectedArchetypeId === 'custom') {
         firstPositiveSourceCostApplied = true;
-        // First positive source MQ is free for custom archetype, so no points added for this one.
       } else {
         totalPoints += points;
       }
@@ -326,7 +337,7 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   basicInfo.selectedPermissionMQIds.forEach(id => {
     const mq = PERMISSION_META_QUALITIES.find(m => m.id === id);
     if (mq) {
-      totalPoints += typeof mq.points === 'function' ? mq.points({}) : mq.points; // Pass empty config if not needed
+      totalPoints += typeof mq.points === 'function' ? mq.points({}) : mq.points; 
     }
   });
 
@@ -335,9 +346,12 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
     const mq = INTRINSIC_META_QUALITIES.find(m => m.id === id);
     if (mq) {
       let intrinsicConfig: any = {};
-      if (mq.configKey && basicInfo[mq.configKey as keyof BasicInfo]) {
-         // @ts-ignore
-        intrinsicConfig = (basicInfo[mq.configKey as keyof BasicInfo] as any)[id] || {};
+      if (mq.configKey) {
+        const configGroup = basicInfo[mq.configKey as keyof Omit<BasicInfo, 'name'|'motivation'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>];
+        if (configGroup && typeof configGroup === 'object' && id in configGroup) {
+           // @ts-ignore
+          intrinsicConfig = configGroup[id] || {};
+        }
       }
       totalPoints += typeof mq.points === 'function' ? mq.points(intrinsicConfig) : mq.points;
     }
