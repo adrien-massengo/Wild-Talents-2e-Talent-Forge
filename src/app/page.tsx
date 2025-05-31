@@ -11,7 +11,7 @@ import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
-import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
+import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
 import type { AllergyEffectType, AllergySubstanceType, BruteFrailType, DiscardedAttributeType, ArchetypeDefinition } from "@/lib/character-definitions";
 import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES } from "@/lib/character-definitions";
@@ -40,15 +40,22 @@ export interface SkillInstance {
   hasType?: boolean;
 }
 
+export interface MotivationObject {
+  id: string;
+  motivationText: string;
+  type: 'loyalty' | 'passion';
+  investedBaseWill: number;
+}
+
 export interface BasicInfo {
   name: string;
-  motivation: string;
+  motivations: MotivationObject[]; // Changed from motivation: string
   selectedArchetypeId?: string;
   selectedSourceMQIds: string[];
   selectedPermissionMQIds: string[];
   selectedIntrinsicMQIds: string[];
   intrinsicAllergyConfig: {
-    [intrinsicId: string]: { // Keyed by the intrinsic ID that uses this config
+    [intrinsicId: string]: {
         substance?: AllergySubstanceType;
         effect?: AllergyEffectType;
     }
@@ -98,8 +105,8 @@ const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice:
 
 const initialBasicInfo: BasicInfo = {
   name: '',
-  motivation: '',
-  selectedArchetypeId: 'custom', // Default to custom
+  motivations: [], // Initialize as empty array
+  selectedArchetypeId: 'custom',
   selectedSourceMQIds: [],
   selectedPermissionMQIds: [],
   selectedIntrinsicMQIds: [],
@@ -133,7 +140,7 @@ export default function HomePage() {
   const [characterData, setCharacterData] = React.useState<CharacterData>(initialCharacterData);
   const { toast } = useToast();
 
-  const handleBasicInfoChange = (field: keyof BasicInfo, value: any) => {
+  const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations'>, value: any) => {
     setCharacterData(prev => {
       const newBasicInfo = { ...prev.basicInfo, [field]: value };
 
@@ -143,8 +150,7 @@ export default function HomePage() {
           newBasicInfo.selectedSourceMQIds = archetype.sourceMQIds || [];
           newBasicInfo.selectedPermissionMQIds = archetype.permissionMQIds || [];
           newBasicInfo.selectedIntrinsicMQIds = archetype.intrinsicMQIds || [];
-          // Reset specific configs for intrinsics not in the new archetype
-          // This is a simplification; a more robust solution would track configs per MQ ID
+          
           const currentIntrinsicConfigs = {
             intrinsicAllergyConfig: { ...newBasicInfo.intrinsicAllergyConfig },
             intrinsicBruteFrailConfig: { ...newBasicInfo.intrinsicBruteFrailConfig },
@@ -162,23 +168,59 @@ export default function HomePage() {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
             if (intrinsicDef?.configKey) {
                 // @ts-ignore
-                newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey][mqId] || (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' || intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {count:0, extraBoxes:0} : {});
+                newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey]?.[mqId] || (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' || intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {count:0, extraBoxes:0} : {});
                  if (intrinsicDef.id === 'mandatory_power') {
-                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
+                    // @ts-ignore
+                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0; // Default to 1 if archetype specifies mandatory power text
+                    // @ts-ignore
+                    newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
                     handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, prev.miracles);
                 }
             }
           });
-
-
         } else if (value === 'custom') {
-          // If switching to custom, retain manually selected MQs.
-          // No specific action needed here as manual changes handle this.
+          // User selected custom, MQs are handled by onMQSelectionChange
         }
       }
       return { ...prev, basicInfo: newBasicInfo };
     });
   };
+  
+  const handleAddMotivation = () => {
+    setCharacterData(prev => ({
+      ...prev,
+      basicInfo: {
+        ...prev.basicInfo,
+        motivations: [
+          ...prev.basicInfo.motivations,
+          { id: `motivation-${Date.now()}`, motivationText: '', type: 'passion', investedBaseWill: 0 }
+        ]
+      }
+    }));
+  };
+
+  const handleRemoveMotivation = (motivationId: string) => {
+    setCharacterData(prev => ({
+      ...prev,
+      basicInfo: {
+        ...prev.basicInfo,
+        motivations: prev.basicInfo.motivations.filter(m => m.id !== motivationId)
+      }
+    }));
+  };
+
+  const handleMotivationChange = (motivationId: string, field: keyof MotivationObject, value: any) => {
+    setCharacterData(prev => ({
+      ...prev,
+      basicInfo: {
+        ...prev.basicInfo,
+        motivations: prev.basicInfo.motivations.map(m =>
+          m.id === motivationId ? { ...m, [field]: value } : m
+        )
+      }
+    }));
+  };
+
 
   const handleMQSelectionChange = (
     mqType: 'source' | 'permission' | 'intrinsic',
@@ -199,14 +241,13 @@ export default function HomePage() {
         }
       } else {
         currentSelection = currentSelection.filter(id => id !== mqId);
-        // If an intrinsic is deselected, remove its config
         if (mqType === 'intrinsic') {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
             if (intrinsicDef?.configKey) {
                  // @ts-ignore
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
                  if (intrinsicDef.id === 'mandatory_power') {
-                    handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, prev.miracles); // Remove mandatory powers
+                    handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, prev.miracles);
                 }
             }
         }
@@ -216,7 +257,6 @@ export default function HomePage() {
       else if (mqType === 'permission') newBasicInfo.selectedPermissionMQIds = currentSelection;
       else if (mqType === 'intrinsic') newBasicInfo.selectedIntrinsicMQIds = currentSelection;
       
-      // If any MQ is changed, archetype becomes custom
       newBasicInfo.selectedArchetypeId = 'custom';
 
       return { ...prev, basicInfo: newBasicInfo };
@@ -224,21 +264,21 @@ export default function HomePage() {
   };
   
   const handleIntrinsicConfigChange = (
-    intrinsicId: string, // ID of the specific intrinsic MQ being configured
-    configKey: keyof Omit<BasicInfo, 'name'|'motivation'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>,
+    intrinsicId: string,
+    configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>,
     field: string,
     value: any,
-    currentMiracles?: MiracleDefinition[] // Pass current miracles for mandatory power logic
+    currentMiraclesParam?: MiracleDefinition[] 
   ) => {
     setCharacterData(prev => {
-        const miraclesToUpdate = currentMiracles || prev.miracles;
+        const miraclesToUpdate = currentMiraclesParam || prev.miracles;
         const newBasicInfo = {
          ...prev.basicInfo,
          [configKey]: {
            ...prev.basicInfo[configKey],
            [intrinsicId]: {
              // @ts-ignore
-             ...(prev.basicInfo[configKey][intrinsicId] || {}),
+             ...(prev.basicInfo[configKey]?.[intrinsicId] || {}),
              [field]: value,
            }
          }
@@ -246,7 +286,6 @@ export default function HomePage() {
 
       if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
           const newCount = Math.max(0, Number(value) || 0);
-          // Filter for mandatory miracles associated with *this specific* intrinsic instance
           const mandatoryMiraclesForThisIntrinsic = miraclesToUpdate.filter(m => 
             m.isMandatory && m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`)
           );
@@ -254,11 +293,11 @@ export default function HomePage() {
 
           let updatedMiracles = [...miraclesToUpdate];
 
-          if (difference > 0) { // Add miracles
+          if (difference > 0) {
               for (let i = 0; i < difference; i++) {
                   const newMandatoryMiracle: MiracleDefinition = {
                       id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
-                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, // Include intrinsicId
+                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
                       name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'Intrinsic'})`,
                       dice: '1D',
                       hardDice: '0HD',
@@ -270,7 +309,7 @@ export default function HomePage() {
                   };
                   updatedMiracles.push(newMandatoryMiracle);
               }
-          } else if (difference < 0) { // Remove miracles
+          } else if (difference < 0) {
               const miraclesToRemove = Math.abs(difference);
               let removedCount = 0;
               updatedMiracles = updatedMiracles.filter(m => {
@@ -382,8 +421,7 @@ export default function HomePage() {
     }));
   };
 
-  // Miracle Handlers
-  const handleAddMiracle = (type: 'custom' | string) => { // string for predefined miracle definitionId
+  const handleAddMiracle = (type: 'custom' | string) => {
     let newMiracle: MiracleDefinition;
     if (type === 'custom') {
       newMiracle = {
@@ -617,10 +655,15 @@ export default function HomePage() {
       if (savedData) {
         const parsedData = JSON.parse(savedData) as Partial<CharacterData>;
 
-        // Ensure basicInfo and its nested config objects exist and are properly typed
         const loadedBasicInfo: BasicInfo = {
-            ...initialCharacterData.basicInfo, // Start with defaults
-            ...(parsedData.basicInfo || {}), // Spread loaded basicInfo
+            ...initialCharacterData.basicInfo, 
+            ...(parsedData.basicInfo || {}),
+            motivations: Array.isArray(parsedData.basicInfo?.motivations) ? parsedData.basicInfo.motivations.map((m: any) => ({
+                id: typeof m.id === 'string' ? m.id : `loaded-motivation-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                motivationText: typeof m.motivationText === 'string' ? m.motivationText : '',
+                type: (m.type === 'loyalty' || m.type === 'passion') ? m.type : 'passion',
+                investedBaseWill: typeof m.investedBaseWill === 'number' ? m.investedBaseWill : 0,
+            })) : [],
             selectedSourceMQIds: Array.isArray(parsedData.basicInfo?.selectedSourceMQIds) ? parsedData.basicInfo.selectedSourceMQIds : [],
             selectedPermissionMQIds: Array.isArray(parsedData.basicInfo?.selectedPermissionMQIds) ? parsedData.basicInfo.selectedPermissionMQIds : [],
             selectedIntrinsicMQIds: Array.isArray(parsedData.basicInfo?.selectedIntrinsicMQIds) ? parsedData.basicInfo.selectedIntrinsicMQIds : [],
@@ -630,14 +673,18 @@ export default function HomePage() {
             intrinsicMandatoryPowerConfig: {...(parsedData.basicInfo?.intrinsicMandatoryPowerConfig || {})},
             intrinsicVulnerableConfig: {...(parsedData.basicInfo?.intrinsicVulnerableConfig || {})},
         };
-         // Ensure count/extraBoxes are numbers
+        
         Object.keys(loadedBasicInfo.intrinsicMandatoryPowerConfig).forEach(key => {
+             // @ts-ignore
             if (typeof loadedBasicInfo.intrinsicMandatoryPowerConfig[key].count !== 'number') {
+                 // @ts-ignore
                 loadedBasicInfo.intrinsicMandatoryPowerConfig[key].count = 0;
             }
         });
         Object.keys(loadedBasicInfo.intrinsicVulnerableConfig).forEach(key => {
+            // @ts-ignore
              if (typeof loadedBasicInfo.intrinsicVulnerableConfig[key].extraBoxes !== 'number') {
+                 // @ts-ignore
                 loadedBasicInfo.intrinsicVulnerableConfig[key].extraBoxes = 0;
             }
         });
@@ -822,6 +869,16 @@ export default function HomePage() {
     }
   };
 
+  const charmDiceValue = parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0;
+  const commandDiceValue = parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0;
+  const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
+  const purchasedBaseWill = characterData.willpower.purchasedBaseWill || 0;
+  const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
+
+  const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
+  const uninvestedBaseWill = totalBaseWill - totalInvestedInMotivations;
+
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <AppHeader
@@ -843,6 +900,11 @@ export default function HomePage() {
                 <CharacterTabContent
                   characterData={characterData}
                   onBasicInfoChange={handleBasicInfoChange}
+                  onAddMotivation={handleAddMotivation}
+                  onRemoveMotivation={handleRemoveMotivation}
+                  onMotivationChange={handleMotivationChange}
+                  uninvestedBaseWill={uninvestedBaseWill}
+                  totalBaseWill={totalBaseWill}
                   onMQSelectionChange={handleMQSelectionChange}
                   onIntrinsicConfigChange={handleIntrinsicConfigChange}
                   onStatChange={handleStatChange}

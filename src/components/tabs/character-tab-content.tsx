@@ -2,10 +2,10 @@
 // src/components/tabs/character-tab-content.tsx
 "use client";
 
-import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/page";
+import type { CharacterData, StatDetail, SkillInstance, BasicInfo, MotivationObject } from "@/app/page";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
-import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PowerQualityDefinition } from "@/lib/miracles-definitions";
+import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import { 
   ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, 
@@ -30,9 +30,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
-  onBasicInfoChange: (field: keyof BasicInfo, value: any) => void;
+  onBasicInfoChange: (field: keyof Omit<BasicInfo, 'motivations'>, value: any) => void;
+  onAddMotivation: () => void;
+  onRemoveMotivation: (motivationId: string) => void;
+  onMotivationChange: (motivationId: string, field: keyof MotivationObject, value: any) => void;
+  uninvestedBaseWill: number;
+  totalBaseWill: number;
   onMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
-  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivation'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any) => void;
+  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
   onAddSkill: (skillDef: PredefinedSkillDef) => void;
@@ -66,13 +71,12 @@ const statsDefinitions: StatDefinition[] = [
   { name: 'command', label: 'Command', description: 'The Command Stat measures your force of personality, your capacity for leadership, and your composure in the face of crisis. With high Command you remain uncracked under great pressure and people instinctively listen to you in a crisis.' },
 ];
 
-const normalDiceOptions = Array.from({ length: 10 }, (_, i) => `${i + 1}D`); 
 const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`); 
 const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`); 
 
 const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
 
-export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: MiracleDefinition, allPowerQualityDefinitions: PowerQualityDefinition[]): number => {
+export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: MiracleDefinition, allPowerQualityDefinitions: ReturnType<typeof getDynamicPowerQualityDefinitions>): number => {
   const NDice = parseInt(miracle.dice.replace('D', '')) || 0;
   const HDice = parseInt(miracle.hardDice.replace('HD', '')) || 0;
   const WDice = parseInt(miracle.wiggleDice.replace('WD', '')) || 0;
@@ -110,7 +114,7 @@ interface MQCollapsibleProps {
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
   title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false); // Default to closed
+  const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <Card className="bg-card/50 shadow-sm">
@@ -132,7 +136,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                   onCheckedChange={(checked) => onMQSelectionChange(mq.id, !!checked)}
                 />
                 <Label htmlFor={`${mqType}-${mq.id}`} className="text-sm font-medium flex-grow">
-                  {mq.name}
+                  {mq.name} ({ typeof mq.points === 'function' ? 'Var' : mq.points } Pts)
                 </Label>
               </div>
               {selectedMQIds.includes(mq.id) && (
@@ -146,6 +150,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           <div>
                             <Label htmlFor={`${mq.id}-allergySubstance`} className="text-xs">Allergy Substance</Label>
                             <Select
+                               // @ts-ignore
                               value={basicInfo.intrinsicAllergyConfig[mq.id]?.substance}
                               onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicAllergyConfig', 'substance', val as AllergySubstanceType)}
                             >
@@ -158,6 +163,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           <div>
                             <Label htmlFor={`${mq.id}-allergyEffect`} className="text-xs">Allergy Effect</Label>
                             <Select
+                               // @ts-ignore
                               value={basicInfo.intrinsicAllergyConfig[mq.id]?.effect}
                               onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicAllergyConfig', 'effect', val as AllergyEffectType)}
                             >
@@ -173,6 +179,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                         <div>
                           <Label className="text-xs">Type</Label>
                           <RadioGroup
+                             // @ts-ignore
                             value={basicInfo.intrinsicBruteFrailConfig[mq.id]?.type}
                             onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicBruteFrailConfig', 'type', val as BruteFrailType)}
                             className="flex space-x-3 mt-1"
@@ -186,6 +193,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                         <div>
                           <Label className="text-xs">Discard Attribute</Label>
                           <RadioGroup
+                             // @ts-ignore
                             value={basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute}
                             onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicCustomStatsConfig', 'discardedAttribute', val as DiscardedAttributeType)}
                             className="mt-1 space-y-1"
@@ -197,9 +205,11 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                               </div>
                             ))}
                           </RadioGroup>
-                           {basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute && (
+                           {// @ts-ignore
+                           basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute && (
                               <p className="text-xs text-muted-foreground mt-1 italic">
-                                  {(mq as IntrinsicMetaQuality).customStatsDiscardOptions?.find(opt => opt.value === basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute)?.description}
+                                  {// @ts-ignore
+                                  (mq as IntrinsicMetaQuality).customStatsDiscardOptions?.find(opt => opt.value === basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute)?.description}
                               </p>
                           )}
                         </div>
@@ -209,6 +219,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           <Label htmlFor={`${mq.id}-mandatoryPowerCount`} className="text-xs">Number of Mandatory Powers</Label>
                           <Input
                             id={`${mq.id}-mandatoryPowerCount`} type="number" min="0"
+                             // @ts-ignore
                             value={basicInfo.intrinsicMandatoryPowerConfig[mq.id]?.count ?? 0}
                             onChange={(e) => onIntrinsicConfigChange(mq.id, 'intrinsicMandatoryPowerConfig', 'count', parseInt(e.target.value) || 0)}
                             className="w-16 h-8 mt-1 text-xs"
@@ -220,6 +231,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           <Label htmlFor={`${mq.id}-vulnerableExtraBoxes`} className="text-xs">Number of Extra Brain Boxes</Label>
                           <Input
                             id={`${mq.id}-vulnerableExtraBoxes`} type="number" min="0"
+                             // @ts-ignore
                             value={basicInfo.intrinsicVulnerableConfig[mq.id]?.extraBoxes ?? 0}
                             onChange={(e) => onIntrinsicConfigChange(mq.id, 'intrinsicVulnerableConfig', 'extraBoxes', parseInt(e.target.value) || 0)}
                             className="w-16 h-8 mt-1 text-xs"
@@ -242,6 +254,11 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
 export function CharacterTabContent({
   characterData,
   onBasicInfoChange,
+  onAddMotivation,
+  onRemoveMotivation,
+  onMotivationChange,
+  uninvestedBaseWill,
+  totalBaseWill,
   onMQSelectionChange,
   onIntrinsicConfigChange,
   onStatChange,
@@ -267,19 +284,9 @@ export function CharacterTabContent({
   const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
 
   const dynamicPqDefs = React.useMemo(() => getDynamicPowerQualityDefinitions(characterData.skills), [characterData.skills]);
-
-  const charmDiceValue = parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0;
-  const commandDiceValue = parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0;
-  const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
-
-  const purchasedBaseWill = characterData.willpower.purchasedBaseWill || 0;
-  const purchasedWill = characterData.willpower.purchasedWill || 0;
-
-  const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
-  const totalWill = totalBaseWill + purchasedWill;
-
+  
   const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
-    const maxStatNormalDice = 5;
+    const maxStatNormalDice = 5; 
     return Array.from({ length: maxStatNormalDice }, (_, i) => `${i + 1}D`);
   };
 
@@ -306,7 +313,7 @@ export function CharacterTabContent({
   const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
   
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles"]}>
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles", "motivations"]}>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>
@@ -322,7 +329,7 @@ export function CharacterTabContent({
                 {ARCHETYPES.map(arch => <SelectItem key={arch.id} value={arch.id}>{arch.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            {selectedArchetype && (
+            {selectedArchetype && selectedArchetype.id !== 'custom' && (
               <Card className="mt-2 p-3 bg-muted/50 text-sm">
                 <p><strong>Source:</strong> {selectedArchetype.sourceText}</p>
                 <p><strong>Permission:</strong> {selectedArchetype.permissionText}</p>
@@ -331,6 +338,11 @@ export function CharacterTabContent({
                 {selectedArchetype.mandatoryPowerText && <p className="mt-1"><strong>Mandatory Power:</strong> {selectedArchetype.mandatoryPowerText}</p>}
                 {selectedArchetype.additions && <p className="mt-1 text-xs italic">{selectedArchetype.additions}</p>}
               </Card>
+            )}
+             {selectedArchetype && selectedArchetype.id === 'custom' && (
+                <Card className="mt-2 p-3 bg-muted/50 text-sm">
+                    <p>{selectedArchetype.description}</p>
+                </Card>
             )}
           </div>
 
@@ -363,11 +375,81 @@ export function CharacterTabContent({
             onIntrinsicConfigChange={onIntrinsicConfigChange}
             mqType="intrinsic"
           />
-          
-          <div>
-            <Label htmlFor="charMotivation" className="font-headline">Motivation / Goals</Label>
-            <Textarea id="charMotivation" placeholder="What drives your character?" value={characterData.basicInfo.motivation} onChange={(e) => onBasicInfoChange('motivation', e.target.value)} />
+        </div>
+      </CollapsibleSectionItem>
+
+      <CollapsibleSectionItem title="Motivations" value="motivations">
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-sm font-medium">Uninvested Base Will: {uninvestedBaseWill}</p>
+            <Button onClick={onAddMotivation} size="sm">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Motivation
+            </Button>
           </div>
+          {characterData.basicInfo.motivations.length === 0 && (
+            <p className="text-muted-foreground text-sm">No motivations added yet.</p>
+          )}
+          {characterData.basicInfo.motivations.map((motivation) => (
+            <Card key={motivation.id} className="p-4 bg-card/60 shadow">
+              <div className="flex justify-end mb-2">
+                <Button variant="ghost" size="sm" onClick={() => onRemoveMotivation(motivation.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor={`motivation-text-${motivation.id}`}>Motivation</Label>
+                  <Textarea
+                    id={`motivation-text-${motivation.id}`}
+                    value={motivation.motivationText}
+                    onChange={(e) => onMotivationChange(motivation.id, 'motivationText', e.target.value)}
+                    placeholder="Describe the motivation (e.g., Protect the innocent, Achieve ultimate power)"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor={`motivation-type-${motivation.id}`}>Type</Label>
+                    <Select
+                      value={motivation.type}
+                      onValueChange={(value) => onMotivationChange(motivation.id, 'type', value as 'loyalty' | 'passion')}
+                    >
+                      <SelectTrigger id={`motivation-type-${motivation.id}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="loyalty">Loyalty</SelectItem>
+                        <SelectItem value="passion">Passion</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor={`motivation-invested-${motivation.id}`}>Invested Base Will</Label>
+                    <Input
+                      id={`motivation-invested-${motivation.id}`}
+                      type="number"
+                      min="0"
+                      max={motivation.investedBaseWill + uninvestedBaseWill}
+                      value={String(motivation.investedBaseWill)}
+                      onChange={(e) => {
+                        let val = parseInt(e.target.value, 10);
+                        if (isNaN(val)) val = 0;
+                        
+                        const currentOtherInvested = characterData.basicInfo.motivations
+                          .filter(m => m.id !== motivation.id)
+                          .reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
+                        
+                        const maxPossibleForThisMotivation = totalBaseWill - currentOtherInvested;
+                        val = Math.min(Math.max(0, val), maxPossibleForThisMotivation);
+                        
+                        onMotivationChange(motivation.id, 'investedBaseWill', val);
+                      }}
+                      disabled={uninvestedBaseWill === 0 && motivation.investedBaseWill === 0}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       </CollapsibleSectionItem>
 
@@ -580,7 +662,7 @@ export function CharacterTabContent({
 
       <CollapsibleSectionItem title="Willpower" value="willpower">
         <div className="space-y-3">
-          <p><strong className="font-headline">Base Will (Charm D + Command D):</strong> {calculatedCharmPlusCommandBaseWill}</p>
+          <p><strong className="font-headline">Calculated Base Will (Charm D + Command D):</strong> {characterData.stats.charm.dice.replace('D','')}D + {characterData.stats.command.dice.replace('D','')}D = { (parseInt(characterData.stats.charm.dice.replace('D','')) || 0) + (parseInt(characterData.stats.command.dice.replace('D','')) || 0) }</p>
           <div className="space-y-1">
             <Label htmlFor="purchasedBaseWill" className="font-headline">Purchased Base Will (3pts/pt)</Label>
             <Input
@@ -593,6 +675,8 @@ export function CharacterTabContent({
               onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))}
             />
           </div>
+          <p><strong className="font-headline">Total Base Will:</strong> {totalBaseWill}</p>
+           <p className="text-sm text-muted-foreground">Uninvested from Motivations: {uninvestedBaseWill}</p>
           <div className="space-y-1">
             <Label htmlFor="purchasedWill" className="font-headline">Purchased Will (1pt/pt)</Label>
             <Input
@@ -605,8 +689,7 @@ export function CharacterTabContent({
               onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))}
             />
           </div>
-          <p><strong className="font-headline">Total Base Will:</strong> {totalBaseWill}</p>
-          <p><strong className="font-headline">Total Will:</strong> {totalWill}</p>
+          <p><strong className="font-headline">Total Will:</strong> {totalBaseWill + (characterData.willpower.purchasedWill || 0)}</p>
         </div>
       </CollapsibleSectionItem>
 
@@ -709,7 +792,7 @@ export function CharacterTabContent({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
                     <Select value={miracle.dice} onValueChange={(v) => onMiracleChange(miracle.id, 'dice', v)}>
                       <SelectTrigger><SelectValue/></SelectTrigger>
-                      <SelectContent>{normalDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                      <SelectContent>{Array.from({ length: 10 }, (_, i) => `${i + 1}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
                       <SelectTrigger><SelectValue/></SelectTrigger>
@@ -763,7 +846,7 @@ export function CharacterTabContent({
                         </div>
                         <div>
                           <Label htmlFor={`${quality.id}-capacity`} className="text-xs">Capacity</Label>
-                          <Select value={quality.capacity} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'capacity', v)}>
+                          <Select value={quality.capacity} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'capacity', v as MiracleCapacityType)}>
                             <SelectTrigger id={`${quality.id}-capacity`}><SelectValue/></SelectTrigger>
                             <SelectContent>
                               {POWER_CAPACITY_OPTIONS.map(cap => <SelectItem key={cap.value} value={cap.value}>{cap.label}</SelectItem>)}
