@@ -1,5 +1,6 @@
 
 // src/lib/character-definitions.ts
+import type { BasicInfo } from '@/app/page';
 
 export interface ArchetypeDefinition {
   id: string;
@@ -12,9 +13,9 @@ export interface ArchetypeDefinition {
   additions?: string;
   mandatoryPowerText?: string;
   // New fields to link to specific MQ IDs
-  sourceMQIds?: string[];
-  permissionMQIds?: string[];
-  intrinsicMQIds?: string[];
+  sourceMQIds: string[];
+  permissionMQIds: string[];
+  intrinsicMQIds: string[];
 }
 
 export const ARCHETYPES: ArchetypeDefinition[] = [
@@ -55,12 +56,11 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     id: 'anachronist',
     name: 'Anachronist (20 Points)',
     points: 20,
-    sourceText: 'Source: Genetic, Life Force, Paranormal, Technological, or Extradimensional/Extraterrestrial (pick one)', // User will pick one of these when selecting this archetype
+    sourceText: 'Source: Genetic, Life Force, Paranormal, Technological, or Extradimensional/Extraterrestrial (pick one)',
     permissionText: 'Permission: Inventor',
     intrinsicsText: 'Intrinsic: Mutable',
     description: 'You are an inventor: one part Einstein’s brilliance, one part Tesla’s innovation, with a dash of Edison’s persistence for flavor. In your laboratory you construct devices that beggar the imagination of the world’s most accomplished scientific minds. Whether your creations are mystical or scientific in nature, they transcend what is considered the extent of human ability.',
-    // For "pick one" sources, we might need a UI hint or a default. For now, let's pre-select 'technological' as an example if chosen.
-    sourceMQIds: ['technological'], // Defaulting to technological, UI might need to allow user to pick from the list if this archetype is selected. This is complex. Let's simplify: anachronist provides one. For now, not pre-selecting a specific source. User must pick.
+    sourceMQIds: ['technological'], // Defaulting for simplicity, UI could allow choice
     permissionMQIds: ['inventor'],
     intrinsicMQIds: ['mutable'],
   },
@@ -79,7 +79,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
   {
     id: 'godlike_talent',
     name: 'Godlike Talent (0 Points)',
-    points: 0, // The archetype itself is 0, mandatory power costs separately.
+    points: 0,
     sourceText: 'Source: Psi',
     permissionText: 'Permission: Super',
     intrinsicsText: 'Intrinsics: Mandatory Power, Willpower Contest, No Willpower No Way',
@@ -89,16 +89,15 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceMQIds: ['psi_source'],
     permissionMQIds: ['super_permission'],
     intrinsicMQIds: ['mandatory_power', 'willpower_contest', 'no_willpower_no_way'],
-    // Note: The Mandatory Power for Godlike Talent (Perceive Godlike Talents) would be added as a miracle by the 'mandatory_power' intrinsic logic.
   },
   {
     id: 'godling',
     name: 'Godling (20 Points)',
     points: 20,
-    sourceText: 'Sources: Divine, Paranormal', // User picks one
+    sourceText: 'Sources: Divine, Paranormal',
     permissionText: 'Permissions: Super',
     description: 'You’re not the God, but a god, surely; or perhaps you are related to a divine entity of some sort and have been exiled to spend your unnaturally long life in the mortal realm.',
-    sourceMQIds: ['divine'], // Defaulting, similar to Anachronist
+    sourceMQIds: ['divine'], // Defaulting for simplicity
     permissionMQIds: ['super_permission'],
     intrinsicMQIds: [],
   },
@@ -106,10 +105,10 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     id: 'human_plus',
     name: 'Human+ (15 Points)',
     points: 15,
-    sourceText: 'Source: Genetic, Psi or Technological', // User picks one
+    sourceText: 'Source: Genetic, Psi or Technological',
     permissionText: 'Permission: Super',
     description: 'You’re a human modified by science, or something else, to be something more. Whatever experiment or accident befell you, it granted you powers beyond the rank and file of humanity.',
-    sourceMQIds: ['genetic_source'], // Defaulting
+    sourceMQIds: ['genetic_source'], // Defaulting for simplicity
     permissionMQIds: ['super_permission'],
     intrinsicMQIds: [],
   },
@@ -133,7 +132,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     intrinsicsText: 'Intrinsic: Mutable',
     description: 'You have discovered the secrets of magic. With your exceptional Willpower you focus mystical energies to create numerous superhuman effects and create magical items. (Your powers take a supernatural, magical form; instead of traditional Cosmic Power and Gadgeteering, you practice spellcasting and enchant objects.)',
     sourceMQIds: ['paranormal_source'],
-    permissionMQIds: ['one_power', 'inventor'], // Multiple permissions
+    permissionMQIds: ['one_power', 'inventor'],
     intrinsicMQIds: ['mutable'],
   },
   {
@@ -151,9 +150,9 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
 
 export interface MetaQualityBase {
   id: string;
-  name: string; // Full name e.g., "Source: Conduit (5 Points)"
-  label: string; // Short name e.g., "Conduit"
-  points: number | ((config?: any) => number); // config can be optional for MQs without specific configs
+  name: string;
+  label: string;
+  points: number | ((config?: any) => number);
   description?: string;
 }
 
@@ -304,4 +303,44 @@ export const INTRINSIC_META_QUALITIES: IntrinsicMetaQuality[] = [
     description: 'Any time you use your powers on a character with Willpower and the target is aware of the attack, you must beat him in a Willpower contest. Both of you “bid” Willpower points during the resolution phase of combat, after you’ve declared and rolled. This is a “blind” bid—each side jots down the bid on scratch paper, then compare the bids. If you bid more than your target, your power works normally. If your target bids more, your power fails. Either way, you each lose the Willpower points that you’ve bid.',
   },
 ];
-  
+
+export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
+  let totalPoints = 0;
+  let firstPositiveSourceCostApplied = false;
+
+  // Calculate Source MQ points
+  basicInfo.selectedSourceMQIds.forEach(id => {
+    const mq = SOURCE_META_QUALITIES.find(m => m.id === id);
+    if (mq) {
+      const points = typeof mq.points === 'function' ? mq.points({}) : mq.points; // Pass empty config if not needed
+      if (points > 0 && !firstPositiveSourceCostApplied && basicInfo.selectedArchetypeId === 'custom') {
+        firstPositiveSourceCostApplied = true;
+        // First positive source MQ is free for custom archetype, so no points added for this one.
+      } else {
+        totalPoints += points;
+      }
+    }
+  });
+
+  // Calculate Permission MQ points
+  basicInfo.selectedPermissionMQIds.forEach(id => {
+    const mq = PERMISSION_META_QUALITIES.find(m => m.id === id);
+    if (mq) {
+      totalPoints += typeof mq.points === 'function' ? mq.points({}) : mq.points; // Pass empty config if not needed
+    }
+  });
+
+  // Calculate Intrinsic MQ points
+  basicInfo.selectedIntrinsicMQIds.forEach(id => {
+    const mq = INTRINSIC_META_QUALITIES.find(m => m.id === id);
+    if (mq) {
+      let intrinsicConfig: any = {};
+      if (mq.configKey && basicInfo[mq.configKey as keyof BasicInfo]) {
+         // @ts-ignore
+        intrinsicConfig = (basicInfo[mq.configKey as keyof BasicInfo] as any)[id] || {};
+      }
+      totalPoints += typeof mq.points === 'function' ? mq.points(intrinsicConfig) : mq.points;
+    }
+  });
+  return totalPoints;
+}

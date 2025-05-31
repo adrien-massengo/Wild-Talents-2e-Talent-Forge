@@ -3,11 +3,14 @@
 "use client";
 
 import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/page";
-import type { MiracleDefinition, MiracleQuality, PowerQualityDefinition } from "@/lib/miracles-definitions";
+import type { MiracleDefinition } from "@/lib/miracles-definitions";
 import { getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import { calculateMiracleQualityCost, calculateMiracleTotalCost } from "@/components/tabs/character-tab-content"; 
-import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, calculateAllergyPoints, MetaQualityBase } from "@/lib/character-definitions";
-
+import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, calculateMetaQualitiesPointCost } from "@/lib/character-definitions";
+import { 
+  bodyEffectsData, coordinationEffectsData, senseEffectsData, mindEffectsData, charmEffectsData, commandEffectsData, skillExamplesData,
+  type BodyEffectData, type CoordinationEffectData, type SenseEffectData, type MindEffectData, type CharmEffectData, type CommandEffectData, type SkillExampleData
+} from "@/lib/effects-definitions";
 
 import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
@@ -69,51 +72,12 @@ const formatSkillDisplay = (skill: SkillInstance | undefined) => {
   return display;
 }
 
-const calculateMetaQualitiesPointCost = (
-  basicInfo: BasicInfo,
-): number => {
-  let totalCost = 0;
-  let firstPositiveSourceMQFree = false;
-
-  // Source MQs
-  for (const mqId of basicInfo.selectedSourceMQIds) {
-    const mqDef = SOURCE_META_QUALITIES.find(m => m.id === mqId);
-    if (mqDef) {
-      const points = typeof mqDef.points === 'function' ? 0 : mqDef.points; // Configurable points not used for Source MQs here
-      if (points > 0 && !firstPositiveSourceMQFree) {
-        firstPositiveSourceMQFree = true; // First positive cost Source MQ is free
-      } else {
-        totalCost += points;
-      }
-    }
-  }
-
-  // Permission MQs
-  for (const mqId of basicInfo.selectedPermissionMQIds) {
-    const mqDef = PERMISSION_META_QUALITIES.find(m => m.id === mqId);
-    if (mqDef) {
-      totalCost += typeof mqDef.points === 'function' ? 0 : mqDef.points; // Configurable points not used for Permission MQs here
-    }
-  }
-
-  // Intrinsic MQs
-  for (const mqId of basicInfo.selectedIntrinsicMQIds) {
-    const mqDef = INTRINSIC_META_QUALITIES.find(m => m.id === mqId);
-    if (mqDef) {
-      if (typeof mqDef.points === 'function') {
-        let config = {};
-        if (mqDef.configKey === 'intrinsicAllergyConfig') config = basicInfo.intrinsicAllergyConfig[mqId];
-        else if (mqDef.configKey === 'intrinsicBruteFrailConfig') config = basicInfo.intrinsicBruteFrailConfig[mqId];
-        else if (mqDef.configKey === 'intrinsicCustomStatsConfig') config = basicInfo.intrinsicCustomStatsConfig[mqId];
-        else if (mqDef.configKey === 'intrinsicMandatoryPowerConfig') config = basicInfo.intrinsicMandatoryPowerConfig[mqId];
-        else if (mqDef.configKey === 'intrinsicVulnerableConfig') config = basicInfo.intrinsicVulnerableConfig[mqId];
-        totalCost += mqDef.points(config);
-      } else {
-        totalCost += mqDef.points;
-      }
-    }
-  }
-  return totalCost;
+const getEffectiveNormalDiceForEffects = (item: StatDetail | SkillInstance | undefined): number => {
+  if (!item) return 0;
+  const normalDice = parseInt(item.dice?.replace('D', '') || '0', 10);
+  const hardDice = parseInt(item.hardDice?.replace('HD', '') || '0', 10);
+  const wiggleDice = parseInt(item.wiggleDice?.replace('WD', '') || '0', 10);
+  return normalDice + hardDice + wiggleDice;
 };
 
 
@@ -144,6 +108,44 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
 
   const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + archetypePointCost;
 
+  const getStatEffectDescription = (statName: keyof CharacterData['stats'], statValue: StatDetail) => {
+    const effectiveDice = Math.min(getEffectiveNormalDiceForEffects(statValue), 10);
+    if (effectiveDice === 0) return "N/A";
+
+    const diceStr = `${effectiveDice}d`;
+    let effectEntry;
+
+    switch (statName) {
+      case 'body':
+        effectEntry = bodyEffectsData.find(e => e.dice === diceStr) as BodyEffectData | undefined;
+        return effectEntry ? `Lift: ${effectEntry.lift}, Throw: ${effectEntry.throw10Yds}, Dmg: ${effectEntry.baseDamage}, Sprint: ${effectEntry.sprint}, Jump: ${effectEntry.jump}` : "N/A";
+      case 'coordination':
+        effectEntry = coordinationEffectsData.find(e => e.dice === diceStr) as CoordinationEffectData | undefined;
+        return effectEntry ? effectEntry.notes : "N/A";
+      case 'sense':
+        effectEntry = senseEffectsData.find(e => e.dice === diceStr) as SenseEffectData | undefined;
+        return effectEntry ? effectEntry.notes : "N/A";
+      case 'mind':
+        effectEntry = mindEffectsData.find(e => e.dice === diceStr) as MindEffectData | undefined;
+        return effectEntry ? effectEntry.notes : "N/A";
+      case 'charm':
+        effectEntry = charmEffectsData.find(e => e.dice === diceStr) as CharmEffectData | undefined;
+        return effectEntry ? effectEntry.notes : "N/A";
+      case 'command':
+        effectEntry = commandEffectsData.find(e => e.dice === diceStr) as CommandEffectData | undefined;
+        return effectEntry ? effectEntry.notes : "N/A";
+      default:
+        return "N/A";
+    }
+  };
+
+  const getSkillProficiencyExample = (skill: SkillInstance) => {
+    const effectiveDice = Math.min(getEffectiveNormalDiceForEffects(skill), 10);
+    if (effectiveDice === 0) return "N/A";
+    const diceStr = `${effectiveDice}d`;
+    const exampleEntry = skillExamplesData.find(e => e.dice === diceStr);
+    return exampleEntry ? exampleEntry.proficiencyExample : "N/A";
+  };
 
   return (
     <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["character-point-summary", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary", "miracles-summary"]}>
@@ -216,6 +218,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                   <TableHead>Stat</TableHead>
                   <TableHead>Dice</TableHead>
                   <TableHead>Cost</TableHead>
+                  <TableHead>Effects</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -224,6 +227,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                     <TableCell className="capitalize font-medium">{key}</TableCell>
                     <TableCell>{formatStatDisplay(value)}</TableCell>
                     <TableCell>{calculateStatPoints(value)}</TableCell>
+                    <TableCell className="text-xs">{getStatEffectDescription(key as keyof CharacterData['stats'], value)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -238,7 +242,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                 <CardTitle className="text-xl">Willpower Breakdown</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-                <p>Base Will (Charm D + Command D): {calculatedCharmPlusCommandBaseWill}</p>
+                <p><strong>Base Will:</strong> {calculatedCharmPlusCommandBaseWill}</p>
                 <p>Purchased Base Will: {purchasedBaseWill}</p>
                 <p>Purchased Will: {purchasedWill}</p>
                 <p className="font-semibold">Total Base Will: {totalBaseWill}</p>
@@ -264,6 +268,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                                 <TableHead>Linked Attribute</TableHead>
                                 <TableHead>Dice</TableHead>
                                 <TableHead>Cost</TableHead>
+                                <TableHead>Proficiency Example</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -273,6 +278,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                                     <TableCell className="capitalize">{skill.linkedAttribute}</TableCell>
                                     <TableCell>{formatSkillDisplay(skill)}</TableCell>
                                     <TableCell>{calculateSkillPoints(skill)}</TableCell>
+                                    <TableCell className="text-xs">{getSkillProficiencyExample(skill)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -344,3 +350,5 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   );
 }
   
+
+    
