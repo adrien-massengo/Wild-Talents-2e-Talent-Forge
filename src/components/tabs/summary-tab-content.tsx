@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 interface SummaryTabContentProps {
   characterData: CharacterData;
   onPointLimitChange: (value: number) => void;
+  onArchetypePointsChange: (value: number) => void; // Kept for potential direct override if needed, though calculation is primary
 }
 
 const formatStatDisplay = (stat: StatDetail | undefined) => {
@@ -81,8 +82,8 @@ const getEffectiveNormalDiceForEffects = (item: StatDetail | SkillInstance | und
 };
 
 
-export function SummaryTabContent({ characterData, onPointLimitChange }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills, miracles, pointLimit } = characterData;
+export function SummaryTabContent({ characterData, onPointLimitChange, onArchetypePointsChange }: SummaryTabContentProps) {
+  const { basicInfo, stats, willpower, skills, miracles, pointLimit, archetypePoints } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
 
@@ -102,11 +103,12 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => sum + calculateMiracleTotalCost(miracle, skills), 0);
   
   const selectedArchetypeDef = ARCHETYPES.find(arch => arch.id === basicInfo.selectedArchetypeId);
-  const archetypePointCost = selectedArchetypeDef && selectedArchetypeDef.id !== 'custom' 
+  const currentArchetypePointCost = selectedArchetypeDef && selectedArchetypeDef.id !== 'custom' 
     ? selectedArchetypeDef.points 
     : calculateMetaQualitiesPointCost(basicInfo);
 
-  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + archetypePointCost;
+
+  const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + currentArchetypePointCost;
 
   const getStatEffectDescription = (statName: keyof CharacterData['stats'], statValue: StatDetail) => {
     const effectiveDice = Math.min(getEffectiveNormalDiceForEffects(statValue), 10);
@@ -139,12 +141,15 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
     }
   };
 
-  const getSkillProficiencyExample = (skill: SkillInstance) => {
+  const getSkillLevelText = (skill: SkillInstance) => {
     const effectiveDice = Math.min(getEffectiveNormalDiceForEffects(skill), 10);
     if (effectiveDice === 0) return "N/A";
     const diceStr = `${effectiveDice}d`;
     const exampleEntry = skillExamplesData.find(e => e.dice === diceStr);
-    return exampleEntry ? exampleEntry.proficiencyExample : "N/A";
+    if (exampleEntry && exampleEntry.skillLevel) {
+      return exampleEntry.skillLevel.replace(/\s*\(.*\)\s*/, '').trim();
+    }
+    return "N/A";
   };
 
   return (
@@ -156,8 +161,8 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 items-center gap-2">
-              <p className="font-medium">Archetype Point Cost:</p>
-              <p>{archetypePointCost}</p>
+                <p className="font-medium">Archetype Point Cost:</p>
+                <p>{currentArchetypePointCost}</p>
             </div>
             <p>Stat Point Cost: {totalStatPoints}</p>
             <p>Willpower Point Cost: {totalWillpowerPoints}</p>
@@ -268,7 +273,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                                 <TableHead>Linked Attribute</TableHead>
                                 <TableHead>Dice</TableHead>
                                 <TableHead>Cost</TableHead>
-                                <TableHead>Proficiency Example</TableHead>
+                                <TableHead>Skill Level</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -278,7 +283,7 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                                     <TableCell className="capitalize">{skill.linkedAttribute}</TableCell>
                                     <TableCell>{formatSkillDisplay(skill)}</TableCell>
                                     <TableCell>{calculateSkillPoints(skill)}</TableCell>
-                                    <TableCell className="text-xs">{getSkillProficiencyExample(skill)}</TableCell>
+                                    <TableCell className="text-xs">{getSkillLevelText(skill)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
