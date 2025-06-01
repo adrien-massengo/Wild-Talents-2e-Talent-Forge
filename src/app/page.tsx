@@ -280,9 +280,9 @@ export default function HomePage() {
                 }
             }
             if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
-                newWillpower.purchasedWill = 0; // Keep willpower at 0 if no_willpower is still selected
+                newWillpower.purchasedWill = 0; 
             } else if (mqId === 'no_willpower' && newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')){
-                newWillpower.purchasedWill = 0; // Keep willpower at 0 if no_base_will is still selected
+                newWillpower.purchasedWill = 0; 
             }
         }
       }
@@ -566,9 +566,17 @@ export default function HomePage() {
       miracles: prev.miracles.map(m =>
         m.id === miracleId ? {
           ...m,
-          qualities: m.qualities.map(q =>
-            q.id === qualityId ? { ...q, [field]: value } : q
-          )
+          qualities: m.qualities.map(q => {
+            if (q.id === qualityId) {
+              let processedValue = value;
+              if (field === 'levels') {
+                const numericValue = Number(value);
+                processedValue = Math.max(0, isNaN(numericValue) ? 0 : numericValue);
+              }
+              return { ...q, [field]: processedValue };
+            }
+            return q;
+          })
         } : m
       ),
     }));
@@ -942,9 +950,8 @@ export default function HomePage() {
   const getDiscardedAttribute = (): DiscardedAttributeType => {
     if (characterData.basicInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
         for (const id of Object.keys(characterData.basicInfo.intrinsicCustomStatsConfig)) {
-            // Check if this config belongs to a selected 'custom_stats' intrinsic.
-            // This assumes 'custom_stats' is the ID of the intrinsic.
-            if (characterData.basicInfo.selectedIntrinsicMQIds.includes(id) && INTRINSIC_META_QUALITIES.find(mq => mq.id === id)?.configKey === 'intrinsicCustomStatsConfig') {
+            const intrinsicDef = INTRINSIC_META_QUALITIES.find(mq => mq.id === id);
+            if (characterData.basicInfo.selectedIntrinsicMQIds.includes(id) && intrinsicDef?.id === 'custom_stats' && intrinsicDef?.configKey === 'intrinsicCustomStatsConfig') {
                  // @ts-ignore
                 const discarded = characterData.basicInfo.intrinsicCustomStatsConfig[id]?.discardedAttribute;
                 if (discarded) return discarded;
@@ -972,7 +979,10 @@ export default function HomePage() {
   const currentPurchasedWill = (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : (characterData.willpower.purchasedWill || 0);
 
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
-  const displayTotalWill = (hasNoBaseWillIntrinsic || (hasNoWillpowerIntrinsic && !hasNoBaseWillIntrinsic)) ? displayTotalBaseWill : displayTotalBaseWill + currentPurchasedWill;
+  
+  const displayTotalWill = hasNoBaseWillIntrinsic ? 0
+                       : hasNoWillpowerIntrinsic ? 0
+                       : displayTotalBaseWill + currentPurchasedWill;
   
   const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
   const uninvestedBaseWill = displayTotalBaseWill - totalInvestedInMotivations;
@@ -1058,5 +1068,7 @@ export default function HomePage() {
   );
 }
   
+
+    
 
     
