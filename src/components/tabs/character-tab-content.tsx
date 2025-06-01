@@ -91,9 +91,9 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
 
   const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
 
-  // Cost for Normal Dice, ensuring minimum of 1 per die if the factor is positive
+  // Cost for Normal Dice, ensuring minimum factor of 1 if NDice > 0
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
-  const costND = NDice * (perNormalDieCostFactor > 0 ? Math.max(1, perNormalDieCostFactor) : 0);
+  const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
 
   // Cost for Hard Dice
   const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
@@ -146,7 +146,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                   onCheckedChange={(checked) => onMQSelectionChange(mq.id, !!checked)}
                 />
                 <Label htmlFor={`${mqType}-${mq.id}`} className="text-sm font-medium flex-grow">
-                  {mq.name} ({ typeof mq.points === 'function' ? 'Var' : mq.points } Pts)
+                  {mq.label} ({ typeof mq.points === 'function' ? 'Var' : mq.points } Pts)
                 </Label>
               </div>
               {selectedMQIds.includes(mq.id) && (
@@ -325,7 +325,7 @@ export function CharacterTabContent({
 
   const calculateDisplayedNDFactor = (quality: MiracleQuality) => {
     const qualityDef = dynamicPqDefs.find(def => def.key === quality.type);
-    if (!qualityDef) return 0;
+    if (!qualityDef) return 0; // Should ideally not happen if types are synced
 
     const baseCostFactor = qualityDef.baseCostFactor;
     const totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
@@ -333,12 +333,12 @@ export function CharacterTabContent({
     const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
     
     const actualPerNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
-    return actualPerNormalDieCostFactor > 0 ? Math.max(1, actualPerNormalDieCostFactor) : 0;
+    return Math.max(1, actualPerNormalDieCostFactor);
   };
   
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6">
+    <Accordion type="multiple" className="w-full space-y-6" >
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>
@@ -721,9 +721,9 @@ export function CharacterTabContent({
       <CollapsibleSectionItem title="Miracles" value="miracles">
         <p className="text-sm text-muted-foreground mb-1">Miracle Dice represent the raw power of the miracle.</p>
         <p className="text-sm text-muted-foreground mb-1">Qualities determine how these dice are applied and costed.</p>
-        <p className="text-sm text-muted-foreground mb-1">Power Quality (Attacks, Defends, Useful) costs 2 points per Normal Die base.</p>
-        <p className="text-sm text-muted-foreground mb-1">Hyperstat qualities cost 4 points per Normal Die base.</p>
-        <p className="text-sm text-muted-foreground mb-4">Hyperskill qualities cost 1 point per Normal Die base. (Hard/Wiggle dice cost 2x/4x respectively for all types). Levels, Extras, and Flaws modify these costs. A quality must cost at least 1 point per Normal Die if its cost factor is positive.</p>
+        <p className="text-sm text-muted-foreground mb-1">Power Quality (Attacks, Defends, Useful) costs a base factor related to the quality type (e.g. 2 for Attacks) per Normal Die. Each Normal Die used for a quality costs a minimum of 1 point.</p>
+        <p className="text-sm text-muted-foreground mb-1">Hyperstat qualities cost a base factor of 4 per Normal Die.</p>
+        <p className="text-sm text-muted-foreground mb-4">Hyperskill qualities cost a base factor of 1 per Normal Die. (Hard/Wiggle dice cost 2x/4x their Normal Die factor respectively for all types). Levels, Extras, and Flaws modify these factors.</p>
 
         <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
           <h4 className="text-lg font-headline mb-3">Add Miracle</h4>
@@ -883,8 +883,12 @@ export function CharacterTabContent({
                           <Input
                             id={`${quality.id}-levels`}
                             type="number"
+                            min="0"
                             value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(quality.levels) : ''}
-                            onChange={(e) => onMiracleQualityChange(miracle.id, quality.id, 'levels', parseInt(e.target.value, 10) || 0)}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                onMiracleQualityChange(miracle.id, quality.id, 'levels', isNaN(val) ? 0 : Math.max(0, val));
+                            }}
                             className="text-sm"
                             placeholder="0"
                           />
