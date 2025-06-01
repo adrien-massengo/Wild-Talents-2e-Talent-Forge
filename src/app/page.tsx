@@ -195,7 +195,6 @@ export default function HomePage() {
           return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower, miracles: updatedMiracles };
         } else if (value === 'custom') {
           // User selected custom, MQs are handled by onMQSelectionChange
-          // Keep existing MQ selections if switching from a sample archetype to custom
         }
       }
       return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower };
@@ -265,7 +264,7 @@ export default function HomePage() {
            if (mqType === 'intrinsic' && mqId === 'no_base_will') {
               newWillpower.purchasedBaseWill = 0;
               newWillpower.purchasedWill = 0;
-           } else if (mqType === 'intrinsic' && mqId === 'no_willpower' && !currentSelection.includes('no_base_will')) {
+           } else if (mqType === 'intrinsic' && mqId === 'no_willpower' && !newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
              newWillpower.purchasedWill = 0;
            }
         }
@@ -280,9 +279,10 @@ export default function HomePage() {
                     updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, true) as MiracleDefinition[];
                 }
             }
-            // If 'no_base_will' is deselected, but 'no_willpower' is still selected, ensure purchasedWill remains 0
             if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
-                newWillpower.purchasedWill = 0;
+                newWillpower.purchasedWill = 0; // Keep willpower at 0 if no_willpower is still selected
+            } else if (mqId === 'no_willpower' && newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')){
+                newWillpower.purchasedWill = 0; // Keep willpower at 0 if no_base_will is still selected
             }
         }
       }
@@ -393,13 +393,13 @@ export default function HomePage() {
     const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
     const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
 
-    let processedValue = isNaN(value) ? 0 : value;
+    let processedValue = isNaN(value) ? 0 : Math.max(0, value);
 
     if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) {
-      processedValue = 0; // Force to 0 if No Base Will intrinsic is selected
+      processedValue = 0; 
     }
     if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) {
-      processedValue = 0; // Force to 0 if No Base Will or No Willpower intrinsic is selected
+      processedValue = 0; 
     }
     
     setCharacterData(prev => ({
@@ -874,18 +874,15 @@ export default function HomePage() {
           }
         }
         
-        // Ensure willpower values are numbers
         validatedData.willpower.purchasedBaseWill = Number(validatedData.willpower.purchasedBaseWill) || 0;
         validatedData.willpower.purchasedWill = Number(validatedData.willpower.purchasedWill) || 0;
         
-        // Apply willpower restrictions based on loaded intrinsics
         if (validatedData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
             validatedData.willpower.purchasedBaseWill = 0;
             validatedData.willpower.purchasedWill = 0;
         } else if (validatedData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
             validatedData.willpower.purchasedWill = 0;
         }
-
 
         setCharacterData(validatedData);
         toast({
@@ -942,20 +939,40 @@ export default function HomePage() {
   const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
   const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
 
-  const rawCalculatedBaseWillFromStats = 
-    (parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0) +
-    (parseInt(characterData.stats.charm.hardDice.replace('HD',''), 10) || 0) +
-    (parseInt(characterData.stats.charm.wiggleDice.replace('WD',''), 10) || 0) +
-    (parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0) +
-    (parseInt(characterData.stats.command.hardDice.replace('HD',''), 10) || 0) +
-    (parseInt(characterData.stats.command.wiggleDice.replace('WD',''), 10) || 0);
+  const getDiscardedAttribute = (): DiscardedAttributeType => {
+    if (characterData.basicInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
+        for (const id of Object.keys(characterData.basicInfo.intrinsicCustomStatsConfig)) {
+            // Check if this config belongs to a selected 'custom_stats' intrinsic.
+            // This assumes 'custom_stats' is the ID of the intrinsic.
+            if (characterData.basicInfo.selectedIntrinsicMQIds.includes(id) && INTRINSIC_META_QUALITIES.find(mq => mq.id === id)?.configKey === 'intrinsicCustomStatsConfig') {
+                 // @ts-ignore
+                const discarded = characterData.basicInfo.intrinsicCustomStatsConfig[id]?.discardedAttribute;
+                if (discarded) return discarded;
+            }
+        }
+    }
+    return undefined;
+  };
+  const discardedAttribute = getDiscardedAttribute();
+
+  const calculateStatValue = (stat: StatDetail | undefined): number => {
+    if (!stat) return 0;
+    return (parseInt(stat.dice.replace('D',''), 10) || 0) +
+           (parseInt(stat.hardDice.replace('HD',''), 10) || 0) +
+           (parseInt(stat.wiggleDice.replace('WD',''), 10) || 0);
+  }
+
+  const charmValue = discardedAttribute === 'charm' ? 0 : calculateStatValue(characterData.stats.charm);
+  const commandValue = discardedAttribute === 'command' ? 0 : calculateStatValue(characterData.stats.command);
+  
+  const rawCalculatedBaseWillFromStats = charmValue + commandValue;
   
   const displayCalculatedBaseWillFromStats = hasNoBaseWillIntrinsic ? 0 : rawCalculatedBaseWillFromStats;
   const currentPurchasedBaseWill = hasNoBaseWillIntrinsic ? 0 : (characterData.willpower.purchasedBaseWill || 0);
   const currentPurchasedWill = (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : (characterData.willpower.purchasedWill || 0);
 
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
-  const displayTotalWill = displayTotalBaseWill + currentPurchasedWill;
+  const displayTotalWill = (hasNoBaseWillIntrinsic || (hasNoWillpowerIntrinsic && !hasNoBaseWillIntrinsic)) ? displayTotalBaseWill : displayTotalBaseWill + currentPurchasedWill;
   
   const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
   const uninvestedBaseWill = displayTotalBaseWill - totalInvestedInMotivations;
@@ -988,6 +1005,7 @@ export default function HomePage() {
                   onMotivationChange={handleMotivationChange}
                   uninvestedBaseWill={uninvestedBaseWill}
                   totalBaseWill={displayTotalBaseWill}
+                  totalWill={displayTotalWill}
                   calculatedBaseWillFromStats={displayCalculatedBaseWillFromStats}
                   onMQSelectionChange={handleMQSelectionChange}
                   onIntrinsicConfigChange={handleIntrinsicConfigChange as any}
@@ -1006,6 +1024,7 @@ export default function HomePage() {
                   onAddExtraOrFlawToQuality={handleAddExtraOrFlawToQuality}
                   onRemoveExtraOrFlawFromQuality={handleRemoveExtraOrFlawFromQuality}
                   onExtraOrFlawChange={handleExtraOrFlawChange}
+                  discardedAttribute={discardedAttribute}
                 />
               </TabsContent>
               <TabsContent value="tables" className="mt-0">
@@ -1015,6 +1034,14 @@ export default function HomePage() {
                 <SummaryTabContent
                   characterData={characterData}
                   onPointLimitChange={handlePointLimitChange}
+                  discardedAttribute={discardedAttribute}
+                  calculatedBaseWillFromStats={displayCalculatedBaseWillFromStats}
+                  totalBaseWill={displayTotalBaseWill}
+                  totalWill={displayTotalWill}
+                  purchasedBaseWill={currentPurchasedBaseWill}
+                  purchasedWill={currentPurchasedWill}
+                  hasNoBaseWillIntrinsic={hasNoBaseWillIntrinsic}
+                  hasNoWillpowerIntrinsic={hasNoWillpowerIntrinsic}
                 />
               </TabsContent>
               <TabsContent value="gm-tools" className="mt-0">
@@ -1031,3 +1058,5 @@ export default function HomePage() {
   );
 }
   
+
+    

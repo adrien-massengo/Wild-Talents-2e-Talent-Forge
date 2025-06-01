@@ -4,7 +4,7 @@ import type { BasicInfo } from '@/app/page';
 
 export interface ArchetypeDefinition {
   id: string;
-  name: string; // Includes points, e.g., "Adept (5 Points)"
+  name: string;
   points: number;
   sourceText: string;
   permissionText: string;
@@ -12,7 +12,6 @@ export interface ArchetypeDefinition {
   intrinsicsText?: string;
   additions?: string;
   mandatoryPowerText?: string;
-  // New fields to link to specific MQ IDs
   sourceMQIds: string[];
   permissionMQIds: string[];
   intrinsicMQIds: string[];
@@ -22,7 +21,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
   {
     id: 'custom',
     name: 'Custom Archetype',
-    points: 0, // Base points for custom, actual cost from MQs
+    points: 0,
     sourceText: 'N/A',
     permissionText: 'N/A',
     description: 'You are building a custom archetype. Select Meta-Qualities below. The first positive-cost Source Meta-Quality is free.',
@@ -60,7 +59,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     permissionText: 'Permission: Inventor',
     intrinsicsText: 'Intrinsic: Mutable',
     description: 'You are an inventor: one part Einstein’s brilliance, one part Tesla’s innovation, with a dash of Edison’s persistence for flavor. In your laboratory you construct devices that beggar the imagination of the world’s most accomplished scientific minds. Whether your creations are mystical or scientific in nature, they transcend what is considered the extent of human ability.',
-    sourceMQIds: ['technological'], // Defaulting for simplicity, UI could allow choice
+    sourceMQIds: ['technological'],
     permissionMQIds: ['inventor'],
     intrinsicMQIds: ['mutable'],
   },
@@ -97,7 +96,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Sources: Divine, Paranormal',
     permissionText: 'Permissions: Super',
     description: 'You’re not the God, but a god, surely; or perhaps you are related to a divine entity of some sort and have been exiled to spend your unnaturally long life in the mortal realm.',
-    sourceMQIds: ['divine'], // Defaulting for simplicity
+    sourceMQIds: ['divine'],
     permissionMQIds: ['super_permission'],
     intrinsicMQIds: [],
   },
@@ -108,7 +107,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Source: Genetic, Psi or Technological',
     permissionText: 'Permission: Super',
     description: 'You’re a human modified by science, or something else, to be something more. Whatever experiment or accident befell you, it granted you powers beyond the rank and file of humanity.',
-    sourceMQIds: ['genetic_source'], // Defaulting for simplicity
+    sourceMQIds: ['genetic_source'],
     permissionMQIds: ['super_permission'],
     intrinsicMQIds: [],
   },
@@ -162,40 +161,40 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
 
 export interface MetaQualityBase {
   id: string;
-  name: string; // e.g. "Source: Conduit"
-  label: string; // e.g. "Conduit"
+  name: string;
+  label: string;
   points: number | ((config?: any) => number);
   description?: string;
 }
 
 export interface SourceMetaQuality extends MetaQualityBase {}
 export const SOURCE_META_QUALITIES: SourceMetaQuality[] = [
-  { id: 'conduit', name: 'Source: Conduit', label: 'Conduit', points: 5, description: 'You’re a gateway to an extradimensional source of energy, and your powers are a careful application of that force.' },
-  { id: 'construct_source', name: 'Source: Construct', label: 'Construct', points: 5, description: 'You’re an artificial entity created by magic or super-science, and your powers derive from your artificial nature.' },
-  { id: 'cyborg', name: 'Source: Cyborg', label: 'Cyborg', points: 5, description: 'You’re part human, part machine. Your machine components are housed in any hit locations on your body, and can be built as foci—see page 134 for details. Choose those locations at character creation. You still require a Permission Meta-Quality to determine what powers your cyborg components can possess.' },
-  { id: 'divine', name: 'Source: Divine', label: 'Divine', points: 5, description: 'Your powers are derived from a deity or deities, or through your divine nature.' },
-  { id: 'driven', name: 'Source: Driven', label: 'Driven', points: 5, description: 'Your inhuman drive has pushed you past the bounds of human potential.' },
-  { id: 'extraterrestrial_extradimensional', name: 'Source: Extraterrestrial/Extradimensional', label: 'Extraterrestrial/Extradimensional', points: 5, description: 'You’re from another planet or dimension and your powers are derived from your alien nature.' },
-  { id: 'genetic_source', name: 'Source: Genetic', label: 'Genetic', points: 5, description: 'Your powers are a result of genetic enhancement.' },
-  { id: 'life_force', name: 'Source: Life Force', label: 'Life Force', points: 5, description: 'Your abilities are based upon the manipulation of your life force—the secret power all living beings possess.' },
-  { id: 'paranormal_source', name: 'Source: Paranormal', label: 'Paranormal', points: 5, description: 'Your powers are magical in nature.' },
-  { id: 'power_focus', name: 'Source: Power Focus', label: 'Power Focus', points: -8, description: 'All your powers are embedded in a single unique focus (see page 134) or must be channeled through one to work properly. If that focus is destroyed, your powers are unusable and return only at the GM’s discretion—if ever. You still need a Permission Meta-Quality to determine what powers your focus can possess.' },
-  { id: 'psi_source', name: 'Source: Psi', label: 'Psi', points: 5, description: 'Your powers are psionic: You manipulate the world through the power of your mind.' },
-  { id: 'technological', name: 'Source: Technological', label: 'Technological', points: 5, description: 'Your powers come from advanced technology. Either you wield high-tech gadgets or you’re the product of super-science.' },
-  { id: 'unknown_source', name: 'Source: Unknown', label: 'Unknown', points: -5, description: 'Your Source is a mystery. Your powers are just as baffling to you as they are to others.' },
+  { id: 'conduit', name: 'Source: Conduit', label: 'Conduit (5 Pts)', points: 5, description: 'You’re a gateway to an extradimensional source of energy, and your powers are a careful application of that force.' },
+  { id: 'construct_source', name: 'Source: Construct', label: 'Construct (5 Pts)', points: 5, description: 'You’re an artificial entity created by magic or super-science, and your powers derive from your artificial nature.' },
+  { id: 'cyborg', name: 'Source: Cyborg', label: 'Cyborg (5 Pts)', points: 5, description: 'You’re part human, part machine. Your machine components are housed in any hit locations on your body, and can be built as foci—see page 134 for details. Choose those locations at character creation. You still require a Permission Meta-Quality to determine what powers your cyborg components can possess.' },
+  { id: 'divine', name: 'Source: Divine', label: 'Divine (5 Pts)', points: 5, description: 'Your powers are derived from a deity or deities, or through your divine nature.' },
+  { id: 'driven', name: 'Source: Driven', label: 'Driven (5 Pts)', points: 5, description: 'Your inhuman drive has pushed you past the bounds of human potential.' },
+  { id: 'extraterrestrial_extradimensional', name: 'Source: Extraterrestrial/Extradimensional', label: 'Extraterrestrial/Extradimensional (5 Pts)', points: 5, description: 'You’re from another planet or dimension and your powers are derived from your alien nature.' },
+  { id: 'genetic_source', name: 'Source: Genetic', label: 'Genetic (5 Pts)', points: 5, description: 'Your powers are a result of genetic enhancement.' },
+  { id: 'life_force', name: 'Source: Life Force', label: 'Life Force (5 Pts)', points: 5, description: 'Your abilities are based upon the manipulation of your life force—the secret power all living beings possess.' },
+  { id: 'paranormal_source', name: 'Source: Paranormal', label: 'Paranormal (5 Pts)', points: 5, description: 'Your powers are magical in nature.' },
+  { id: 'power_focus', name: 'Source: Power Focus', label: 'Power Focus (-8 Pts)', points: -8, description: 'All your powers are embedded in a single unique focus (see page 134) or must be channeled through one to work properly. If that focus is destroyed, your powers are unusable and return only at the GM’s discretion—if ever. You still need a Permission Meta-Quality to determine what powers your focus can possess.' },
+  { id: 'psi_source', name: 'Source: Psi', label: 'Psi (5 Pts)', points: 5, description: 'Your powers are psionic: You manipulate the world through the power of your mind.' },
+  { id: 'technological', name: 'Source: Technological', label: 'Technological (5 Pts)', points: 5, description: 'Your powers come from advanced technology. Either you wield high-tech gadgets or you’re the product of super-science.' },
+  { id: 'unknown_source', name: 'Source: Unknown', label: 'Unknown (-5 Pts)', points: -5, description: 'Your Source is a mystery. Your powers are just as baffling to you as they are to others.' },
 ];
 
 export interface PermissionMetaQuality extends MetaQualityBase {}
 export const PERMISSION_META_QUALITIES: PermissionMetaQuality[] = [
-  { id: 'hypertrained', name: 'Permission: Hypertrained', label: 'Hypertrained', points: 5, description: 'You can purchase any number of Hyperskills and any kind of dice with them.' },
-  { id: 'inhuman_stats', name: 'Permission: Inhuman Stats', label: 'Inhuman Stats', points: 1, description: 'Characters with this Permission have limits on Stats that are different from the ordinary limits. Where humans are limited to five dice in a Stat (not counting Hyperstat dice; see page 104), your Archetype might have more, perhaps even in more than one Stat. In addition, the maximum allowed Stat sets the maximum allowed Skill for all Skills based on that Stat. This Permission costs 3 Points for each inhuman Stat. That Stat, and all Skills based on it, can have up to 10d rather than the normal 5d limit, and can have Hard Dice, Wiggle Dice, additional Power Qualities, Power Quality Levels, Extras and Flaws. The inhuman Stat is not affected if your Willpower reaches zero, like a typical Hyperstat would be. For each Stat that has a maximum lower than five, subtract 1 Point from the cost of this Permission per die lower than five. This also restricts your maximum dice with Skills associated with the restricted Stat. The Permission has a minimum cost of 1 Point.' },
-  { id: 'inventor', name: 'Permission: Inventor', label: 'Inventor', points: 5, description: 'You can build external powers of any type embedded in foci, also known as gadgets (when based on high technology) or artifacts (when based on magic). You may buy any number of dice in the Gadgeteering power (see page 145), but all other powers must be built into foci. You cannot take any other permanent, internal power without buying another Permission.' },
-  { id: 'one_power', name: 'Permission: One Power', label: 'One Power', points: 1, description: 'You can have any one Hyperstat, Hyperskill, or Miracle—but only one. (This can still be pretty broad with a “Variable Effect” Miracle such as Cosmic Power, page 142.)' },
-  { id: 'peak_performer', name: 'Permission: Peak Performer', label: 'Peak Performer', points: 5, description: 'You may purchase any kind of dice with your Stats and Skills, up to the normal limit of five dice in a Stat or Skill unless you have Inhuman Stats. You can have 5wd in Body, for example, or 5hd in Coordination and 5wd in Body, but not 6d in either one.' },
-  { id: 'power_theme', name: 'Permission: Power Theme', label: 'Power Theme', points: 5, description: 'You can buy Hyperstats, Hyperskills, and Miracles, but all powers must fit a certain theme, such as “cold-based powers,” “solar powers,” “monkey powers,” or whatever you and the GM agree on.' },
-  { id: 'prime_specimen', name: 'Permission: Prime Specimen', label: 'Prime Specimen', points: 5, description: 'You can buy Hyperstats without restriction.' },
-  { id: 'super_permission', name: 'Permission: Super', label: 'Super', points: 15, description: 'You can purchase any number and types of dice with Hyperstats, Hyperskills, and powers.' },
-  { id: 'super_equipment', name: 'Permission: Super-Equipment', label: 'Super-Equipment', points: 2, description: 'During character creation only, you can buy any number of powers embedded in foci. This Permission does not give you the ability to buy internal powers or the Gadgeteering Miracle; it only allows you to buy gadgets or artifacts during character creation. To get a new one after character creation you must have the GM’s permission.' },
+  { id: 'hypertrained', name: 'Permission: Hypertrained', label: 'Hypertrained (5 Pts)', points: 5, description: 'You can purchase any number of Hyperskills and any kind of dice with them.' },
+  { id: 'inhuman_stats', name: 'Permission: Inhuman Stats', label: 'Inhuman Stats (1 Pt/Stat)', points: 1, description: 'Characters with this Permission have limits on Stats that are different from the ordinary limits. Where humans are limited to five dice in a Stat (not counting Hyperstat dice; see page 104), your Archetype might have more, perhaps even in more than one Stat. In addition, the maximum allowed Stat sets the maximum allowed Skill for all Skills based on that Stat. This Permission costs 3 Points for each inhuman Stat. That Stat, and all Skills based on it, can have up to 10d rather than the normal 5d limit, and can have Hard Dice, Wiggle Dice, additional Power Qualities, Power Quality Levels, Extras and Flaws. The inhuman Stat is not affected if your Willpower reaches zero, like a typical Hyperstat would be. For each Stat that has a maximum lower than five, subtract 1 Point from the cost of this Permission per die lower than five. This also restricts your maximum dice with Skills associated with the restricted Stat. The Permission has a minimum cost of 1 Point.' },
+  { id: 'inventor', name: 'Permission: Inventor', label: 'Inventor (5 Pts)', points: 5, description: 'You can build external powers of any type embedded in foci, also known as gadgets (when based on high technology) or artifacts (when based on magic). You may buy any number of dice in the Gadgeteering power (see page 145), but all other powers must be built into foci. You cannot take any other permanent, internal power without buying another Permission.' },
+  { id: 'one_power', name: 'Permission: One Power', label: 'One Power (1 Pt)', points: 1, description: 'You can have any one Hyperstat, Hyperskill, or Miracle—but only one. (This can still be pretty broad with a “Variable Effect” Miracle such as Cosmic Power, page 142.)' },
+  { id: 'peak_performer', name: 'Permission: Peak Performer', label: 'Peak Performer (5 Pts)', points: 5, description: 'You may purchase any kind of dice with your Stats and Skills, up to the normal limit of five dice in a Stat or Skill unless you have Inhuman Stats. You can have 5wd in Body, for example, or 5hd in Coordination and 5wd in Body, but not 6d in either one.' },
+  { id: 'power_theme', name: 'Permission: Power Theme', label: 'Power Theme (5 Pts)', points: 5, description: 'You can buy Hyperstats, Hyperskills, and Miracles, but all powers must fit a certain theme, such as “cold-based powers,” “solar powers,” “monkey powers,” or whatever you and the GM agree on.' },
+  { id: 'prime_specimen', name: 'Permission: Prime Specimen', label: 'Prime Specimen (5 Pts)', points: 5, description: 'You can buy Hyperstats without restriction.' },
+  { id: 'super_permission', name: 'Permission: Super', label: 'Super (15 Pts)', points: 15, description: 'You can purchase any number and types of dice with Hyperstats, Hyperskills, and powers.' },
+  { id: 'super_equipment', name: 'Permission: Super-Equipment', label: 'Super-Equipment (2 Pts)', points: 2, description: 'During character creation only, you can buy any number of powers embedded in foci. This Permission does not give you the ability to buy internal powers or the Gadgeteering Miracle; it only allows you to buy gadgets or artifacts during character creation. To get a new one after character creation you must have the GM’s permission.' },
 ];
 
 export interface AllergyOption { value: string; label: string; }
@@ -214,7 +213,7 @@ export type AllergySubstanceType = typeof ALLERGY_SUBSTANCES[number]['value'] | 
 export type AllergyEffectType = typeof ALLERGY_EFFECTS[number]['value'] | undefined;
 
 export type BruteFrailType = 'brute' | 'frail' | undefined;
-export type DiscardedAttributeType = 'body' | 'coordination' | 'sense' | 'command' | 'charm' | undefined;
+export type DiscardedAttributeType = 'body' | 'coordination' | 'sense' | 'mind' | 'charm' | 'command' | undefined;
 
 
 export interface IntrinsicMetaQuality extends MetaQualityBase {
@@ -249,18 +248,18 @@ export function calculateAllergyPoints(substance?: AllergySubstanceType, effect?
 
 export const INTRINSIC_META_QUALITIES: IntrinsicMetaQuality[] = [
   {
-    id: 'allergy', name: 'Intrinsic: Allergy', label: 'Allergy',
+    id: 'allergy', name: 'Intrinsic: Allergy', label: 'Allergy (Var Pts)',
     points: (config?: { substance?: AllergySubstanceType; effect?: AllergyEffectType }) => calculateAllergyPoints(config?.substance, config?.effect),
     description: 'You’re allergic to a substance. Exposure to it is enough to drain Willpower, incapacitate or even kill you.',
     configKey: 'intrinsicAllergyConfig',
   },
   {
-    id: 'brute_frail', name: 'Intrinsic: Brute/Frail', label: 'Brute/Frail', points: -8,
+    id: 'brute_frail', name: 'Intrinsic: Brute/Frail', label: 'Brute/Frail (-8 Pts)', points: -8,
     description: 'All your physical actions (including powers) are limited to a maximum width of 2 for initiative purposes only (this does not affect damage or other functions of width). This represents either overwhelming physical power (which makes it difficult to focus on small or swift targets), or a natural frailty that makes it difficult to move too fast. Pick one.',
     configKey: 'intrinsicBruteFrailConfig',
   },
   {
-    id: 'custom_stats', name: 'Intrinsic: Custom Stats', label: 'Custom Stats', points: 5,
+    id: 'custom_stats', name: 'Intrinsic: Custom Stats', label: 'Custom Stats (5 Pts)', points: 5,
     description: 'Select an attribute to discard. Its box\'s contents will be replaced with specific effects.',
     configKey: 'intrinsicCustomStatsConfig',
     customStatsDiscardOptions: [
@@ -272,46 +271,46 @@ export const INTRINSIC_META_QUALITIES: IntrinsicMetaQuality[] = [
     ]
   },
   {
-    id: 'globular', name: 'Intrinsic: Globular', label: 'Globular', points: 8,
+    id: 'globular', name: 'Intrinsic: Globular', label: 'Globular (8 Pts)', points: 8,
     description: 'You are an amorphous, constantly changing life form. All 34 of your wound boxes are contained in a single hit location (1-10), but you must mark four wound boxes on your character sheet as brain boxes. If these boxes are filled with Shock damage, you are knocked unconscious. If they fill with Killing, you die. Any of your brain boxes can “split off” from your body, abandoning it in case of gross physical damage (only one can do so; the rest die along with the body). If this is done, you lose all Willpower points except 1. You then can heal your hit boxes back normally, up to your normal level, as per the healing rules on page 61. This Intrinsic does not give you the ability to do more than one thing at a time, or to heal yourself instantly by rearranging your body. If you want to be able to use multiple pseudopods at once, buy the Multiple Actions Miracle; if you want to regenerate, buy Regeneration.',
   },
   {
-    id: 'inhuman_intrinsic', name: 'Intrinsic: Inhuman', label: 'Inhuman', points: -8,
+    id: 'inhuman_intrinsic', name: 'Intrinsic: Inhuman', label: 'Inhuman (-8 Pts)', points: -8,
     description: 'You’re terrifyingly inhuman, or at least you look it, and have no way of disguising yourself to pass for normal. Whether you have wings, claws, or tentacles, the effect is the same—humans who don’t know you react to your presence with mindless fear. If surprised, or in combat, NPCs must make a Stability roll to not flee immediately or attack you.',
   },
   {
-    id: 'mandatory_power', name: 'Intrinsic: Mandatory Power', label: 'Mandatory Power', points: 0,
+    id: 'mandatory_power', name: 'Intrinsic: Mandatory Power', label: 'Mandatory Power (0 Pts)', points: 0,
     description: 'Some particular power is an essential part of this Archetype. This Intrinsic does not give you extra Points like other restrictive Intrinsics, but each power that’s mandatory is automatically covered by your Archetype’s Sources, at no extra cost.',
     configKey: 'intrinsicMandatoryPowerConfig',
   },
   {
-    id: 'mutable', name: 'Intrinsic: Mutable', label: 'Mutable', points: 15,
+    id: 'mutable', name: 'Intrinsic: Mutable', label: 'Mutable (15 Pts)', points: 15,
     description: 'At the GM’s discretion, you may purchase entirely new powers during game play.',
   },
   {
-    id: 'no_base_will', name: 'Intrinsic: No Base Will', label: 'No Base Will', points: -10,
+    id: 'no_base_will', name: 'Intrinsic: No Base Will', label: 'No Base Will (-10 Pts)', points: -10,
     description: 'You have no Base Will and no Willpower score. You are immune to damaging psychological stimuli and powers that directly interfere with perception and thought. You can use powers that require you to bid 1 Willpower point without restriction; if you fail to activate the power, it costs you nothing. However, powers that cost Willpower must have an external Willpower source, such as the Willpower Battery Miracle with the Willpower donated by other characters.',
   },
   {
-    id: 'no_willpower', name: 'Intrinsic: No Willpower', label: 'No Willpower', points: -5,
+    id: 'no_willpower', name: 'Intrinsic: No Willpower', label: 'No Willpower (-5 Pts)', points: -5,
     description: 'Like an ordinary human, your character has a Base Will score but no Willpower, and thus none of the advantages that go along with it.',
   },
   {
-    id: 'no_willpower_no_way', name: 'Intrinsic: No Willpower No Way', label: 'No Willpower No Way', points: -5,
+    id: 'no_willpower_no_way', name: 'Intrinsic: No Willpower No Way', label: 'No Willpower No Way (-5 Pts)', points: -5,
     description: 'If your Willpower reaches zero, your powers all fail completely until you gain 1 or more.',
   },
   {
-    id: 'unhealing', name: 'Intrinsic: Unhealing', label: 'Unhealing', points: -8,
+    id: 'unhealing', name: 'Intrinsic: Unhealing', label: 'Unhealing (-8 Pts)', points: -8,
     description: 'You do not heal naturally and get no benefit from first aid or medical care. The only way to repair damage is to spend 1 Willpower point outside of combat to restore 1 point of Killing or 2 points of Shock. How long this takes is up to the GM, but it should be a significant amount of time. To heal faster, buy the Regeneration power. It’s possible to have this Intrinsic even if you have no Base Will or Willpower score—you rely solely on the kindness of other creatures with Base Will or Willpower to heal your damage. How this happens is up to the GM.',
   },
   {
-    id: 'vulnerable', name: 'Intrinsic: Vulnerable', label: 'Vulnerable',
+    id: 'vulnerable', name: 'Intrinsic: Vulnerable', label: 'Vulnerable (Var Pts)',
     points: (config?: { extraBoxes?: number }) => (config?.extraBoxes || 0) * -2,
     description: 'For each level of this Intrinsic you must designate one additional wound box somewhere on your body as a brain box (see Intrinsic: Globular, page 100), in addition to the basic four. If any four of your various brain boxes are filled with Shock damage, you’re rendered unconscious. If any four are filled with Killing, you’re dead. Be cautious with this Intrinsic—it makes you much more vulnerable to attack.',
     configKey: 'intrinsicVulnerableConfig',
   },
   {
-    id: 'willpower_contest', name: 'Intrinsic: Willpower Contest', label: 'Willpower Contest', points: -10,
+    id: 'willpower_contest', name: 'Intrinsic: Willpower Contest', label: 'Willpower Contest (-10 Pts)', points: -10,
     description: 'Any time you use your powers on a character with Willpower and the target is aware of the attack, you must beat him in a Willpower contest. Both of you “bid” Willpower points during the resolution phase of combat, after you’ve declared and rolled. This is a “blind” bid—each side jots down the bid on scratch paper, then compare the bids. If you bid more than your target, your power works normally. If your target bids more, your power fails. Either way, you each lose the Willpower points that you’ve bid.',
   },
 ];
@@ -320,20 +319,18 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   let totalPoints = 0;
   let firstPositiveSourceCostApplied = false;
 
-  // Calculate Source MQ points
   basicInfo.selectedSourceMQIds.forEach(id => {
     const mq = SOURCE_META_QUALITIES.find(m => m.id === id);
     if (mq) {
       const points = typeof mq.points === 'function' ? mq.points({}) : mq.points;
       if (points > 0 && !firstPositiveSourceCostApplied && basicInfo.selectedArchetypeId === 'custom') {
-        firstPositiveSourceCostApplied = true; // This positive cost source is free
+        firstPositiveSourceCostApplied = true;
       } else {
         totalPoints += points;
       }
     }
   });
 
-  // Calculate Permission MQ points
   basicInfo.selectedPermissionMQIds.forEach(id => {
     const mq = PERMISSION_META_QUALITIES.find(m => m.id === id);
     if (mq) {
@@ -341,13 +338,12 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
     }
   });
 
-  // Calculate Intrinsic MQ points
   basicInfo.selectedIntrinsicMQIds.forEach(id => {
     const mq = INTRINSIC_META_QUALITIES.find(m => m.id === id);
     if (mq) {
       let intrinsicConfig: any = {};
       if (mq.configKey) {
-        // @ts-ignore - Indexing basicInfo with a dynamic key
+        // @ts-ignore
         const configGroup = basicInfo[mq.configKey];
         if (configGroup && typeof configGroup === 'object' && id in configGroup) {
            // @ts-ignore
@@ -359,3 +355,5 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   });
   return totalPoints;
 }
+
+    

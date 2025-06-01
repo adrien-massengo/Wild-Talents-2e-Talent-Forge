@@ -36,6 +36,7 @@ interface CharacterTabContentProps {
   onMotivationChange: (motivationId: string, field: keyof MotivationObject, value: any) => void;
   uninvestedBaseWill: number;
   totalBaseWill: number;
+  totalWill: number;
   calculatedBaseWillFromStats: number;
   onMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
   onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any, currentMiracles?: MiracleDefinition[]) => void;
@@ -55,6 +56,7 @@ interface CharacterTabContentProps {
   onAddExtraOrFlawToQuality: (miracleId: string, qualityId: string, itemType: 'extra' | 'flaw', definitionId?: string) => void;
   onRemoveExtraOrFlawFromQuality: (miracleId: string, qualityId: string, itemType: 'extra' | 'flaw', itemId: string) => void;
   onExtraOrFlawChange: (miracleId: string, qualityId: string, itemType: 'extra' | 'flaw', itemId: string, field: keyof AppliedExtraOrFlaw, value: string | number) => void;
+  discardedAttribute?: DiscardedAttributeType;
 }
 
 interface StatDefinition {
@@ -143,7 +145,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                   onCheckedChange={(checked) => onMQSelectionChange(mq.id, !!checked)}
                 />
                 <Label htmlFor={`${mqType}-${mq.id}`} className="text-sm font-medium flex-grow">
-                  {mq.label} ({ typeof mq.points === 'function' ? 'Var' : mq.points } Pts)
+                  {mq.label}
                 </Label>
               </div>
               {selectedMQIds.includes(mq.id) && (
@@ -266,6 +268,7 @@ export function CharacterTabContent({
   onMotivationChange,
   uninvestedBaseWill,
   totalBaseWill,
+  totalWill,
   calculatedBaseWillFromStats,
   onMQSelectionChange,
   onIntrinsicConfigChange,
@@ -284,6 +287,7 @@ export function CharacterTabContent({
   onAddExtraOrFlawToQuality,
   onRemoveExtraOrFlawFromQuality,
   onExtraOrFlawChange,
+  discardedAttribute,
 }: CharacterTabContentProps) {
 
   const [selectedSkillToAdd, setSelectedSkillToAdd] = React.useState<string>("");
@@ -336,9 +340,10 @@ export function CharacterTabContent({
   const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
   const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
 
+  const customStatsDefinition = INTRINSIC_META_QUALITIES.find(mq => mq.id === 'custom_stats');
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" >
+    <Accordion type="multiple" className="w-full space-y-6" defaultValue={['basic-information']} >
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>
@@ -407,7 +412,7 @@ export function CharacterTabContent({
         <div className="space-y-4">
           <div className="flex justify-between items-center mb-2">
             <p className="text-sm font-medium">Uninvested Base Will: {uninvestedBaseWill}</p>
-            <Button onClick={onAddMotivation} size="sm">
+            <Button onClick={onAddMotivation} size="sm" disabled={hasNoBaseWillIntrinsic}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Motivation
             </Button>
           </div>
@@ -483,56 +488,70 @@ export function CharacterTabContent({
           Costs: Normal Dice: 5 points per die. Hard Dice: 10 points per die. Wiggle Dice: 20 points per die.
         </p>
         <div className="space-y-6">
-          {statsDefinitions.map((stat) => (
+          {statsDefinitions.map((stat) => {
+            const isDiscarded = discardedAttribute === stat.name;
+            const discardedDescription = isDiscarded && customStatsDefinition?.customStatsDiscardOptions?.find(opt => opt.value === stat.name)?.description;
+
+            return (
             <div key={stat.name} className="p-4 border rounded-lg bg-card/50 shadow-sm">
               <h4 className="text-xl font-headline mb-2 text-primary">{stat.label}</h4>
-              <p className="text-sm text-muted-foreground mb-4">{stat.description}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
-                <div>
-                  <Label htmlFor={`${stat.name}-dice`} className="text-xs font-semibold">Normal Dice</Label>
-                  <Select
-                    value={characterData.stats[stat.name]?.dice || '2D'}
-                    onValueChange={(value) => onStatChange(stat.name, 'dice', value)}
-                  >
-                    <SelectTrigger id={`${stat.name}-dice`} aria-label={`${stat.label} Normal Dice`}>
-                      <SelectValue placeholder="Select dice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 6 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+              {isDiscarded ? (
+                <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded-md">
+                  <p><strong>This attribute is discarded due to the Custom Stats intrinsic.</strong></p>
+                  <p className="mt-1">{discardedDescription}</p>
                 </div>
-                <div>
-                  <Label htmlFor={`${stat.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
-                  <Select
-                    value={characterData.stats[stat.name]?.hardDice || '0HD'}
-                    onValueChange={(value) => onStatChange(stat.name, 'hardDice', value)}
-                  >
-                    <SelectTrigger id={`${stat.name}-hardDice`} aria-label={`${stat.label} Hard Dice`}>
-                      <SelectValue placeholder="Select hard dice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor={`${stat.name}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
-                  <Select
-                    value={characterData.stats[stat.name]?.wiggleDice || '0WD'}
-                    onValueChange={(value) => onStatChange(stat.name, 'wiggleDice', value)}
-                  >
-                    <SelectTrigger id={`${stat.name}-wiggleDice`} aria-label={`${stat.label} Wiggle Dice`}>
-                      <SelectValue placeholder="Select wiggle dice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">{stat.description}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
+                    <div>
+                      <Label htmlFor={`${stat.name}-dice`} className="text-xs font-semibold">Normal Dice</Label>
+                      <Select
+                        value={characterData.stats[stat.name]?.dice || '2D'}
+                        onValueChange={(value) => onStatChange(stat.name, 'dice', value)}
+                      >
+                        <SelectTrigger id={`${stat.name}-dice`} aria-label={`${stat.label} Normal Dice`}>
+                          <SelectValue placeholder="Select dice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 6 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`${stat.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
+                      <Select
+                        value={characterData.stats[stat.name]?.hardDice || '0HD'}
+                        onValueChange={(value) => onStatChange(stat.name, 'hardDice', value)}
+                      >
+                        <SelectTrigger id={`${stat.name}-hardDice`} aria-label={`${stat.label} Hard Dice`}>
+                          <SelectValue placeholder="Select hard dice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`${stat.name}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
+                      <Select
+                        value={characterData.stats[stat.name]?.wiggleDice || '0WD'}
+                        onValueChange={(value) => onStatChange(stat.name, 'wiggleDice', value)}
+                      >
+                        <SelectTrigger id={`${stat.name}-wiggleDice`} aria-label={`${stat.label} Wiggle Dice`}>
+                          <SelectValue placeholder="Select wiggle dice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-          ))}
+          );
+        })}
         </div>
       </CollapsibleSectionItem>
 
@@ -716,7 +735,7 @@ export function CharacterTabContent({
               disabled={hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic}
             />
           </div>
-          <p><strong className="font-headline">Total Will:</strong> {totalBaseWill + ((hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : (characterData.willpower.purchasedWill || 0))}</p>
+          <p><strong className="font-headline">Total Will:</strong> {totalWill}</p>
         </div>
       </CollapsibleSectionItem>
 
@@ -889,7 +908,7 @@ export function CharacterTabContent({
                             value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(Math.max(0, quality.levels)) : '0'}
                             onChange={(e) => {
                                 let val = parseInt(e.target.value, 10);
-                                if (isNaN(val) || val < 0) val = 0;
+                                val = Math.max(0, isNaN(val) ? 0 : val);
                                 onMiracleQualityChange(miracle.id, quality.id, 'levels', val);
                             }}
                             className="text-sm"
@@ -997,5 +1016,7 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
+    
 
     

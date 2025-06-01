@@ -6,7 +6,7 @@ import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/
 import type { MiracleDefinition } from "@/lib/miracles-definitions";
 import { getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import { calculateMiracleQualityCost, calculateMiracleTotalCost } from "@/components/tabs/character-tab-content"; 
-import { ARCHETYPES, calculateMetaQualitiesPointCost, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES } from "@/lib/character-definitions";
+import { ARCHETYPES, calculateMetaQualitiesPointCost, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, DiscardedAttributeType } from "@/lib/character-definitions";
 import { 
   bodyEffectsData, coordinationEffectsData, senseEffectsData, mindEffectsData, charmEffectsData, commandEffectsData, skillExamplesData,
   type BodyEffectData, type CoordinationEffectData, type SenseEffectData, type MindEffectData, type CharmEffectData, type CommandEffectData, type SkillExampleData
@@ -23,6 +23,14 @@ import { Label } from "@/components/ui/label";
 interface SummaryTabContentProps {
   characterData: CharacterData;
   onPointLimitChange: (value: number) => void;
+  discardedAttribute?: DiscardedAttributeType;
+  calculatedBaseWillFromStats: number;
+  totalBaseWill: number;
+  totalWill: number;
+  purchasedBaseWill: number;
+  purchasedWill: number;
+  hasNoBaseWillIntrinsic: boolean;
+  hasNoWillpowerIntrinsic: boolean;
 }
 
 const formatStatDisplay = (stat: StatDetail | undefined) => {
@@ -46,11 +54,16 @@ const calculateStatPoints = (stat: StatDetail | undefined): number => {
 };
 
 const calculateWillpowerPoints = (
-    willpower: CharacterData['willpower'] | undefined
+    purchasedBaseWill: number,
+    purchasedWill: number,
+    hasNoBaseWill: boolean,
+    hasNoWillpower: boolean
   ): number => {
-    if (!willpower) return 0;
-    const purchasedBaseWillPoints = (willpower.purchasedBaseWill || 0) * 3;
-    const purchasedWillPoints = (willpower.purchasedWill || 0) * 1;
+    const effectivePurchasedBaseWill = hasNoBaseWill ? 0 : purchasedBaseWill;
+    const effectivePurchasedWill = (hasNoBaseWill || hasNoWillpower) ? 0 : purchasedWill;
+    
+    const purchasedBaseWillPoints = (effectivePurchasedBaseWill || 0) * 3;
+    const purchasedWillPoints = (effectivePurchasedWill || 0) * 1;
     return purchasedBaseWillPoints + purchasedWillPoints;
   };
 
@@ -83,28 +96,29 @@ const getEffectiveNormalDiceForEffects = (item: StatDetail | SkillInstance | und
 };
 
 
-export function SummaryTabContent({ characterData, onPointLimitChange }: SummaryTabContentProps) {
+export function SummaryTabContent({ 
+    characterData, 
+    onPointLimitChange, 
+    discardedAttribute,
+    calculatedBaseWillFromStats,
+    totalBaseWill,
+    totalWill,
+    purchasedBaseWill,
+    purchasedWill,
+    hasNoBaseWillIntrinsic,
+    hasNoWillpowerIntrinsic,
+}: SummaryTabContentProps) {
   const { basicInfo, stats, willpower, skills, miracles, pointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
-  const charmNormalDice = parseInt(stats?.charm?.dice.replace('D',''), 10) || 0;
-  const charmHardDice = parseInt(stats?.charm?.hardDice.replace('HD',''), 10) || 0;
-  const charmWiggleDice = parseInt(stats?.charm?.wiggleDice.replace('WD',''), 10) || 0;
-  
-  const commandNormalDice = parseInt(stats?.command?.dice.replace('D',''), 10) || 0;
-  const commandHardDice = parseInt(stats?.command?.hardDice.replace('HD',''), 10) || 0;
-  const commandWiggleDice = parseInt(stats?.command?.wiggleDice.replace('WD',''), 10) || 0;
+  const totalStatPoints = Object.entries(stats || {}).reduce((sum, [key, stat]) => {
+    if (discardedAttribute === key as keyof CharacterData['stats']) {
+      return sum; // Discarded stats cost 0 points
+    }
+    return sum + calculateStatPoints(stat);
+  }, 0);
 
-  const calculatedBaseWillFromStats = charmNormalDice + charmHardDice + charmWiggleDice + commandNormalDice + commandHardDice + commandWiggleDice;
-
-  const purchasedBaseWill = willpower?.purchasedBaseWill || 0;
-  const purchasedWill = willpower?.purchasedWill || 0;
-
-  const totalBaseWill = calculatedBaseWillFromStats + purchasedBaseWill;
-  const totalWill = totalBaseWill + purchasedWill;
-
-  const totalStatPoints = Object.values(stats || {}).reduce((sum, stat) => sum + calculateStatPoints(stat), 0);
-  const totalWillpowerPoints = calculateWillpowerPoints(willpower);
+  const totalWillpowerPoints = calculateWillpowerPoints(purchasedBaseWill, purchasedWill, hasNoBaseWillIntrinsic, hasNoWillpowerIntrinsic);
   const totalSkillPoints = (skills || []).reduce((sum, skill) => sum + calculateSkillPoints(skill), 0);
   const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => sum + calculateMiracleTotalCost(miracle, skills), 0);
   
@@ -161,9 +175,11 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   const mandatoryMiracles = (miracles || []).filter(m => m.isMandatory);
   const regularMiracles = (miracles || []).filter(m => !m.isMandatory);
 
+  const customStatsIntrinsicDef = INTRINSIC_META_QUALITIES.find(mq => mq.id === 'custom_stats');
+
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper">
+    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={['character-point-summary']}>
       <CollapsibleSectionItem title="Character Point Summary" value="character-point-summary">
         <Card>
           <CardHeader>
@@ -247,14 +263,30 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stats && Object.entries(stats).map(([key, value]) => (
-                  <TableRow key={key}>
-                    <TableCell className="capitalize font-medium">{key}</TableCell>
-                    <TableCell>{formatStatDisplay(value)}</TableCell>
-                    <TableCell>{calculateStatPoints(value)}</TableCell>
-                    <TableCell className="text-xs">{getStatEffectDescription(key as keyof CharacterData['stats'], value)}</TableCell>
-                  </TableRow>
-                ))}
+                {stats && Object.entries(stats).map(([key, value]) => {
+                  const statKey = key as keyof CharacterData['stats'];
+                  const isDiscarded = discardedAttribute === statKey;
+                  const discardedDescription = isDiscarded && customStatsIntrinsicDef?.customStatsDiscardOptions?.find(opt => opt.value === statKey)?.description;
+
+                  return (
+                    <TableRow key={key}>
+                      <TableCell className="capitalize font-medium">{key}</TableCell>
+                      {isDiscarded ? (
+                        <>
+                          <TableCell>N/A</TableCell>
+                          <TableCell>0</TableCell>
+                          <TableCell className="text-xs whitespace-pre-wrap">{discardedDescription}</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell>{formatStatDisplay(value)}</TableCell>
+                          <TableCell>{calculateStatPoints(value)}</TableCell>
+                          <TableCell className="text-xs">{getStatEffectDescription(statKey, value)}</TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -404,3 +436,5 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   );
 }
   
+
+    
