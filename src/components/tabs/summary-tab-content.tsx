@@ -120,7 +120,10 @@ export function SummaryTabContent({
 
   const totalWillpowerPoints = calculateWillpowerPoints(purchasedBaseWill, purchasedWill, hasNoBaseWillIntrinsic, hasNoWillpowerIntrinsic);
   const totalSkillPoints = (skills || []).reduce((sum, skill) => sum + calculateSkillPoints(skill), 0);
-  const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => sum + calculateMiracleTotalCost(miracle, skills), 0);
+  
+  const totalMiraclePoints = (miracles || []).reduce((sum, miracle) => {
+    return sum + (miracle.isMandatory ? 0 : calculateMiracleTotalCost(miracle, skills));
+  }, 0);
   
   const selectedArchetypeDef = ARCHETYPES.find(arch => arch.id === basicInfo.selectedArchetypeId);
   const currentArchetypePointCost = selectedArchetypeDef && selectedArchetypeDef.id !== 'custom' 
@@ -179,7 +182,7 @@ export function SummaryTabContent({
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={['character-point-summary']}>
+    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" >
       <CollapsibleSectionItem title="Character Point Summary" value="character-point-summary">
         <Card>
           <CardHeader>
@@ -371,7 +374,7 @@ export function SummaryTabContent({
                               <TableRow key={miracle.id}>
                                 <TableCell className="font-medium">{miracle.name}</TableCell>
                                 <TableCell>{miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</TableCell>
-                                <TableCell>{calculateMiracleTotalCost(miracle, skills)}</TableCell>
+                                <TableCell>{miracle.isMandatory ? '0 (Mandatory)' : calculateMiracleTotalCost(miracle, skills)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

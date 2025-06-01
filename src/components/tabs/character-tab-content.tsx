@@ -39,7 +39,7 @@ interface CharacterTabContentProps {
   totalWill: number;
   calculatedBaseWillFromStats: number;
   onMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
-  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any, currentMiracles?: MiracleDefinition[]) => void;
+  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any, currentMiracles?: MiracleDefinition[], calledFromArchetypeChange?: boolean, newArchetypeIdForContext?: string) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
   onAddSkill: (skillDef: PredefinedSkillDef) => void;
@@ -361,6 +361,16 @@ export function CharacterTabContent({
                 <Trash2 className="h-5 w-5 text-destructive" />
               </Button>
           }
+           { (miracle.definitionId?.startsWith('archetype-mandatory-') && !miracle.isMandatory) && // Should not happen based on logic, but as a safeguard
+              <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </Button>
+          }
+          { (!miracle.definitionId?.startsWith('archetype-mandatory-') && miracle.isMandatory) &&
+             <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </Button>
+          }
         </div>
         <div className="flex items-center space-x-1 mt-1">
           <Checkbox
@@ -403,7 +413,10 @@ export function CharacterTabContent({
           />
         </div>
 
-        <p className="font-semibold">Total Miracle Cost: {calculateMiracleTotalCost(miracle, characterData.skills)} points</p>
+        <p className="font-semibold">
+          Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
+        </p>
+
 
         <div className="space-y-3 mt-3">
           <div className="flex justify-between items-center">
@@ -550,7 +563,7 @@ export function CharacterTabContent({
           ))}
         </div>
          {miracle.definitionId?.startsWith('archetype-mandatory-') &&
-            <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list.</p>
+            <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
         }
       </CardContent>
     </>
@@ -1011,3 +1024,4 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+

@@ -145,6 +145,7 @@ export default function HomePage() {
     setCharacterData(prev => {
       const newBasicInfo = { ...prev.basicInfo, [field]: value };
       let newWillpower = { ...prev.willpower };
+      let updatedMiracles = [...prev.miracles];
 
       if (field === 'selectedArchetypeId') {
         const archetype = ARCHETYPES.find(arch => arch.id === value);
@@ -166,7 +167,7 @@ export default function HomePage() {
           newBasicInfo.intrinsicMandatoryPowerConfig = {};
           newBasicInfo.intrinsicVulnerableConfig = {};
 
-          let updatedMiracles = [...prev.miracles];
+          
           updatedMiracles = updatedMiracles.filter(m => !m.definitionId?.startsWith('archetype-mandatory-'));
 
 
@@ -180,7 +181,7 @@ export default function HomePage() {
                     const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0;
                     // @ts-ignore
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
-                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true) as MiracleDefinition[];
+                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value) as MiracleDefinition[];
                 }
             }
           });
@@ -197,7 +198,7 @@ export default function HomePage() {
           // User selected custom, MQs are handled by onMQSelectionChange
         }
       }
-      return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower };
+      return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower, miracles: updatedMiracles };
     });
   };
   
@@ -259,7 +260,7 @@ export default function HomePage() {
            if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
                 // @ts-ignore
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
-                updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, true) as MiracleDefinition[];
+                updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId) as MiracleDefinition[];
            }
            if (mqType === 'intrinsic' && mqId === 'no_base_will') {
               newWillpower.purchasedBaseWill = 0;
@@ -276,7 +277,7 @@ export default function HomePage() {
                  // @ts-ignore
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
                  if (intrinsicDef.id === 'mandatory_power') {
-                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, true) as MiracleDefinition[];
+                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, false, newBasicInfo.selectedArchetypeId) as MiracleDefinition[];
                 }
             }
             if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
@@ -303,7 +304,8 @@ export default function HomePage() {
     field: string,
     value: any,
     currentMiraclesParam?: MiracleDefinition[],
-    calledFromArchetypeChange?: boolean 
+    calledFromArchetypeChange?: boolean,
+    archetypeIdForContext?: string
   ): MiracleDefinition[] | CharacterData => {
     let finalMiracles: MiracleDefinition[] | undefined = undefined;
 
@@ -334,18 +336,52 @@ export default function HomePage() {
 
           if (difference > 0) {
               for (let i = 0; i < difference; i++) {
-                  const newMandatoryMiracle: MiracleDefinition = {
-                      id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
-                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, 
-                      name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'Intrinsic'})`,
-                      dice: '1D',
-                      hardDice: '0HD',
-                      wiggleDice: '0WD',
-                      qualities: [],
-                      description: `This power is mandated by the ${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'selected'} intrinsic.`,
-                      isCustom: true, 
-                      isMandatory: true,
-                  };
+                  let newMandatoryMiracle: MiracleDefinition | undefined = undefined;
+                  const currentArchetypeId = archetypeIdForContext || prev.basicInfo.selectedArchetypeId;
+
+                  if (currentArchetypeId === 'godlike_talent' && intrinsicId === 'mandatory_power') {
+                      const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'perceive_godlike_talents');
+                      if (template) {
+                          newMandatoryMiracle = {
+                              id: `miracle-arch-mandatory-${intrinsicId}-${Date.now()}-${i}`,
+                              definitionId: template.definitionId, // Keep template definitionId
+                              name: template.name,
+                              dice: '0D', 
+                              hardDice: '2HD', 
+                              wiggleDice: '0WD',
+                              qualities: template.qualities.map(tq => ({
+                                ...tq,
+                                id: `quality-instance-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                                extras: tq.extras.map(tex => ({
+                                  ...tex,
+                                  id: `extra-instance-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                                })),
+                                flaws: tq.flaws.map(tfl => ({
+                                  ...tfl,
+                                  id: `flaw-instance-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                                })),
+                              })),
+                              description: template.description,
+                              isCustom: false, 
+                              isMandatory: true,
+                          };
+                      }
+                  }
+                  
+                  if (!newMandatoryMiracle) { // Fallback to generic if not Godlike Talent or template missing
+                      newMandatoryMiracle = {
+                          id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
+                          definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, 
+                          name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'Intrinsic'})`,
+                          dice: '1D',
+                          hardDice: '0HD',
+                          wiggleDice: '0WD',
+                          qualities: [],
+                          description: `This power is mandated by the ${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'selected'} intrinsic.`,
+                          isCustom: true, 
+                          isMandatory: true,
+                      };
+                  }
                   updatedMiracles.push(newMandatoryMiracle);
               }
           } else if (difference < 0) {
@@ -501,7 +537,12 @@ export default function HomePage() {
         dice: '1D', 
         hardDice: '0HD',
         wiggleDice: '0WD',
-        qualities: template.qualities.map(q => ({...q, id: `${q.id}-${Date.now()}`})), 
+        qualities: template.qualities.map(q => ({
+            ...q, 
+            id: `quality-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+            extras: q.extras.map(ex => ({...ex, id: `extra-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
+            flaws: q.flaws.map(fl => ({...fl, id: `flaw-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
+        })), 
         isCustom: false,
         isMandatory: false, 
       };
@@ -980,9 +1021,7 @@ export default function HomePage() {
 
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
   
-  const displayTotalWill = hasNoBaseWillIntrinsic ? 0
-                       : hasNoWillpowerIntrinsic ? 0
-                       : displayTotalBaseWill + currentPurchasedWill;
+  const displayTotalWill = hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic ? 0 : displayTotalBaseWill + currentPurchasedWill;
   
   const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
   const uninvestedBaseWill = displayTotalBaseWill - totalInvestedInMotivations;
