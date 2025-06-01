@@ -90,17 +90,13 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
 
   const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
-
-  // Cost for Normal Dice, ensuring minimum factor of 1 if NDice > 0 and factor is positive
+  
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
   const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
 
-
-  // Cost for Hard Dice
   const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
   const costHD = HDice * Math.max(0, perHardDieCostFactor);
 
-  // Cost for Wiggle Dice
   const perWiggleDieCostFactor = (baseCostFactor * 4) + effectiveCostModifier;
   const costWD = WDice * Math.max(0, perWiggleDieCostFactor);
 
@@ -326,7 +322,7 @@ export function CharacterTabContent({
 
   const calculateDisplayedNDFactor = (quality: MiracleQuality) => {
     const qualityDef = dynamicPqDefs.find(def => def.key === quality.type);
-    if (!qualityDef) return 1; // Should ideally not happen
+    if (!qualityDef) return 1; 
 
     const baseCostFactor = qualityDef.baseCostFactor;
     const totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
@@ -336,6 +332,9 @@ export function CharacterTabContent({
     const actualPerNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
     return Math.max(1, actualPerNormalDieCostFactor);
   };
+
+  const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
+  const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
 
 
   return (
@@ -469,7 +468,7 @@ export function CharacterTabContent({
 
                         onMotivationChange(motivation.id, 'investedBaseWill', val);
                       }}
-                      disabled={uninvestedBaseWill === 0 && motivation.investedBaseWill === 0}
+                      disabled={(uninvestedBaseWill === 0 && motivation.investedBaseWill === 0) || hasNoBaseWillIntrinsic}
                     />
                   </div>
                 </div>
@@ -697,8 +696,9 @@ export function CharacterTabContent({
               min="0"
               placeholder="0"
               className="w-24"
-              value={String(characterData.willpower.purchasedBaseWill)}
+              value={String(hasNoBaseWillIntrinsic ? 0 : characterData.willpower.purchasedBaseWill)}
               onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))}
+              disabled={hasNoBaseWillIntrinsic}
             />
           </div>
           <p><strong className="font-headline">Total Base Will:</strong> {totalBaseWill}</p>
@@ -711,11 +711,12 @@ export function CharacterTabContent({
               min="0"
               placeholder="0"
               className="w-24"
-              value={String(characterData.willpower.purchasedWill)}
+              value={String((hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : characterData.willpower.purchasedWill)}
               onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))}
+              disabled={hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic}
             />
           </div>
-          <p><strong className="font-headline">Total Will:</strong> {totalBaseWill + (characterData.willpower.purchasedWill || 0)}</p>
+          <p><strong className="font-headline">Total Will:</strong> {totalBaseWill + ((hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : (characterData.willpower.purchasedWill || 0))}</p>
         </div>
       </CollapsibleSectionItem>
 
@@ -885,10 +886,11 @@ export function CharacterTabContent({
                             id={`${quality.id}-levels`}
                             type="number"
                             min="0"
-                            value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(quality.levels) : ''}
+                            value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(Math.max(0, quality.levels)) : '0'}
                             onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                onMiracleQualityChange(miracle.id, quality.id, 'levels', isNaN(val) ? 0 : Math.max(0, val));
+                                let val = parseInt(e.target.value, 10);
+                                if (isNaN(val) || val < 0) val = 0;
+                                onMiracleQualityChange(miracle.id, quality.id, 'levels', val);
                             }}
                             className="text-sm"
                             placeholder="0"

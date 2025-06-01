@@ -100,7 +100,6 @@ export interface CharacterData {
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
   pointLimit: number;
-  archetypePoints: number;
 }
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
@@ -136,7 +135,6 @@ const initialCharacterData: CharacterData = {
   skills: [],
   miracles: [],
   pointLimit: 250,
-  archetypePoints: 0,
 };
 
 export default function HomePage() {
@@ -146,6 +144,7 @@ export default function HomePage() {
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations'>, value: any) => {
     setCharacterData(prev => {
       const newBasicInfo = { ...prev.basicInfo, [field]: value };
+      let newWillpower = { ...prev.willpower };
 
       if (field === 'selectedArchetypeId') {
         const archetype = ARCHETYPES.find(arch => arch.id === value);
@@ -168,7 +167,6 @@ export default function HomePage() {
           newBasicInfo.intrinsicVulnerableConfig = {};
 
           let updatedMiracles = [...prev.miracles];
-           // Remove all existing archetype-mandated powers first
           updatedMiracles = updatedMiracles.filter(m => !m.definitionId?.startsWith('archetype-mandatory-'));
 
 
@@ -182,17 +180,25 @@ export default function HomePage() {
                     const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0;
                     // @ts-ignore
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
-                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true);
+                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true) as MiracleDefinition[];
                 }
             }
           });
-          return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
+           // Apply willpower restrictions for the new archetype's intrinsics
+          if (newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
+            newWillpower.purchasedBaseWill = 0;
+            newWillpower.purchasedWill = 0;
+          } else if (newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
+            newWillpower.purchasedWill = 0;
+          }
+
+          return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower, miracles: updatedMiracles };
         } else if (value === 'custom') {
           // User selected custom, MQs are handled by onMQSelectionChange
           // Keep existing MQ selections if switching from a sample archetype to custom
         }
       }
-      return { ...prev, basicInfo: newBasicInfo };
+      return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower };
     });
   };
   
@@ -240,6 +246,7 @@ export default function HomePage() {
     setCharacterData(prev => {
       const newBasicInfo = { ...prev.basicInfo };
       let currentSelection: string[] = [];
+      let newWillpower = { ...prev.willpower };
 
       if (mqType === 'source') currentSelection = [...newBasicInfo.selectedSourceMQIds];
       else if (mqType === 'permission') currentSelection = [...newBasicInfo.selectedPermissionMQIds];
@@ -253,7 +260,13 @@ export default function HomePage() {
            if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
                 // @ts-ignore
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
-                updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, true);
+                updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, true) as MiracleDefinition[];
+           }
+           if (mqType === 'intrinsic' && mqId === 'no_base_will') {
+              newWillpower.purchasedBaseWill = 0;
+              newWillpower.purchasedWill = 0;
+           } else if (mqType === 'intrinsic' && mqId === 'no_willpower' && !currentSelection.includes('no_base_will')) {
+             newWillpower.purchasedWill = 0;
            }
         }
       } else {
@@ -264,8 +277,12 @@ export default function HomePage() {
                  // @ts-ignore
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
                  if (intrinsicDef.id === 'mandatory_power') {
-                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, true);
+                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, true) as MiracleDefinition[];
                 }
+            }
+            // If 'no_base_will' is deselected, but 'no_willpower' is still selected, ensure purchasedWill remains 0
+            if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
+                newWillpower.purchasedWill = 0;
             }
         }
       }
@@ -276,7 +293,7 @@ export default function HomePage() {
       
       newBasicInfo.selectedArchetypeId = 'custom';
 
-      return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
+      return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower, miracles: updatedMiracles };
     });
   };
   
@@ -319,7 +336,7 @@ export default function HomePage() {
               for (let i = 0; i < difference; i++) {
                   const newMandatoryMiracle: MiracleDefinition = {
                       id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
-                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, // Unique definition ID per instance for tracking
+                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, 
                       name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'Intrinsic'})`,
                       dice: '1D',
                       hardDice: '0HD',
@@ -343,16 +360,15 @@ export default function HomePage() {
               });
           }
           finalMiracles = updatedMiracles;
-          if (calledFromArchetypeChange) return prev; // Return prev state if called internally to avoid nested setCharacterData
+          if (calledFromArchetypeChange) return prev; 
           return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
       }
       finalMiracles = updatedMiracles;
       if (calledFromArchetypeChange) return prev;
       return { ...prev, basicInfo: newBasicInfo };
     });
-    // This part is tricky. If calledFromArchetypeChange, we need to return the miracles for further processing.
-    // Otherwise, setCharacterData has handled it.
-    return finalMiracles || []; // Ensure it returns something meaningful or the updated character data
+
+    return finalMiracles || []; 
   };
 
 
@@ -374,11 +390,23 @@ export default function HomePage() {
   };
 
   const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
+    const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
+    const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
+
+    let processedValue = isNaN(value) ? 0 : value;
+
+    if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) {
+      processedValue = 0; // Force to 0 if No Base Will intrinsic is selected
+    }
+    if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) {
+      processedValue = 0; // Force to 0 if No Base Will or No Willpower intrinsic is selected
+    }
+    
     setCharacterData(prev => ({
       ...prev,
       willpower: {
         ...prev.willpower,
-        [field]: isNaN(value) ? 0 : value,
+        [field]: processedValue,
       }
     }));
   };
@@ -660,13 +688,6 @@ export default function HomePage() {
     }));
   };
 
-  const handleArchetypePointsChange = (value: number) => {
-    setCharacterData(prev => ({
-      ...prev,
-      archetypePoints: isNaN(value) || value < 0 ? 0 : value,
-    }));
-  };
-
 
   const handleSaveCharacter = () => {
     try {
@@ -711,17 +732,17 @@ export default function HomePage() {
         };
         
         Object.keys(loadedBasicInfo.intrinsicMandatoryPowerConfig).forEach(key => {
-             // @ts-ignore
-            if (typeof loadedBasicInfo.intrinsicMandatoryPowerConfig[key].count !== 'number') {
-                 // @ts-ignore
-                loadedBasicInfo.intrinsicMandatoryPowerConfig[key].count = 0;
+            // @ts-ignore
+            if (typeof loadedBasicInfo.intrinsicMandatoryPowerConfig[key]?.count !== 'number') {
+                // @ts-ignore
+                loadedBasicInfo.intrinsicMandatoryPowerConfig[key] = { ...(loadedBasicInfo.intrinsicMandatoryPowerConfig[key] || {}), count: 0};
             }
         });
         Object.keys(loadedBasicInfo.intrinsicVulnerableConfig).forEach(key => {
             // @ts-ignore
-             if (typeof loadedBasicInfo.intrinsicVulnerableConfig[key].extraBoxes !== 'number') {
-                 // @ts-ignore
-                loadedBasicInfo.intrinsicVulnerableConfig[key].extraBoxes = 0;
+             if (typeof loadedBasicInfo.intrinsicVulnerableConfig[key]?.extraBoxes !== 'number') {
+                // @ts-ignore
+                 loadedBasicInfo.intrinsicVulnerableConfig[key] = { ...(loadedBasicInfo.intrinsicVulnerableConfig[key] || {}), extraBoxes: 0};
             }
         });
 
@@ -842,7 +863,6 @@ export default function HomePage() {
             };
           }) : [],
           pointLimit: typeof parsedData.pointLimit === 'number' && parsedData.pointLimit >=0 ? parsedData.pointLimit : initialCharacterData.pointLimit,
-          archetypePoints: typeof parsedData.archetypePoints === 'number' ? parsedData.archetypePoints : initialCharacterData.archetypePoints,
         };
 
         for (const statKey in initialCharacterData.stats) {
@@ -853,6 +873,19 @@ export default function HomePage() {
             };
           }
         }
+        
+        // Ensure willpower values are numbers
+        validatedData.willpower.purchasedBaseWill = Number(validatedData.willpower.purchasedBaseWill) || 0;
+        validatedData.willpower.purchasedWill = Number(validatedData.willpower.purchasedWill) || 0;
+        
+        // Apply willpower restrictions based on loaded intrinsics
+        if (validatedData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
+            validatedData.willpower.purchasedBaseWill = 0;
+            validatedData.willpower.purchasedWill = 0;
+        } else if (validatedData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
+            validatedData.willpower.purchasedWill = 0;
+        }
+
 
         setCharacterData(validatedData);
         toast({
@@ -906,21 +939,26 @@ export default function HomePage() {
     }
   };
 
-  const charmNormalDice = parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0;
-  const charmHardDice = parseInt(characterData.stats.charm.hardDice.replace('HD',''), 10) || 0;
-  const charmWiggleDice = parseInt(characterData.stats.charm.wiggleDice.replace('WD',''), 10) || 0;
-  
-  const commandNormalDice = parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0;
-  const commandHardDice = parseInt(characterData.stats.command.hardDice.replace('HD',''), 10) || 0;
-  const commandWiggleDice = parseInt(characterData.stats.command.wiggleDice.replace('WD',''), 10) || 0;
+  const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
+  const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
 
-  const calculatedCharmPlusCommandBaseWill = charmNormalDice + charmHardDice + charmWiggleDice + commandNormalDice + commandHardDice + commandWiggleDice;
+  const rawCalculatedBaseWillFromStats = 
+    (parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0) +
+    (parseInt(characterData.stats.charm.hardDice.replace('HD',''), 10) || 0) +
+    (parseInt(characterData.stats.charm.wiggleDice.replace('WD',''), 10) || 0) +
+    (parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0) +
+    (parseInt(characterData.stats.command.hardDice.replace('HD',''), 10) || 0) +
+    (parseInt(characterData.stats.command.wiggleDice.replace('WD',''), 10) || 0);
   
-  const purchasedBaseWill = characterData.willpower.purchasedBaseWill || 0;
-  const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
+  const displayCalculatedBaseWillFromStats = hasNoBaseWillIntrinsic ? 0 : rawCalculatedBaseWillFromStats;
+  const currentPurchasedBaseWill = hasNoBaseWillIntrinsic ? 0 : (characterData.willpower.purchasedBaseWill || 0);
+  const currentPurchasedWill = (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : (characterData.willpower.purchasedWill || 0);
 
+  const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
+  const displayTotalWill = displayTotalBaseWill + currentPurchasedWill;
+  
   const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
-  const uninvestedBaseWill = totalBaseWill - totalInvestedInMotivations;
+  const uninvestedBaseWill = displayTotalBaseWill - totalInvestedInMotivations;
 
 
   return (
@@ -932,7 +970,7 @@ export default function HomePage() {
       />
       <main className="flex-grow container mx-auto px-4 py-2 md:py-4">
         <Tabs defaultValue="character" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-flex mb-4 shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 md:w-auto md:inline-flex mb-4 shadow-sm">
             <TabsTrigger value="character">Character</TabsTrigger>
             <TabsTrigger value="tables">Tables</TabsTrigger>
             <TabsTrigger value="summary">Summary</TabsTrigger>
@@ -949,8 +987,8 @@ export default function HomePage() {
                   onRemoveMotivation={handleRemoveMotivation}
                   onMotivationChange={handleMotivationChange}
                   uninvestedBaseWill={uninvestedBaseWill}
-                  totalBaseWill={totalBaseWill}
-                  calculatedBaseWillFromStats={calculatedCharmPlusCommandBaseWill}
+                  totalBaseWill={displayTotalBaseWill}
+                  calculatedBaseWillFromStats={displayCalculatedBaseWillFromStats}
                   onMQSelectionChange={handleMQSelectionChange}
                   onIntrinsicConfigChange={handleIntrinsicConfigChange as any}
                   onStatChange={handleStatChange}
