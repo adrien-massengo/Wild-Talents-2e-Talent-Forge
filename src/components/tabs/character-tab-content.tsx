@@ -5,7 +5,7 @@
 import type { CharacterData, StatDetail, SkillInstance, BasicInfo, MotivationObject } from "@/app/page";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
-import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
+import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PredefinedExtraOrFlaw } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import {
   ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES,
@@ -299,36 +299,28 @@ export function CharacterTabContent({
   const [selectedExtraToAdd, setSelectedExtraToAdd] = React.useState<{ [qualityId: string]: string }>({});
   const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
 
-  const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
-
-  const canUseHardWiggleDiceForStats = React.useMemo(() => {
-    return selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
-  }, [selectedPermissions]);
-  
-  const canAddHyperskillQuality = React.useMemo(() => [
-    'hypertrained', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
-  ].some(id => selectedPermissions.includes(id)), [selectedPermissions]);
-
-  const canAddHyperstatQuality = React.useMemo(() => [
-    'prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
-  ].some(id => selectedPermissions.includes(id)), [selectedPermissions]);
-
-  const canAddStandardMiracleQuality = React.useMemo(() => [ // For Attacks, Defends, Useful
-    'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
-  ].some(id => selectedPermissions.includes(id)), [selectedPermissions]);
+  const {
+    canAddHyperskillQuality,
+    canAddHyperstatQuality,
+    canAddStandardMiracleQuality,
+    canUseHardWiggleDiceForStats
+  } = React.useMemo(() => {
+    const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
+    const canAddHS = ['hypertrained', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
+    const canAddHStat = ['prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
+    const canAddStandard = ['inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
+    const canUseHardWiggle = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
+    return { 
+      canAddHyperskillQuality: canAddHS, 
+      canAddHyperstatQuality: canAddHStat, 
+      canAddStandardMiracleQuality: canAddStandard,
+      canUseHardWiggleDiceForStats: canUseHardWiggle
+    };
+  }, [characterData.basicInfo.selectedPermissionMQIds]);
   
   const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
-  const onePowerLimitReached = selectedPermissions.includes('one_power') && characterData.miracles.length >= 1;
-  const isAddMiracleDisabled = onePowerLimitReached || !canCharacterAddAnyMiracle;
-
-  let addMiracleTooltipContent = "";
-  if (onePowerLimitReached) {
-      addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1).";
-  } else if (!canCharacterAddAnyMiracle) {
-      addMiracleTooltipContent = "No permissions selected to add new miracles or specific miracle qualities.";
-  }
-
-
+  const onePowerLimitReached = characterData.basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.length >= 1;
+  
   const filteredDynamicPqDefs = React.useMemo(() => {
       const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
       return allDynamicDefs.filter(def => {
@@ -344,6 +336,36 @@ export function CharacterTabContent({
           return false; 
       });
   }, [characterData.skills, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
+
+  const filteredMiracleTemplates = React.useMemo(() => {
+    return PREDEFINED_MIRACLES_TEMPLATES.filter(template => {
+        if (!template.qualities || template.qualities.length === 0) {
+            return canAddStandardMiracleQuality || canAddHyperstatQuality || canAddHyperskillQuality; 
+        }
+        return template.qualities.every(quality => {
+            const type = quality.type;
+            if (type === 'attacks' || type === 'defends' || type === 'useful') {
+                return canAddStandardMiracleQuality;
+            } else if (type.startsWith('hyperstat_')) {
+                return canAddHyperstatQuality;
+            } else if (type.startsWith('hyperskill_')) {
+                return canAddHyperskillQuality;
+            }
+            return false; 
+        });
+    });
+  }, [characterData.basicInfo.selectedPermissionMQIds, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
+
+  const isAddMiracleOverallDisabled = onePowerLimitReached || !canCharacterAddAnyMiracle;
+
+  let addMiracleTooltipContent = "";
+  if (onePowerLimitReached) {
+      addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1).";
+  } else if (!canCharacterAddAnyMiracle) {
+      addMiracleTooltipContent = "No permissions selected that allow adding new miracles or specific miracle qualities.";
+  } else if (filteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0) {
+      addMiracleTooltipContent = "No predefined miracle templates match your current permissions. You can still add a custom miracle.";
+  }
 
 
   const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
@@ -362,8 +384,11 @@ export function CharacterTabContent({
   };
 
   const handleAddSelectedMiracle = () => {
-    if (selectedMiracleToAdd) {
+    if (selectedMiracleToAdd && selectedMiracleToAdd !== 'custom') {
       onAddMiracle(selectedMiracleToAdd);
+      setSelectedMiracleToAdd("");
+    } else if (selectedMiracleToAdd === 'custom') {
+      onAddMiracle('custom');
       setSelectedMiracleToAdd("");
     }
   };
@@ -374,7 +399,7 @@ export function CharacterTabContent({
   const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
 
   const calculateDisplayedNDFactor = (quality: MiracleQuality) => {
-    const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills); // Use all for calculation context
+    const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills); 
     const qualityDef = allDynamicDefs.find(def => def.key === quality.type);
     if (!qualityDef) return 1; 
 
@@ -392,7 +417,9 @@ export function CharacterTabContent({
   const customStatsDefinition = INTRINSIC_META_QUALITIES.find(mq => mq.id === 'custom_stats');
 
   const renderMiracleCardContent = (miracle: MiracleDefinition) => {
-    const isIntrinsicMandated = miracle.isMandatory && (miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents');
+    const isIntrinsicMandatedUnremovable = miracle.isMandatory && 
+        (miracle.definitionId?.startsWith('archetype-mandatory-') || 
+        (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
     
     return (
       <>
@@ -408,7 +435,7 @@ export function CharacterTabContent({
             ) : (
               <h3 className="text-xl font-headline text-primary flex-grow">{miracle.name}</h3>
             )}
-            { !isIntrinsicMandated &&
+            { !isIntrinsicMandatedUnremovable &&
                 <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
                   <Trash2 className="h-5 w-5 text-destructive" />
                 </Button>
@@ -419,7 +446,7 @@ export function CharacterTabContent({
               id={`${miracle.id}-mandatory`}
               checked={miracle.isMandatory}
               onCheckedChange={(checked) => onMiracleChange(miracle.id, 'isMandatory', !!checked)}
-              disabled={isIntrinsicMandated}
+              disabled={isIntrinsicMandatedUnremovable}
               className="form-checkbox h-4 w-4 text-primary rounded disabled:opacity-50"
             />
             <Label htmlFor={`${miracle.id}-mandatory`} className="text-xs">Mandatory</Label>
@@ -606,7 +633,7 @@ export function CharacterTabContent({
               </Card>
             ))}
           </div>
-           {isIntrinsicMandated &&
+           {isIntrinsicMandatedUnremovable &&
               <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
           }
         </CardContent>
@@ -992,7 +1019,7 @@ export function CharacterTabContent({
               min="0"
               placeholder="0"
               className="w-24"
-              value={String(characterData.willpower.purchasedBaseWill)}
+              value={String(hasNoBaseWillIntrinsic ? 0 : characterData.willpower.purchasedBaseWill)}
               onChange={(e) => onWillpowerChange('purchasedBaseWill', parseInt(e.target.value, 10))}
               disabled={hasNoBaseWillIntrinsic}
             />
@@ -1007,7 +1034,7 @@ export function CharacterTabContent({
               min="0"
               placeholder="0"
               className="w-24"
-              value={String(characterData.willpower.purchasedWill)}
+              value={String((hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : characterData.willpower.purchasedWill)}
               onChange={(e) => onWillpowerChange('purchasedWill', parseInt(e.target.value, 10))}
               disabled={hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic}
             />
@@ -1026,7 +1053,7 @@ export function CharacterTabContent({
         <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-lg font-headline">Add Miracle</h4>
-            {isAddMiracleDisabled && addMiracleTooltipContent && (
+            {isAddMiracleOverallDisabled && addMiracleTooltipContent && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1045,20 +1072,23 @@ export function CharacterTabContent({
               <Select 
                 value={selectedMiracleToAdd} 
                 onValueChange={setSelectedMiracleToAdd}
-                disabled={isAddMiracleDisabled}
+                disabled={isAddMiracleOverallDisabled}
               >
-                <SelectTrigger id="add-miracle-select" disabled={isAddMiracleDisabled}>
+                <SelectTrigger id="add-miracle-select" disabled={isAddMiracleOverallDisabled}>
                   <SelectValue placeholder="Choose a miracle..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="custom">Add Custom Miracle</SelectItem>
-                  {PREDEFINED_MIRACLES_TEMPLATES.map(def => (
+                  {filteredMiracleTemplates.map(def => (
                     <SelectItem key={def.definitionId} value={def.definitionId!}>{def.name}</SelectItem>
                   ))}
+                   {filteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0 && !isAddMiracleOverallDisabled && (
+                      <div className="p-2 text-xs text-muted-foreground">No predefined templates match current permissions.</div>
+                    )}
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleAddSelectedMiracle} disabled={!selectedMiracleToAdd || isAddMiracleDisabled}>
+            <Button onClick={handleAddSelectedMiracle} disabled={!selectedMiracleToAdd || isAddMiracleOverallDisabled}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Selected
             </Button>
           </div>
@@ -1079,6 +1109,10 @@ export function CharacterTabContent({
         {regularMiracles.length === 0 && mandatoryMiracles.length === 0 && (
           <p className="text-muted-foreground">No miracles added yet.</p>
         )}
+         {regularMiracles.length === 0 && mandatoryMiracles.length > 0 && (
+          <p className="text-muted-foreground">No regular miracles added yet.</p>
+        )}
+
 
         <div className="space-y-6">
           {regularMiracles.map((miracle) => (
@@ -1091,5 +1125,6 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
 
 

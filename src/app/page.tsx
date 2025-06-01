@@ -143,49 +143,84 @@ export default function HomePage() {
 
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations'>, value: any) => {
     setCharacterData(prev => {
+      const previousArchetypeId = prev.basicInfo.selectedArchetypeId;
       const newBasicInfo = { ...prev.basicInfo, [field]: value };
       let newWillpower = { ...prev.willpower };
       let updatedMiracles = [...prev.miracles];
 
       if (field === 'selectedArchetypeId') {
-        const archetype = ARCHETYPES.find(arch => arch.id === value);
-        if (archetype && archetype.id !== 'custom') {
-          newBasicInfo.selectedSourceMQIds = archetype.sourceMQIds || [];
-          newBasicInfo.selectedPermissionMQIds = archetype.permissionMQIds || [];
-          newBasicInfo.selectedIntrinsicMQIds = archetype.intrinsicMQIds || [];
+        const newArchetype = ARCHETYPES.find(arch => arch.id === value);
+
+        // Explicitly remove Perceive Godlike Talents if deselecting Godlike Talent archetype
+        if (previousArchetypeId === 'godlike_talent' && value !== 'godlike_talent') {
+          updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
+        }
+        
+        // General cleanup for *other* archetype-mandated powers. 
+        // This assumes generic mandatory powers have definitionId starting with 'archetype-mandatory-'
+        // and are NOT the 'perceive_godlike_talents' miracle.
+        // This filter is intended to remove generic mandatory powers if the archetype changes to one
+        // that doesn't re-specify them or if changing to 'custom'.
+        // It might be overly aggressive if a new archetype also uses a similarly named generic power.
+        // However, specific named mandatory powers (like PGT) need their own handling as above.
+        if (newArchetype && newArchetype.id !== previousArchetypeId) {
+             updatedMiracles = updatedMiracles.filter(m => {
+                const isGenericMandatory = m.definitionId?.startsWith('archetype-mandatory-');
+                // If it's PGT, it was handled above.
+                if (m.definitionId === 'perceive_godlike_talents') return true; 
+                // If it's a generic mandatory power AND the new archetype does NOT include 'mandatory_power' intrinsic, remove it.
+                // Or if switching to custom.
+                if (isGenericMandatory) {
+                    if (value === 'custom') return false; // Remove if switching to custom
+                    const newArchHasMandatoryPowerIntrinsic = newArchetype?.intrinsicMQIds.includes('mandatory_power');
+                    if (!newArchHasMandatoryPowerIntrinsic) return false; // Remove if new arch doesn't have this intrinsic
+                }
+                return true;
+            });
+        }
+
+
+        if (newArchetype && newArchetype.id !== 'custom') {
+          newBasicInfo.selectedSourceMQIds = newArchetype.sourceMQIds || [];
+          newBasicInfo.selectedPermissionMQIds = newArchetype.permissionMQIds || [];
+          newBasicInfo.selectedIntrinsicMQIds = newArchetype.intrinsicMQIds || [];
           
           const currentIntrinsicConfigs = {
-            intrinsicAllergyConfig: { ...newBasicInfo.intrinsicAllergyConfig },
-            intrinsicBruteFrailConfig: { ...newBasicInfo.intrinsicBruteFrailConfig },
-            intrinsicCustomStatsConfig: { ...newBasicInfo.intrinsicCustomStatsConfig },
-            intrinsicMandatoryPowerConfig: { ...newBasicInfo.intrinsicMandatoryPowerConfig },
-            intrinsicVulnerableConfig: { ...newBasicInfo.intrinsicVulnerableConfig },
+            intrinsicAllergyConfig: { ...prev.basicInfo.intrinsicAllergyConfig },
+            intrinsicBruteFrailConfig: { ...prev.basicInfo.intrinsicBruteFrailConfig },
+            intrinsicCustomStatsConfig: { ...prev.basicInfo.intrinsicCustomStatsConfig },
+            intrinsicMandatoryPowerConfig: { ...prev.basicInfo.intrinsicMandatoryPowerConfig },
+            intrinsicVulnerableConfig: { ...prev.basicInfo.intrinsicVulnerableConfig },
           };
+          
+          // Reset configs for the new archetype, then populate based on new archetype's intrinsics
           newBasicInfo.intrinsicAllergyConfig = {};
           newBasicInfo.intrinsicBruteFrailConfig = {};
           newBasicInfo.intrinsicCustomStatsConfig = {};
           newBasicInfo.intrinsicMandatoryPowerConfig = {};
           newBasicInfo.intrinsicVulnerableConfig = {};
 
-          
-          updatedMiracles = updatedMiracles.filter(m => !m.definitionId?.startsWith('archetype-mandatory-') && !(archetype.id === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents'));
-
-
-          (archetype.intrinsicMQIds || []).forEach(mqId => {
+          (newArchetype.intrinsicMQIds || []).forEach(mqId => {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
             if (intrinsicDef?.configKey) {
                 // @ts-ignore
-                newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey]?.[mqId] || (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' || intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {count:0, extraBoxes:0} : {});
+                newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey]?.[mqId] || 
+                  (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' 
+                    ? { count: (newArchetype.mandatoryPowerText ? 1 : 0) } 
+                    : (intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {extraBoxes:0} : {})
+                  );
+
                  if (intrinsicDef.id === 'mandatory_power') {
                     // @ts-ignore
-                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0);
+                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (newArchetype.mandatoryPowerText ? 1 : 0);
                     // @ts-ignore
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
+                    // Pass 'updatedMiracles' which might have had PGT removed
                     updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value) as MiracleDefinition[];
                 }
             }
           });
-           // Apply willpower restrictions for the new archetype's intrinsics
+          
           if (newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
             newWillpower.purchasedBaseWill = 0;
             newWillpower.purchasedWill = 0;
@@ -195,7 +230,13 @@ export default function HomePage() {
 
           return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower, miracles: updatedMiracles };
         } else if (value === 'custom') {
-          // User selected custom, MQs are handled by onMQSelectionChange
+           // If switching to 'custom', MQs are handled by onMQSelectionChange.
+           // Ensure any mandatory powers from the *previous non-custom* archetype are cleared.
+           // This is partly handled by onMQSelectionChange if intrinsics are deselected.
+           // And PGT is handled above.
+           // We might need to iterate over prev.basicInfo.selectedIntrinsicMQIds and call handleIntrinsicConfigChange with count 0
+           // if those intrinsics are no longer relevant for 'custom'.
+           // For now, the specific PGT removal and individual MQ deselection should cover most cases.
         }
       }
       return { ...prev, basicInfo: newBasicInfo, willpower: newWillpower, miracles: updatedMiracles };
@@ -285,6 +326,10 @@ export default function HomePage() {
             } else if (mqId === 'no_willpower' && newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')){
                 newWillpower.purchasedWill = 0; 
             }
+             // If Godlike Talent was selected and 'mandatory_power' intrinsic is deselected
+            if (newBasicInfo.selectedArchetypeId === 'godlike_talent' && mqId === 'mandatory_power') {
+                updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
+            }
         }
       }
 
@@ -305,7 +350,7 @@ export default function HomePage() {
     value: any,
     currentMiraclesParam?: MiracleDefinition[],
     calledFromArchetypeChange?: boolean,
-    archetypeIdForContext?: string
+    archetypeIdForContext?: string // This is the NEW archetype ID
   ): MiracleDefinition[] | CharacterData => {
     let finalMiracles: MiracleDefinition[] | undefined = undefined;
 
@@ -328,43 +373,53 @@ export default function HomePage() {
 
       if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
           const newCount = Math.max(0, Number(value) || 0);
+          // Determine current archetype for context (either passed in or from previous state)
+          const currentArchetypeForContext = archetypeIdForContext || prev.basicInfo.selectedArchetypeId;
+          
           const mandatoryMiraclesForThisIntrinsic = updatedMiracles.filter(m => 
-            m.isMandatory && (m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) || (archetypeIdForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents'))
+            m.isMandatory && 
+            (
+              m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) || 
+              (currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && intrinsicId === 'mandatory_power')
+            )
           );
+
           const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
 
-
-          if (difference > 0) {
+          if (difference > 0) { // Need to add miracles
               for (let i = 0; i < difference; i++) {
                   let newMandatoryMiracle: MiracleDefinition | undefined = undefined;
-                  const currentArchetypeId = archetypeIdForContext || prev.basicInfo.selectedArchetypeId;
-
-                  if (currentArchetypeId === 'godlike_talent' && intrinsicId === 'mandatory_power') {
-                      const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'perceive_godlike_talents');
-                      if (template) {
-                          newMandatoryMiracle = {
-                              id: `miracle-arch-mandatory-${intrinsicId}-${Date.now()}-${i}`,
-                              definitionId: template.definitionId, 
-                              name: template.name,
-                              dice: '0D', 
-                              hardDice: '2HD', 
-                              wiggleDice: '0WD',
-                              qualities: template.qualities.map(tq => ({
-                                ...tq,
-                                id: `quality-instance-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
-                                extras: tq.extras.map(tex => ({
-                                  ...tex,
-                                  id: `extra-instance-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                  
+                  if (currentArchetypeForContext === 'godlike_talent' && intrinsicId === 'mandatory_power') {
+                      // Check if PGT already exists for this intrinsic, to avoid duplicates if count increases from 0 to 1+
+                      const pgtExists = updatedMiracles.some(m => m.definitionId === 'perceive_godlike_talents' && m.isMandatory);
+                      if (!pgtExists) { // Only add if it doesn't exist
+                        const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'perceive_godlike_talents');
+                        if (template) {
+                            newMandatoryMiracle = {
+                                id: `miracle-arch-mandatory-pgt-${Date.now()}-${i}`,
+                                definitionId: template.definitionId, 
+                                name: template.name,
+                                dice: '0D', 
+                                hardDice: '2HD', 
+                                wiggleDice: '0WD',
+                                qualities: template.qualities.map(tq => ({
+                                  ...tq,
+                                  id: `quality-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                                  extras: tq.extras.map(tex => ({
+                                    ...tex,
+                                    id: `extra-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                                  })),
+                                  flaws: tq.flaws.map(tfl => ({
+                                    ...tfl,
+                                    id: `flaw-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                                  })),
                                 })),
-                                flaws: tq.flaws.map(tfl => ({
-                                  ...tfl,
-                                  id: `flaw-instance-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
-                                })),
-                              })),
-                              description: template.description,
-                              isCustom: false, 
-                              isMandatory: true,
-                          };
+                                description: template.description,
+                                isCustom: false, 
+                                isMandatory: true,
+                            };
+                        }
                       }
                   }
                   
@@ -382,17 +437,22 @@ export default function HomePage() {
                           isMandatory: true,
                       };
                   }
-                  updatedMiracles.push(newMandatoryMiracle);
+                  if (newMandatoryMiracle) { // Ensure a miracle was actually created (e.g. PGT wasn't duplicated)
+                    updatedMiracles.push(newMandatoryMiracle);
+                  }
               }
-          } else if (difference < 0) {
-              const miraclesToRemove = Math.abs(difference);
+          } else if (difference < 0) { // Need to remove miracles
+              const miraclesToRemoveCount = Math.abs(difference);
               let removedCount = 0;
               updatedMiracles = updatedMiracles.filter(m => {
-                  if (m.isMandatory && (m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) || (archetypeIdForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents')) && removedCount < miraclesToRemove) {
+                  const isPGTForGodlike = currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && intrinsicId === 'mandatory_power';
+                  const isGenericMandatoryForIntrinsic = m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`);
+
+                  if (m.isMandatory && (isPGTForGodlike || isGenericMandatoryForIntrinsic) && removedCount < miraclesToRemoveCount) {
                       removedCount++;
-                      return false;
+                      return false; // Remove this miracle
                   }
-                  return true;
+                  return true; // Keep this miracle
               });
           }
           finalMiracles = updatedMiracles;
@@ -559,9 +619,12 @@ export default function HomePage() {
 
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
      const miracle = characterData.miracles.find(m => m.id === miracleId);
-     const isUnremovableIntrinsicMandated = miracle && miracle.isMandatory && (miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents');
+     const isIntrinsicMandated = miracle && miracle.isMandatory && 
+        (miracle.definitionId?.startsWith('archetype-mandatory-') || 
+         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
 
-     if (isUnremovableIntrinsicMandated && field === 'isMandatory' && !value) {
+
+     if (isIntrinsicMandated && field === 'isMandatory' && !value) {
        toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic or specific archetype rule.", variant: "destructive"});
        return;
      }
@@ -987,9 +1050,6 @@ export default function HomePage() {
     }
   };
 
-  const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
-  const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
-
   const getDiscardedAttribute = (): DiscardedAttributeType => {
     if (characterData.basicInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
         for (const id of Object.keys(characterData.basicInfo.intrinsicCustomStatsConfig)) {
@@ -1017,8 +1077,12 @@ export default function HomePage() {
   
   const rawCalculatedBaseWillFromStats = charmValue + commandValue;
   
+  const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
   const displayCalculatedBaseWillFromStats = hasNoBaseWillIntrinsic ? 0 : rawCalculatedBaseWillFromStats;
+  
   const currentPurchasedBaseWill = hasNoBaseWillIntrinsic ? 0 : (characterData.willpower.purchasedBaseWill || 0);
+  
+  const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
   const currentPurchasedWill = (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) ? 0 : (characterData.willpower.purchasedWill || 0);
 
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
@@ -1116,4 +1180,5 @@ export default function HomePage() {
     
 
     
+
 
