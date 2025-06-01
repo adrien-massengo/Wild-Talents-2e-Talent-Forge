@@ -189,7 +189,20 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
           </CardHeader>
           <CardContent className="space-y-2">
              <p><strong>Archetype:</strong> {selectedArchetypeDef?.name || "Custom"}</p>
-            <p><strong>Motivation:</strong> {basicInfo?.motivation || "N/A"}</p>
+             
+             <h4 className="font-semibold mt-2">Motivations:</h4>
+            {basicInfo.motivations && basicInfo.motivations.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm">
+                {basicInfo.motivations.map(motivation => (
+                  <li key={motivation.id}>
+                    {motivation.motivationText || "(Untitled Motivation)"} ({motivation.type}) - Invested Base Will: {motivation.investedBaseWill}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No motivations defined.</p>
+            )}
+
              <h4 className="font-semibold mt-2">Selected Meta-Qualities:</h4>
             {basicInfo.selectedSourceMQIds.length > 0 && (
                 <div><strong>Source:</strong> {basicInfo.selectedSourceMQIds.map(id => SOURCE_META_QUALITIES.find(mq => mq.id === id)?.label).join(', ')}</div>
@@ -353,3 +366,4 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   
 
     
+
