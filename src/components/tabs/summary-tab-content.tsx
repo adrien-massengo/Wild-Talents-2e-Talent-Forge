@@ -159,13 +159,13 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
             <CardTitle className="text-xl">Overall Character Cost</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p><span className="font-medium">Archetype Point Cost:</span> {currentArchetypePointCost}</p>
-            <p>Stat Point Cost: {totalStatPoints}</p>
-            <p>Willpower Point Cost: {totalWillpowerPoints}</p>
-            <p>Skill Point Cost: {totalSkillPoints}</p>
-            <p>Miracle Point Cost: {totalMiraclePoints}</p>
+            <p><span className="font-medium">Archetype Cost:</span> {currentArchetypePointCost}</p>
+            <p>Stat Cost: {totalStatPoints}</p>
+            <p>Willpower Cost: {totalWillpowerPoints}</p>
+            <p>Skill Cost: {totalSkillPoints}</p>
+            <p>Miracle Cost: {totalMiraclePoints}</p>
             <hr className="my-2" />
-            <p className="font-bold text-lg">Current Point Cost: {grandTotalPoints} / {pointLimit}</p>
+            <p className="font-bold text-lg">Current Cost: {grandTotalPoints} / {pointLimit}</p>
              <div className="grid grid-cols-2 items-center gap-2">
               <Label htmlFor="point-limit" className="font-medium">Point Limit:</Label>
               <Input
@@ -366,4 +366,5 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   
 
     
+
 
