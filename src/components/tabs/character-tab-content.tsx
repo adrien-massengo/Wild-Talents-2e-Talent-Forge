@@ -114,7 +114,7 @@ interface MQCollapsibleProps {
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
   title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = React.useState(false); // Default to closed
 
   return (
     <Card className="bg-card/50 shadow-sm">
@@ -312,6 +312,8 @@ export function CharacterTabContent({
 
   const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
   
+  const calculatedBaseWillFromStats = totalBaseWill - (characterData.willpower.purchasedBaseWill || 0);
+
   return (
     <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles", "motivations"]}>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
@@ -662,7 +664,7 @@ export function CharacterTabContent({
 
       <CollapsibleSectionItem title="Willpower" value="willpower">
         <div className="space-y-3">
-          <p><strong className="font-headline">Calculated Base Will (Charm D + Command D):</strong> {characterData.stats.charm.dice.replace('D','')}D + {characterData.stats.command.dice.replace('D','')}D = { (parseInt(characterData.stats.charm.dice.replace('D','')) || 0) + (parseInt(characterData.stats.command.dice.replace('D','')) || 0) }</p>
+          <p><strong className="font-headline">Calculated Base Will (Charm + Command):</strong> { calculatedBaseWillFromStats }</p>
           <div className="space-y-1">
             <Label htmlFor="purchasedBaseWill" className="font-headline">Purchased Base Will (3pts/pt)</Label>
             <Input

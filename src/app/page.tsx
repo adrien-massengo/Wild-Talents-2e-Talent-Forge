@@ -49,7 +49,7 @@ export interface MotivationObject {
 
 export interface BasicInfo {
   name: string;
-  motivations: MotivationObject[]; // Changed from motivation: string
+  motivations: MotivationObject[];
   selectedArchetypeId?: string;
   selectedSourceMQIds: string[];
   selectedPermissionMQIds: string[];
@@ -99,13 +99,14 @@ export interface CharacterData {
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
   pointLimit: number;
+  archetypePoints: number; // Retained for potential future use if direct archetype cost override is needed
 }
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
 
 const initialBasicInfo: BasicInfo = {
   name: '',
-  motivations: [], // Initialize as empty array
+  motivations: [],
   selectedArchetypeId: 'custom',
   selectedSourceMQIds: [],
   selectedPermissionMQIds: [],
@@ -134,6 +135,7 @@ const initialCharacterData: CharacterData = {
   skills: [],
   miracles: [],
   pointLimit: 250,
+  archetypePoints: 0,
 };
 
 export default function HomePage() {
@@ -171,7 +173,7 @@ export default function HomePage() {
                 newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey]?.[mqId] || (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' || intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {count:0, extraBoxes:0} : {});
                  if (intrinsicDef.id === 'mandatory_power') {
                     // @ts-ignore
-                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0; // Default to 1 if archetype specifies mandatory power text
+                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0;
                     // @ts-ignore
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
                     handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, prev.miracles);
@@ -275,7 +277,8 @@ export default function HomePage() {
         const newBasicInfo = {
          ...prev.basicInfo,
          [configKey]: {
-           ...prev.basicInfo[configKey],
+           // @ts-ignore
+           ...(prev.basicInfo[configKey] || {}), // Ensure configKey exists
            [intrinsicId]: {
              // @ts-ignore
              ...(prev.basicInfo[configKey]?.[intrinsicId] || {}),
@@ -631,6 +634,14 @@ export default function HomePage() {
     }));
   };
 
+  // Handler for archetypePoints remains for direct modification if needed, but primary calculation is on summary page.
+  const handleArchetypePointsChange = (value: number) => {
+    setCharacterData(prev => ({
+      ...prev,
+      archetypePoints: isNaN(value) || value < 0 ? 0 : value,
+    }));
+  };
+
 
   const handleSaveCharacter = () => {
     try {
@@ -806,6 +817,7 @@ export default function HomePage() {
             };
           }) : [],
           pointLimit: typeof parsedData.pointLimit === 'number' && parsedData.pointLimit >=0 ? parsedData.pointLimit : initialCharacterData.pointLimit,
+          archetypePoints: typeof parsedData.archetypePoints === 'number' ? parsedData.archetypePoints : initialCharacterData.archetypePoints,
         };
 
         for (const statKey in initialCharacterData.stats) {
@@ -869,9 +881,16 @@ export default function HomePage() {
     }
   };
 
-  const charmDiceValue = parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0;
-  const commandDiceValue = parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0;
-  const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
+  const charmNormalDice = parseInt(characterData.stats.charm.dice.replace('D',''), 10) || 0;
+  const charmHardDice = parseInt(characterData.stats.charm.hardDice.replace('HD',''), 10) || 0;
+  const charmWiggleDice = parseInt(characterData.stats.charm.wiggleDice.replace('WD',''), 10) || 0;
+  
+  const commandNormalDice = parseInt(characterData.stats.command.dice.replace('D',''), 10) || 0;
+  const commandHardDice = parseInt(characterData.stats.command.hardDice.replace('HD',''), 10) || 0;
+  const commandWiggleDice = parseInt(characterData.stats.command.wiggleDice.replace('WD',''), 10) || 0;
+
+  const calculatedCharmPlusCommandBaseWill = charmNormalDice + charmHardDice + charmWiggleDice + commandNormalDice + commandHardDice + commandWiggleDice;
+  
   const purchasedBaseWill = characterData.willpower.purchasedBaseWill || 0;
   const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
 
@@ -931,6 +950,7 @@ export default function HomePage() {
                 <SummaryTabContent
                   characterData={characterData}
                   onPointLimitChange={handlePointLimitChange}
+                  onArchetypePointsChange={handleArchetypePointsChange}
                 />
               </TabsContent>
             </div>
