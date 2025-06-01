@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { CharacterTabContent } from "@/components/tabs/character-tab-content";
 import { TablesTabContent } from "@/components/tabs/tables-tab-content";
 import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
+import { GmToolsTabContent } from "@/components/tabs/gm-tools-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
@@ -99,7 +100,7 @@ export interface CharacterData {
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
   pointLimit: number;
-  archetypePoints: number; // Retained for potential future use if direct archetype cost override is needed
+  archetypePoints: number;
 }
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
@@ -166,6 +167,11 @@ export default function HomePage() {
           newBasicInfo.intrinsicMandatoryPowerConfig = {};
           newBasicInfo.intrinsicVulnerableConfig = {};
 
+          let updatedMiracles = [...prev.miracles];
+           // Remove all existing archetype-mandated powers first
+          updatedMiracles = updatedMiracles.filter(m => !m.definitionId?.startsWith('archetype-mandatory-'));
+
+
           (archetype.intrinsicMQIds || []).forEach(mqId => {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
             if (intrinsicDef?.configKey) {
@@ -176,12 +182,14 @@ export default function HomePage() {
                     const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0;
                     // @ts-ignore
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
-                    handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, prev.miracles);
+                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true);
                 }
             }
           });
+          return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
         } else if (value === 'custom') {
           // User selected custom, MQs are handled by onMQSelectionChange
+          // Keep existing MQ selections if switching from a sample archetype to custom
         }
       }
       return { ...prev, basicInfo: newBasicInfo };
@@ -237,9 +245,16 @@ export default function HomePage() {
       else if (mqType === 'permission') currentSelection = [...newBasicInfo.selectedPermissionMQIds];
       else if (mqType === 'intrinsic') currentSelection = [...newBasicInfo.selectedIntrinsicMQIds];
 
+      let updatedMiracles = [...prev.miracles];
+
       if (isSelected) {
         if (!currentSelection.includes(mqId)) {
           currentSelection.push(mqId);
+           if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
+                // @ts-ignore
+                const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
+                updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, true);
+           }
         }
       } else {
         currentSelection = currentSelection.filter(id => id !== mqId);
@@ -249,7 +264,7 @@ export default function HomePage() {
                  // @ts-ignore
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
                  if (intrinsicDef.id === 'mandatory_power') {
-                    handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, prev.miracles);
+                    updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, true);
                 }
             }
         }
@@ -261,24 +276,27 @@ export default function HomePage() {
       
       newBasicInfo.selectedArchetypeId = 'custom';
 
-      return { ...prev, basicInfo: newBasicInfo };
+      return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
     });
   };
   
-  const handleIntrinsicConfigChange = (
+ const handleIntrinsicConfigChange = (
     intrinsicId: string,
     configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>,
     field: string,
     value: any,
-    currentMiraclesParam?: MiracleDefinition[] 
-  ) => {
+    currentMiraclesParam?: MiracleDefinition[],
+    calledFromArchetypeChange?: boolean 
+  ): MiracleDefinition[] | CharacterData => {
+    let finalMiracles: MiracleDefinition[] | undefined = undefined;
+
     setCharacterData(prev => {
         const miraclesToUpdate = currentMiraclesParam || prev.miracles;
         const newBasicInfo = {
          ...prev.basicInfo,
          [configKey]: {
            // @ts-ignore
-           ...(prev.basicInfo[configKey] || {}), // Ensure configKey exists
+           ...(prev.basicInfo[configKey] || {}), 
            [intrinsicId]: {
              // @ts-ignore
              ...(prev.basicInfo[configKey]?.[intrinsicId] || {}),
@@ -287,20 +305,21 @@ export default function HomePage() {
          }
        };
 
+      let updatedMiracles = [...miraclesToUpdate];
+
       if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
           const newCount = Math.max(0, Number(value) || 0);
-          const mandatoryMiraclesForThisIntrinsic = miraclesToUpdate.filter(m => 
+          const mandatoryMiraclesForThisIntrinsic = updatedMiracles.filter(m => 
             m.isMandatory && m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`)
           );
           const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
 
-          let updatedMiracles = [...miraclesToUpdate];
 
           if (difference > 0) {
               for (let i = 0; i < difference; i++) {
                   const newMandatoryMiracle: MiracleDefinition = {
                       id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
-                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
+                      definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, // Unique definition ID per instance for tracking
                       name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===intrinsicId)?.label || 'Intrinsic'})`,
                       dice: '1D',
                       hardDice: '0HD',
@@ -323,10 +342,17 @@ export default function HomePage() {
                   return true;
               });
           }
+          finalMiracles = updatedMiracles;
+          if (calledFromArchetypeChange) return prev; // Return prev state if called internally to avoid nested setCharacterData
           return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
       }
+      finalMiracles = updatedMiracles;
+      if (calledFromArchetypeChange) return prev;
       return { ...prev, basicInfo: newBasicInfo };
     });
+    // This part is tricky. If calledFromArchetypeChange, we need to return the miracles for further processing.
+    // Otherwise, setCharacterData has handled it.
+    return finalMiracles || []; // Ensure it returns something meaningful or the updated character data
   };
 
 
@@ -634,7 +660,6 @@ export default function HomePage() {
     }));
   };
 
-  // Handler for archetypePoints remains for direct modification if needed, but primary calculation is on summary page.
   const handleArchetypePointsChange = (value: number) => {
     setCharacterData(prev => ({
       ...prev,
@@ -907,10 +932,11 @@ export default function HomePage() {
       />
       <main className="flex-grow container mx-auto px-4 py-2 md:py-4">
         <Tabs defaultValue="character" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex mb-4 shadow-sm">
+          <TabsList className="grid w-full grid-cols-4 md:w-auto md:inline-flex mb-4 shadow-sm">
             <TabsTrigger value="character">Character</TabsTrigger>
             <TabsTrigger value="tables">Tables</TabsTrigger>
             <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="gm-tools">GM Tools</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[calc(100vh-200px)] md:h-[calc(100vh-220px)]">
@@ -924,8 +950,9 @@ export default function HomePage() {
                   onMotivationChange={handleMotivationChange}
                   uninvestedBaseWill={uninvestedBaseWill}
                   totalBaseWill={totalBaseWill}
+                  calculatedBaseWillFromStats={calculatedCharmPlusCommandBaseWill}
                   onMQSelectionChange={handleMQSelectionChange}
-                  onIntrinsicConfigChange={handleIntrinsicConfigChange}
+                  onIntrinsicConfigChange={handleIntrinsicConfigChange as any}
                   onStatChange={handleStatChange}
                   onWillpowerChange={handleWillpowerChange}
                   onAddSkill={handleAddSkill}
@@ -950,8 +977,10 @@ export default function HomePage() {
                 <SummaryTabContent
                   characterData={characterData}
                   onPointLimitChange={handlePointLimitChange}
-                  onArchetypePointsChange={handleArchetypePointsChange}
                 />
+              </TabsContent>
+              <TabsContent value="gm-tools" className="mt-0">
+                <GmToolsTabContent />
               </TabsContent>
             </div>
           </ScrollArea>

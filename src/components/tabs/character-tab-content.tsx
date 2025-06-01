@@ -36,8 +36,9 @@ interface CharacterTabContentProps {
   onMotivationChange: (motivationId: string, field: keyof MotivationObject, value: any) => void;
   uninvestedBaseWill: number;
   totalBaseWill: number;
+  calculatedBaseWillFromStats: number;
   onMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
-  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any) => void;
+  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any, currentMiracles?: MiracleDefinition[]) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
   onAddSkill: (skillDef: PredefinedSkillDef) => void;
@@ -114,7 +115,7 @@ interface MQCollapsibleProps {
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
   title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false); // Default to closed
+  const [isOpen, setIsOpen] = React.useState(false); 
 
   return (
     <Card className="bg-card/50 shadow-sm">
@@ -259,6 +260,7 @@ export function CharacterTabContent({
   onMotivationChange,
   uninvestedBaseWill,
   totalBaseWill,
+  calculatedBaseWillFromStats,
   onMQSelectionChange,
   onIntrinsicConfigChange,
   onStatChange,
@@ -312,10 +314,9 @@ export function CharacterTabContent({
 
   const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
   
-  const calculatedBaseWillFromStats = totalBaseWill - (characterData.willpower.purchasedBaseWill || 0);
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" defaultValue={["basic-information", "stats", "skills", "willpower", "miracles", "motivations"]}>
+    <Accordion type="multiple" className="w-full space-y-6">
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>

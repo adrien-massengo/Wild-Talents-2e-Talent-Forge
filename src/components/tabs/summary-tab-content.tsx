@@ -6,7 +6,7 @@ import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/
 import type { MiracleDefinition } from "@/lib/miracles-definitions";
 import { getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import { calculateMiracleQualityCost, calculateMiracleTotalCost } from "@/components/tabs/character-tab-content"; 
-import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, calculateMetaQualitiesPointCost } from "@/lib/character-definitions";
+import { ARCHETYPES, calculateMetaQualitiesPointCost, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES } from "@/lib/character-definitions";
 import { 
   bodyEffectsData, coordinationEffectsData, senseEffectsData, mindEffectsData, charmEffectsData, commandEffectsData, skillExamplesData,
   type BodyEffectData, type CoordinationEffectData, type SenseEffectData, type MindEffectData, type CharmEffectData, type CommandEffectData, type SkillExampleData
@@ -45,12 +45,14 @@ const calculateStatPoints = (stat: StatDetail | undefined): number => {
   return (normalDice * 5) + (hardDice * 10) + (wiggleDice * 20);
 };
 
-const calculateWillpowerPoints = (willpower: CharacterData['willpower'] | undefined): number => {
-  if (!willpower) return 0;
-  const purchasedBaseWillPoints = (willpower.purchasedBaseWill || 0) * 3;
-  const purchasedWillPoints = (willpower.purchasedWill || 0) * 1;
-  return purchasedBaseWillPoints + purchasedWillPoints;
-};
+const calculateWillpowerPoints = (
+    willpower: CharacterData['willpower'] | undefined
+  ): number => {
+    if (!willpower) return 0;
+    const purchasedBaseWillPoints = (willpower.purchasedBaseWill || 0) * 3;
+    const purchasedWillPoints = (willpower.purchasedWill || 0) * 1;
+    return purchasedBaseWillPoints + purchasedWillPoints;
+  };
 
 const calculateSkillPoints = (skill: SkillInstance | undefined): number => {
   if (!skill) return 0;
@@ -85,15 +87,20 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   const { basicInfo, stats, willpower, skills, miracles, pointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
+  const charmNormalDice = parseInt(stats?.charm?.dice.replace('D',''), 10) || 0;
+  const charmHardDice = parseInt(stats?.charm?.hardDice.replace('HD',''), 10) || 0;
+  const charmWiggleDice = parseInt(stats?.charm?.wiggleDice.replace('WD',''), 10) || 0;
+  
+  const commandNormalDice = parseInt(stats?.command?.dice.replace('D',''), 10) || 0;
+  const commandHardDice = parseInt(stats?.command?.hardDice.replace('HD',''), 10) || 0;
+  const commandWiggleDice = parseInt(stats?.command?.wiggleDice.replace('WD',''), 10) || 0;
 
-  const charmDiceValue = parseInt(stats?.charm?.dice?.replace('D', '') || '0', 10);
-  const commandDiceValue = parseInt(stats?.command?.dice?.replace('D', '') || '0', 10);
-  const calculatedCharmPlusCommandBaseWill = charmDiceValue + commandDiceValue;
+  const calculatedBaseWillFromStats = charmNormalDice + charmHardDice + charmWiggleDice + commandNormalDice + commandHardDice + commandWiggleDice;
 
   const purchasedBaseWill = willpower?.purchasedBaseWill || 0;
   const purchasedWill = willpower?.purchasedWill || 0;
 
-  const totalBaseWill = calculatedCharmPlusCommandBaseWill + purchasedBaseWill;
+  const totalBaseWill = calculatedBaseWillFromStats + purchasedBaseWill;
   const totalWill = totalBaseWill + purchasedWill;
 
   const totalStatPoints = Object.values(stats || {}).reduce((sum, stat) => sum + calculateStatPoints(stat), 0);
@@ -150,16 +157,20 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
     }
     return "N/A";
   };
+  
+  const mandatoryMiracles = (miracles || []).filter(m => m.isMandatory);
+  const regularMiracles = (miracles || []).filter(m => !m.isMandatory);
+
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper" defaultValue={["character-point-summary", "basic-info-summary", "abilities-summary", "willpower-summary", "skills-summary", "miracles-summary"]}>
+    <Accordion type="multiple" className="w-full space-y-6 summary-accordion-wrapper">
       <CollapsibleSectionItem title="Character Point Summary" value="character-point-summary">
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">Overall Character Cost</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p><span className="font-medium">Archetype Cost:</span> {currentArchetypePointCost}</p>
+            <p>Archetype Cost: {currentArchetypePointCost}</p>
             <p>Stat Cost: {totalStatPoints}</p>
             <p>Willpower Cost: {totalWillpowerPoints}</p>
             <p>Skill Cost: {totalSkillPoints}</p>
@@ -250,13 +261,13 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
         </Card>
       </CollapsibleSectionItem>
       
-      <CollapsibleSectionItem title="Willpower Details" value="willpower-summary">
+      <CollapsibleSectionItem title="Willpower Summary" value="willpower-summary">
         <Card>
             <CardHeader>
                 <CardTitle className="text-xl">Willpower Breakdown</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-                <p><strong>Base Will:</strong> {calculatedCharmPlusCommandBaseWill}</p>
+                <p><strong>Base Will:</strong> {calculatedBaseWillFromStats}</p>
                 <p>Purchased Base Will: {purchasedBaseWill}</p>
                 <p>Purchased Will: {purchasedWill}</p>
                 <p className="font-semibold">Total Base Will: {totalBaseWill}</p>
@@ -311,28 +322,54 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                 {(!miracles || miracles.length === 0) ? (
                     <p className="text-muted-foreground">No miracles added yet.</p>
                 ) : (
-                    <Table>
-                        <TableHeader>
+                  <>
+                    {mandatoryMiracles.length > 0 && (
+                      <>
+                        <h4 className="font-semibold text-md text-accent mb-2">Mandatory Miracles</h4>
+                        <Table className="mb-4">
+                          <TableHeader>
                             <TableRow>
-                                <TableHead>Miracle</TableHead>
-                                <TableHead>Base Dice</TableHead>
-                                <TableHead>Total Cost</TableHead>
+                              <TableHead>Miracle</TableHead>
+                              <TableHead>Base Dice</TableHead>
+                              <TableHead>Total Cost</TableHead>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {miracles.map((miracle) => (
-                                <TableRow key={miracle.id}>
-                                    <TableCell className="font-medium">{miracle.name}</TableCell>
-                                    <TableCell>{miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</TableCell>
-                                    <TableCell>{calculateMiracleTotalCost(miracle, skills)}</TableCell>
-                                </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {mandatoryMiracles.map((miracle) => (
+                              <TableRow key={miracle.id}>
+                                <TableCell className="font-medium">{miracle.name}</TableCell>
+                                <TableCell>{miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</TableCell>
+                                <TableCell>{calculateMiracleTotalCost(miracle, skills)}</TableCell>
+                              </TableRow>
                             ))}
-                             <TableRow className="font-bold">
-                                <TableCell colSpan={2} className="text-right">Total Miracle Points:</TableCell>
-                                <TableCell>{totalMiraclePoints}</TableCell>
+                          </TableBody>
+                        </Table>
+                      </>
+                    )}
+                    {regularMiracles.length > 0 && (
+                       <>
+                        <h4 className="font-semibold text-md mb-2">{mandatoryMiracles.length > 0 ? 'Regular Miracles' : 'Miracles'}</h4>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Miracle</TableHead>
+                              <TableHead>Base Dice</TableHead>
+                              <TableHead>Total Cost</TableHead>
                             </TableRow>
-                        </TableBody>
-                    </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {regularMiracles.map((miracle) => (
+                              <TableRow key={miracle.id}>
+                                <TableCell className="font-medium">{miracle.name}</TableCell>
+                                <TableCell>{miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</TableCell>
+                                <TableCell>{calculateMiracleTotalCost(miracle, skills)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </>
+                    )}
+                  </>
                 )}
                  {miracles.length > 0 && (
                     <div className="mt-4 space-y-2">
@@ -355,6 +392,9 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
                                 </ul>
                             </div>
                         ))}
+                         <div className="mt-4 pt-2 border-t">
+                            <p className="font-bold text-right">Total Miracle Points: {totalMiraclePoints}</p>
+                        </div>
                     </div>
                 )}
             </CardContent>
@@ -364,7 +404,3 @@ export function SummaryTabContent({ characterData, onPointLimitChange }: Summary
   );
 }
   
-
-    
-
-
