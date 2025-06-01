@@ -7,8 +7,8 @@ import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
-import { 
-  ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES, 
+import {
+  ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES,
   ALLERGY_SUBSTANCES, ALLERGY_EFFECTS,
   type IntrinsicMetaQuality, type SourceMetaQuality, type PermissionMetaQuality,
   type AllergySubstanceType, type AllergyEffectType, type BruteFrailType, type DiscardedAttributeType
@@ -72,8 +72,8 @@ const statsDefinitions: StatDefinition[] = [
   { name: 'command', label: 'Command', description: 'The Command Stat measures your force of personality, your capacity for leadership, and your composure in the face of crisis. With high Command you remain uncracked under great pressure and people instinctively listen to you in a crisis.' },
 ];
 
-const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`); 
-const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`); 
+const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`);
+const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`);
 
 const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
 
@@ -87,18 +87,19 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
 
   const baseCostFactor = qualityDef.baseCostFactor;
   let totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
-  let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0); 
+  let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
 
   const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
 
-  // Cost for Normal Dice, ensuring minimum factor of 1 if NDice > 0
+  // Cost for Normal Dice, ensuring minimum factor of 1 if NDice > 0 and factor is positive
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
   const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
+
 
   // Cost for Hard Dice
   const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
   const costHD = HDice * Math.max(0, perHardDieCostFactor);
-  
+
   // Cost for Wiggle Dice
   const perWiggleDieCostFactor = (baseCostFactor * 4) + effectiveCostModifier;
   const costWD = WDice * Math.max(0, perWiggleDieCostFactor);
@@ -124,11 +125,11 @@ interface MQCollapsibleProps {
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
   title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false); 
+  const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <Card className="bg-card/50 shadow-sm">
-      <CardHeader 
+      <CardHeader
         className="flex flex-row items-center justify-between p-3 cursor-pointer hover:bg-accent/5"
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -295,9 +296,9 @@ export function CharacterTabContent({
   const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
 
   const dynamicPqDefs = React.useMemo(() => getDynamicPowerQualityDefinitions(characterData.skills), [characterData.skills]);
-  
+
   const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
-    const maxStatNormalDice = 5; 
+    const maxStatNormalDice = 5;
     return Array.from({ length: maxStatNormalDice }, (_, i) => `${i + 1}D`);
   };
 
@@ -325,17 +326,17 @@ export function CharacterTabContent({
 
   const calculateDisplayedNDFactor = (quality: MiracleQuality) => {
     const qualityDef = dynamicPqDefs.find(def => def.key === quality.type);
-    if (!qualityDef) return 0; // Should ideally not happen if types are synced
+    if (!qualityDef) return 1; // Should ideally not happen
 
     const baseCostFactor = qualityDef.baseCostFactor;
     const totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
     const totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
     const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
-    
+
     const actualPerNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
     return Math.max(1, actualPerNormalDieCostFactor);
   };
-  
+
 
   return (
     <Accordion type="multiple" className="w-full space-y-6" >
@@ -345,7 +346,7 @@ export function CharacterTabContent({
             <Label htmlFor="charName" className="font-headline">Name</Label>
             <Input id="charName" placeholder="e.g., John Doe" value={characterData.basicInfo.name} onChange={(e) => onBasicInfoChange('name', e.target.value)} />
           </div>
-          
+
           <div>
             <Label htmlFor="archetype" className="font-headline">Sample Archetype</Label>
             <Select value={characterData.basicInfo.selectedArchetypeId} onValueChange={(value) => onBasicInfoChange('selectedArchetypeId', value)}>
@@ -458,14 +459,14 @@ export function CharacterTabContent({
                       onChange={(e) => {
                         let val = parseInt(e.target.value, 10);
                         if (isNaN(val)) val = 0;
-                        
+
                         const currentOtherInvested = characterData.basicInfo.motivations
                           .filter(m => m.id !== motivation.id)
                           .reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
-                        
+
                         const maxPossibleForThisMotivation = totalBaseWill - currentOtherInvested;
                         val = Math.min(Math.max(0, val), maxPossibleForThisMotivation);
-                        
+
                         onMotivationChange(motivation.id, 'investedBaseWill', val);
                       }}
                       disabled={uninvestedBaseWill === 0 && motivation.investedBaseWill === 0}
@@ -498,7 +499,7 @@ export function CharacterTabContent({
                       <SelectValue placeholder="Select dice" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({ length: 5 }, (_, i) => `${i + 1}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                      {Array.from({ length: 6 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -766,7 +767,7 @@ export function CharacterTabContent({
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Base Dice: {miracle.dice} {miracle.hardDice} {miracle.wiggleDice}</p>
                   <p className="text-sm">Total Cost: {calculateMiracleTotalCost(miracle, characterData.skills)} points</p>
-                   {miracle.definitionId?.startsWith('archetype-mandatory-') && 
+                   {miracle.definitionId?.startsWith('archetype-mandatory-') &&
                     <p className="text-xs italic text-muted-foreground mt-1">This miracle is mandated by an archetype intrinsic and cannot be removed here. Its "Mandatory" status cannot be unchecked.</p>
                    }
                 </CardContent>
@@ -817,7 +818,7 @@ export function CharacterTabContent({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
                     <Select value={miracle.dice} onValueChange={(v) => onMiracleChange(miracle.id, 'dice', v)}>
                       <SelectTrigger><SelectValue/></SelectTrigger>
-                      <SelectContent>{Array.from({ length: 10 }, (_, i) => `${i + 1}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                      <SelectContent>{Array.from({ length: 11 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
                       <SelectTrigger><SelectValue/></SelectTrigger>
@@ -994,4 +995,5 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
-  
+
+    

@@ -2,9 +2,9 @@
 // src/lib/miracles-definitions.ts
 import type { SkillInstance } from "@/app/page";
 
-export type MiracleQualityType = 
-  | 'attacks' | 'defends' | 'useful' 
-  | 'hyperstat_body' | 'hyperstat_coordination' | 'hyperstat_sense' 
+export type MiracleQualityType =
+  | 'attacks' | 'defends' | 'useful'
+  | 'hyperstat_body' | 'hyperstat_coordination' | 'hyperstat_sense'
   | 'hyperstat_mind' | 'hyperstat_charm' | 'hyperstat_command'
   | 'hyperskill'; // Appended with skill ID for specific hyperskills
 
@@ -108,6 +108,7 @@ export const PREDEFINED_FLAWS: PredefinedExtraOrFlaw[] = [
   { id: 'one_use', name: 'One Use', costModifier: -4, description: 'Power can only be used once and never again unless repurchased.' },
   { id: 'reduced_capacities', name: 'Reduced Capacities', costModifier: -1, description: 'Power Capacity is reduced to one-tenth of normal.' },
   { id: 'scattered_damage', name: 'Scattered Damage', costModifier: -1, description: 'Damage from your attack affects random hit locations individually.' },
+  { id: 'see_it_first', name: 'See It First', costModifier: -1, description: 'For this quality to work the target must be visible.' },
   { id: 'self_only', name: 'Self Only', costModifier: -3, description: 'Power can affect only yourself (not applicable to Defends).' },
   { id: 'slow', name: 'Slow', costModifier: -2, description: 'Power can be used only every other round.' },
   { id: 'touch_only', name: 'Touch Only', costModifier: -2, description: 'Power has no range or extended capacity—only works via physical touch.' },
@@ -1228,6 +1229,23 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     ]
   },
   {
+    definitionId: 'perceive_godlike_talents',
+    name: 'Perceive (Godlike Talents)',
+    description: "Talents from Godlike are humans with the peculiar ability to change reality with the power of their minds alone. They possess several unique abilities and limitations—such as the ability to detect and resist the powers of others of their kind. There is no physiological aspect to the phenomena; they are wholly psychic in nature.\nIn Godlike, Talents are usually built on 25 Points with normal Stats and Skills provided free. Using Wild Talents rules such characters are built on 125 Points.\n\nFor postwar Wild Talents in the Godlike world, build them normally without this Archetype. You can pick or create any other Archetype you like; they have transcended the limitations of their predecessors and are now truly superhuman.",
+    qualities: [
+        {
+            id: 'pgt_q1_use',
+            type: 'useful',
+            capacity: 'touch',
+            levels: 0,
+            extras: [],
+            flaws: [
+                { id: 'pgt_q1_fl1', definitionId: 'see_it_first', name: 'See It First', costModifier: PREDEFINED_FLAWS.find(f=>f.id==='see_it_first')!.costModifier, isCustom: false }
+            ]
+        }
+    ]
+  },
+  {
     definitionId: 'perceive_type',
     name: 'Perceive (Type)',
     description: "You can perceive or detect stimuli outside the range of human awareness. You can use Perceive just like making a Sense Skill roll, such as Perception or Scrutiny, but use your Perceive dice pool instead of your Stat and Skill dice.\nPerceive, by default, lets you perceive one particular kind of stimulus, whether it’s infrared light, X rays, life forms, gravity, magnetism, powers, or whatever. For a particular broad perception—“all spectra of light,” say—you may need to add the Variable Effect or another Useful quality. Work with the GM and other players to determine the appropriate scope and cost of your power. For a particular narrow power take the If/Then Flaw.",
@@ -1884,6 +1902,5 @@ export const getDynamicPowerQualityDefinitions = (skills: SkillInstance[]): Powe
   }));
   return [...POWER_QUALITY_DEFINITIONS, ...hyperskillDefinitions];
 };
-
 
     
