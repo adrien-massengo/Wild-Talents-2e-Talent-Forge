@@ -23,10 +23,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Trash2, PlusCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, PlusCircle, ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
@@ -297,7 +299,52 @@ export function CharacterTabContent({
   const [selectedExtraToAdd, setSelectedExtraToAdd] = React.useState<{ [qualityId: string]: string }>({});
   const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
 
-  const dynamicPqDefs = React.useMemo(() => getDynamicPowerQualityDefinitions(characterData.skills), [characterData.skills]);
+  const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
+
+  const canUseHardWiggleDiceForStats = React.useMemo(() => {
+    return selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
+  }, [selectedPermissions]);
+  
+  const canAddHyperskillQuality = React.useMemo(() => [
+    'hypertrained', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
+  ].some(id => selectedPermissions.includes(id)), [selectedPermissions]);
+
+  const canAddHyperstatQuality = React.useMemo(() => [
+    'prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
+  ].some(id => selectedPermissions.includes(id)), [selectedPermissions]);
+
+  const canAddStandardMiracleQuality = React.useMemo(() => [ // For Attacks, Defends, Useful
+    'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
+  ].some(id => selectedPermissions.includes(id)), [selectedPermissions]);
+  
+  const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
+  const onePowerLimitReached = selectedPermissions.includes('one_power') && characterData.miracles.length >= 1;
+  const isAddMiracleDisabled = onePowerLimitReached || !canCharacterAddAnyMiracle;
+
+  let addMiracleTooltipContent = "";
+  if (onePowerLimitReached) {
+      addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1).";
+  } else if (!canCharacterAddAnyMiracle) {
+      addMiracleTooltipContent = "No permissions selected to add new miracles or specific miracle qualities.";
+  }
+
+
+  const filteredDynamicPqDefs = React.useMemo(() => {
+      const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
+      return allDynamicDefs.filter(def => {
+          if (def.key.startsWith('hyperskill_')) {
+              return canAddHyperskillQuality;
+          }
+          if (def.key.startsWith('hyperstat_')) {
+              return canAddHyperstatQuality;
+          }
+          if (['attacks', 'defends', 'useful'].includes(def.key)) {
+              return canAddStandardMiracleQuality;
+          }
+          return false; 
+      });
+  }, [characterData.skills, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
+
 
   const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
     const maxStatNormalDice = 5;
@@ -327,7 +374,8 @@ export function CharacterTabContent({
   const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
 
   const calculateDisplayedNDFactor = (quality: MiracleQuality) => {
-    const qualityDef = dynamicPqDefs.find(def => def.key === quality.type);
+    const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills); // Use all for calculation context
+    const qualityDef = allDynamicDefs.find(def => def.key === quality.type);
     if (!qualityDef) return 1; 
 
     const baseCostFactor = qualityDef.baseCostFactor;
@@ -335,8 +383,7 @@ export function CharacterTabContent({
     const totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
     const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
 
-    const actualPerNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
-    return Math.max(1, actualPerNormalDieCostFactor);
+    return Math.max(1, baseCostFactor + effectiveCostModifier);
   };
 
   const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
@@ -345,8 +392,8 @@ export function CharacterTabContent({
   const customStatsDefinition = INTRINSIC_META_QUALITIES.find(mq => mq.id === 'custom_stats');
 
   const renderMiracleCardContent = (miracle: MiracleDefinition) => {
-    const isUnremovableIntrinsicMandated = miracle.isMandatory && (miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents');
-
+    const isIntrinsicMandated = miracle.isMandatory && (miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents');
+    
     return (
       <>
         <CardHeader className="pb-3">
@@ -361,7 +408,7 @@ export function CharacterTabContent({
             ) : (
               <h3 className="text-xl font-headline text-primary flex-grow">{miracle.name}</h3>
             )}
-            { !isUnremovableIntrinsicMandated &&
+            { !isIntrinsicMandated &&
                 <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
                   <Trash2 className="h-5 w-5 text-destructive" />
                 </Button>
@@ -372,7 +419,7 @@ export function CharacterTabContent({
               id={`${miracle.id}-mandatory`}
               checked={miracle.isMandatory}
               onCheckedChange={(checked) => onMiracleChange(miracle.id, 'isMandatory', !!checked)}
-              disabled={isUnremovableIntrinsicMandated}
+              disabled={isIntrinsicMandated}
               className="form-checkbox h-4 w-4 text-primary rounded disabled:opacity-50"
             />
             <Label htmlFor={`${miracle.id}-mandatory`} className="text-xs">Mandatory</Label>
@@ -416,11 +463,13 @@ export function CharacterTabContent({
           <div className="space-y-3 mt-3">
             <div className="flex justify-between items-center">
               <h5 className="text-md font-semibold text-accent">Power Qualities</h5>
-              <Button size="sm" variant="outline" onClick={() => onAddMiracleQuality(miracle.id)}>
+              <Button size="sm" variant="outline" onClick={() => onAddMiracleQuality(miracle.id)} disabled={filteredDynamicPqDefs.length === 0}>
                 <PlusCircle className="mr-2 h-4 w-4"/> Add Quality
               </Button>
             </div>
-            {miracle.qualities.length === 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
+            {filteredDynamicPqDefs.length === 0 && <p className="text-xs text-muted-foreground">No quality types available based on current permissions.</p>}
+            {miracle.qualities.length === 0 && filteredDynamicPqDefs.length > 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
+            
             {miracle.qualities.map((quality) => (
               <Card key={quality.id} className="p-3 bg-background/50 border-border shadow-inner">
                 <div className="flex justify-between items-center mb-2">
@@ -435,7 +484,7 @@ export function CharacterTabContent({
                     <Select value={quality.type} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'type', v)}>
                       <SelectTrigger id={`${quality.id}-type`}><SelectValue/></SelectTrigger>
                       <SelectContent>
-                        {dynamicPqDefs.map(def => <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>)}
+                        {filteredDynamicPqDefs.map(def => <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -454,7 +503,7 @@ export function CharacterTabContent({
                       id={`${quality.id}-levels`}
                       type="number"
                       min="0"
-                      value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(Math.max(0, quality.levels)) : '0'}
+                      value={String(Math.max(0, quality.levels || 0))}
                       onChange={(e) => {
                           let val = parseInt(e.target.value, 10);
                           val = Math.max(0, isNaN(val) ? 0 : val);
@@ -557,7 +606,7 @@ export function CharacterTabContent({
               </Card>
             ))}
           </div>
-           {isUnremovableIntrinsicMandated &&
+           {isIntrinsicMandated &&
               <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
           }
         </CardContent>
@@ -742,34 +791,38 @@ export function CharacterTabContent({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor={`${stat.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
-                      <Select
-                        value={characterData.stats[stat.name]?.hardDice || '0HD'}
-                        onValueChange={(value) => onStatChange(stat.name, 'hardDice', value)}
-                      >
-                        <SelectTrigger id={`${stat.name}-hardDice`} aria-label={`${stat.label} Hard Dice`}>
-                          <SelectValue placeholder="Select hard dice" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor={`${stat.name}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
-                      <Select
-                        value={characterData.stats[stat.name]?.wiggleDice || '0WD'}
-                        onValueChange={(value) => onStatChange(stat.name, 'wiggleDice', value)}
-                      >
-                        <SelectTrigger id={`${stat.name}-wiggleDice`} aria-label={`${stat.label} Wiggle Dice`}>
-                          <SelectValue placeholder="Select wiggle dice" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {canUseHardWiggleDiceForStats && (
+                      <>
+                        <div>
+                          <Label htmlFor={`${stat.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
+                          <Select
+                            value={characterData.stats[stat.name]?.hardDice || '0HD'}
+                            onValueChange={(value) => onStatChange(stat.name, 'hardDice', value)}
+                          >
+                            <SelectTrigger id={`${stat.name}-hardDice`} aria-label={`${stat.label} Hard Dice`}>
+                              <SelectValue placeholder="Select hard dice" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor={`${stat.name}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
+                          <Select
+                            value={characterData.stats[stat.name]?.wiggleDice || '0WD'}
+                            onValueChange={(value) => onStatChange(stat.name, 'wiggleDice', value)}
+                          >
+                            <SelectTrigger id={`${stat.name}-wiggleDice`} aria-label={`${stat.label} Wiggle Dice`}>
+                              <SelectValue placeholder="Select wiggle dice" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -971,12 +1024,30 @@ export function CharacterTabContent({
         <p className="text-sm text-muted-foreground mb-4">Hyperskill qualities cost a base factor of 1 per Normal Die. (Hard/Wiggle dice cost 2x/4x their Normal Die factor respectively for all types). Levels, Extras, and Flaws modify these factors.</p>
 
         <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
-          <h4 className="text-lg font-headline mb-3">Add Miracle</h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-lg font-headline">Add Miracle</h4>
+            {isAddMiracleDisabled && addMiracleTooltipContent && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>{addMiracleTooltipContent}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <div className="flex items-end space-x-2 mb-4">
             <div className="flex-grow">
               <Label htmlFor="add-miracle-select">Select Miracle Template or Custom</Label>
-              <Select value={selectedMiracleToAdd} onValueChange={setSelectedMiracleToAdd}>
-                <SelectTrigger id="add-miracle-select">
+              <Select 
+                value={selectedMiracleToAdd} 
+                onValueChange={setSelectedMiracleToAdd}
+                disabled={isAddMiracleDisabled}
+              >
+                <SelectTrigger id="add-miracle-select" disabled={isAddMiracleDisabled}>
                   <SelectValue placeholder="Choose a miracle..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -987,7 +1058,7 @@ export function CharacterTabContent({
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleAddSelectedMiracle} disabled={!selectedMiracleToAdd}>
+            <Button onClick={handleAddSelectedMiracle} disabled={!selectedMiracleToAdd || isAddMiracleDisabled}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Selected
             </Button>
           </div>
@@ -1020,4 +1091,5 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
 
