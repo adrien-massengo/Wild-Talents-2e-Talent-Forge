@@ -96,6 +96,7 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
   const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
 
+
   const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
   const costHD = HDice * Math.max(0, perHardDieCostFactor);
 
@@ -106,6 +107,7 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
 };
 
 export const calculateMiracleTotalCost = (miracle: MiracleDefinition, skills: SkillInstance[]): number => {
+  if (miracle.isMandatory) return 0;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
   return miracle.qualities.reduce((sum, quality) => sum + calculateMiracleQualityCost(quality, miracle, dynamicPqDefs), 0);
 };
@@ -342,236 +344,230 @@ export function CharacterTabContent({
 
   const customStatsDefinition = INTRINSIC_META_QUALITIES.find(mq => mq.id === 'custom_stats');
 
-  const renderMiracleCardContent = (miracle: MiracleDefinition) => (
-    <>
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          {(miracle.isCustom || !miracle.definitionId || miracle.definitionId?.startsWith('archetype-mandatory-')) ? (
-            <Input
-              value={miracle.name}
-              onChange={(e) => onMiracleChange(miracle.id, 'name', e.target.value)}
-              className="text-xl font-headline mr-2 flex-grow"
-              placeholder="Miracle Name"
-            />
-          ) : (
-            <h3 className="text-xl font-headline text-primary flex-grow">{miracle.name}</h3>
-          )}
-           { !(miracle.definitionId?.startsWith('archetype-mandatory-')) &&
-              <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
-                <Trash2 className="h-5 w-5 text-destructive" />
-              </Button>
-          }
-           { (miracle.definitionId?.startsWith('archetype-mandatory-') && !miracle.isMandatory) && // Should not happen based on logic, but as a safeguard
-              <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
-                <Trash2 className="h-5 w-5 text-destructive" />
-              </Button>
-          }
-          { (!miracle.definitionId?.startsWith('archetype-mandatory-') && miracle.isMandatory) &&
-             <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
-                <Trash2 className="h-5 w-5 text-destructive" />
-              </Button>
-          }
-        </div>
-        <div className="flex items-center space-x-1 mt-1">
-          <Checkbox
-            id={`${miracle.id}-mandatory`}
-            checked={miracle.isMandatory}
-            onCheckedChange={(checked) => onMiracleChange(miracle.id, 'isMandatory', !!checked)}
-            disabled={miracle.definitionId?.startsWith('archetype-mandatory-')}
-            className="form-checkbox h-4 w-4 text-primary rounded disabled:opacity-50"
-          />
-          <Label htmlFor={`${miracle.id}-mandatory`} className="text-xs">Mandatory</Label>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <Label className="text-sm font-semibold block mb-1">Miracle Base Dice</Label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
-            <Select value={miracle.dice} onValueChange={(v) => onMiracleChange(miracle.id, 'dice', v)}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>{Array.from({ length: 11 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>{hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={miracle.wiggleDice} onValueChange={(v) => onMiracleChange(miracle.id, 'wiggleDice', v)}>
-              <SelectTrigger><SelectValue/></SelectTrigger>
-              <SelectContent>{wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
+  const renderMiracleCardContent = (miracle: MiracleDefinition) => {
+    const isUnremovableIntrinsicMandated = miracle.isMandatory && (miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents');
 
-        <div>
-          <Label htmlFor={`${miracle.id}-description`} className="text-sm font-semibold">Description</Label>
-          <Textarea
-            id={`${miracle.id}-description`}
-            value={miracle.description}
-            onChange={(e) => onMiracleChange(miracle.id, 'description', e.target.value)}
-            placeholder="Describe the miracle..."
-            className="text-sm"
-          />
-        </div>
-
-        <p className="font-semibold">
-          Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
-        </p>
-
-
-        <div className="space-y-3 mt-3">
-          <div className="flex justify-between items-center">
-            <h5 className="text-md font-semibold text-accent">Power Qualities</h5>
-            <Button size="sm" variant="outline" onClick={() => onAddMiracleQuality(miracle.id)}>
-              <PlusCircle className="mr-2 h-4 w-4"/> Add Quality
-            </Button>
-          </div>
-          {miracle.qualities.length === 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
-          {miracle.qualities.map((quality) => (
-            <Card key={quality.id} className="p-3 bg-background/50 border-border shadow-inner">
-              <div className="flex justify-between items-center mb-2">
-                <p className="text-sm font-medium">Quality Configuration</p>
-                <Button variant="ghost" size="sm" onClick={() => onRemoveMiracleQuality(miracle.id, quality.id)}>
-                  <Trash2 className="h-4 w-4 text-destructive"/>
+    return (
+      <>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
+            {(miracle.isCustom || !miracle.definitionId || miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents') ? (
+              <Input
+                value={miracle.name}
+                onChange={(e) => onMiracleChange(miracle.id, 'name', e.target.value)}
+                className="text-xl font-headline mr-2 flex-grow"
+                placeholder="Miracle Name"
+              />
+            ) : (
+              <h3 className="text-xl font-headline text-primary flex-grow">{miracle.name}</h3>
+            )}
+            { !isUnremovableIntrinsicMandated &&
+                <Button variant="ghost" size="icon" onClick={() => onRemoveMiracle(miracle.id)} aria-label={`Remove ${miracle.name}`}>
+                  <Trash2 className="h-5 w-5 text-destructive" />
                 </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-                <div>
-                  <Label htmlFor={`${quality.id}-type`} className="text-xs">Quality Type</Label>
-                  <Select value={quality.type} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'type', v)}>
-                    <SelectTrigger id={`${quality.id}-type`}><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      {dynamicPqDefs.map(def => <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+            }
+          </div>
+          <div className="flex items-center space-x-1 mt-1">
+            <Checkbox
+              id={`${miracle.id}-mandatory`}
+              checked={miracle.isMandatory}
+              onCheckedChange={(checked) => onMiracleChange(miracle.id, 'isMandatory', !!checked)}
+              disabled={isUnremovableIntrinsicMandated}
+              className="form-checkbox h-4 w-4 text-primary rounded disabled:opacity-50"
+            />
+            <Label htmlFor={`${miracle.id}-mandatory`} className="text-xs">Mandatory</Label>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="text-sm font-semibold block mb-1">Miracle Base Dice</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
+              <Select value={miracle.dice} onValueChange={(v) => onMiracleChange(miracle.id, 'dice', v)}>
+                <SelectTrigger><SelectValue/></SelectTrigger>
+                <SelectContent>{Array.from({ length: 11 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
+                <SelectTrigger><SelectValue/></SelectTrigger>
+                <SelectContent>{hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={miracle.wiggleDice} onValueChange={(v) => onMiracleChange(miracle.id, 'wiggleDice', v)}>
+                <SelectTrigger><SelectValue/></SelectTrigger>
+                <SelectContent>{wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor={`${miracle.id}-description`} className="text-sm font-semibold">Description</Label>
+            <Textarea
+              id={`${miracle.id}-description`}
+              value={miracle.description}
+              onChange={(e) => onMiracleChange(miracle.id, 'description', e.target.value)}
+              placeholder="Describe the miracle..."
+              className="text-sm"
+            />
+          </div>
+
+          <p className="font-semibold">
+            Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
+          </p>
+
+
+          <div className="space-y-3 mt-3">
+            <div className="flex justify-between items-center">
+              <h5 className="text-md font-semibold text-accent">Power Qualities</h5>
+              <Button size="sm" variant="outline" onClick={() => onAddMiracleQuality(miracle.id)}>
+                <PlusCircle className="mr-2 h-4 w-4"/> Add Quality
+              </Button>
+            </div>
+            {miracle.qualities.length === 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
+            {miracle.qualities.map((quality) => (
+              <Card key={quality.id} className="p-3 bg-background/50 border-border shadow-inner">
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-sm font-medium">Quality Configuration</p>
+                  <Button variant="ghost" size="sm" onClick={() => onRemoveMiracleQuality(miracle.id, quality.id)}>
+                    <Trash2 className="h-4 w-4 text-destructive"/>
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor={`${quality.id}-capacity`} className="text-xs">Capacity</Label>
-                  <Select value={quality.capacity} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'capacity', v as MiracleCapacityType)}>
-                    <SelectTrigger id={`${quality.id}-capacity`}><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      {POWER_CAPACITY_OPTIONS.map(cap => <SelectItem key={cap.value} value={cap.value}>{cap.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor={`${quality.id}-levels`} className="text-xs">Power Quality Levels</Label>
-                  <Input
-                    id={`${quality.id}-levels`}
-                    type="number"
-                    min="0"
-                    value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(Math.max(0, quality.levels)) : '0'}
-                    onChange={(e) => {
-                        let val = parseInt(e.target.value, 10);
-                        val = Math.max(0, isNaN(val) ? 0 : val);
-                        onMiracleQualityChange(miracle.id, quality.id, 'levels', val);
-                    }}
-                    className="text-sm"
-                    placeholder="0"
-                  />
-                </div>
-                 <div>
-                    <Label className="text-xs block">Effective Factor (per ND)</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                  <div>
+                    <Label htmlFor={`${quality.id}-type`} className="text-xs">Quality Type</Label>
+                    <Select value={quality.type} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'type', v)}>
+                      <SelectTrigger id={`${quality.id}-type`}><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        {dynamicPqDefs.map(def => <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor={`${quality.id}-capacity`} className="text-xs">Capacity</Label>
+                    <Select value={quality.capacity} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'capacity', v as MiracleCapacityType)}>
+                      <SelectTrigger id={`${quality.id}-capacity`}><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        {POWER_CAPACITY_OPTIONS.map(cap => <SelectItem key={cap.value} value={cap.value}>{cap.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor={`${quality.id}-levels`} className="text-xs">Power Quality Levels</Label>
                     <Input
-                        type="text"
-                        readOnly
-                        value={String(calculateDisplayedNDFactor(quality))}
-                        className="text-sm bg-muted cursor-not-allowed"
+                      id={`${quality.id}-levels`}
+                      type="number"
+                      min="0"
+                      value={(typeof quality.levels === 'number' && !isNaN(quality.levels)) ? String(Math.max(0, quality.levels)) : '0'}
+                      onChange={(e) => {
+                          let val = parseInt(e.target.value, 10);
+                          val = Math.max(0, isNaN(val) ? 0 : val);
+                          onMiracleQualityChange(miracle.id, quality.id, 'levels', val);
+                      }}
+                      className="text-sm"
+                      placeholder="0"
                     />
-                </div>
-              </div>
-
-              {/* Extras Section */}
-              <div className="mt-3 pt-2 border-t border-dashed">
-                <Label className="text-xs font-semibold">Extras</Label>
-                {quality.extras.map(extra => (
-                  <div key={extra.id} className="flex items-center space-x-2 my-1 text-xs p-1 bg-primary/10 rounded-md">
-                    {extra.isCustom ? (
-                      <>
-                        <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
-                        <Input
-                          type="number"
-                          value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? String(extra.costModifier) : ''}
-                          onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
-                          className="w-16 h-7 text-xs" placeholder="Cost"
-                        />
-                      </>
-                    ) : (
-                      <span className="flex-grow">{extra.name} ({extra.costModifier > 0 ? '+' : ''}{extra.costModifier})</span>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'extra', extra.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                   </div>
-                ))}
-                <div className="flex items-end space-x-1 mt-1">
-                    <Select
-                        value={selectedExtraToAdd[quality.id] || ""}
-                        onValueChange={val => setSelectedExtraToAdd(prev => ({...prev, [quality.id]: val}))}
-                    >
-                        <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Extra..."/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="custom_extra">Custom Extra</SelectItem>
-                            {PREDEFINED_EXTRAS.map(ex => <SelectItem key={ex.id} value={ex.id}>{ex.name} ({ex.costModifier > 0 ? '+' : ''}{ex.costModifier})</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Button size="sm" className="h-8 text-xs" onClick={() => {
-                        const val = selectedExtraToAdd[quality.id];
-                        onAddExtraOrFlawToQuality(miracle.id, quality.id, 'extra', val === 'custom_extra' ? undefined : val);
-                        setSelectedExtraToAdd(prev => ({...prev, [quality.id]: ""}));
-                    }} disabled={!selectedExtraToAdd[quality.id]}>Add</Button>
-                </div>
-              </div>
-
-              {/* Flaws Section */}
-              <div className="mt-3 pt-2 border-t border-dashed">
-                <Label className="text-xs font-semibold">Flaws</Label>
-                 {quality.flaws.map(flaw => (
-                  <div key={flaw.id} className="flex items-center space-x-2 my-1 text-xs p-1 bg-destructive/10 rounded-md">
-                    {flaw.isCustom ? (
-                      <>
-                        <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
-                        <Input
-                          type="number"
-                          value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? String(flaw.costModifier) : ''}
-                          onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
-                          className="w-16 h-7 text-xs" placeholder="Cost"
-                        />
-                      </>
-                    ) : (
-                      <span className="flex-grow">{flaw.name} ({flaw.costModifier})</span>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'flaw', flaw.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                   <div>
+                      <Label className="text-xs block">Effective Factor (per ND)</Label>
+                      <Input
+                          type="text"
+                          readOnly
+                          value={String(calculateDisplayedNDFactor(quality))}
+                          className="text-sm bg-muted cursor-not-allowed"
+                      />
                   </div>
-                ))}
-                 <div className="flex items-end space-x-1 mt-1">
-                    <Select
-                        value={selectedFlawToAdd[quality.id] || ""}
-                        onValueChange={val => setSelectedFlawToAdd(prev => ({...prev, [quality.id]: val}))}
-                    >
-                        <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Flaw..." /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="custom_flaw">Custom Flaw</SelectItem>
-                            {PREDEFINED_FLAWS.map(fl => <SelectItem key={fl.id} value={fl.id}>{fl.name} ({fl.costModifier})</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                     <Button size="sm" className="h-8 text-xs" onClick={() => {
-                        const val = selectedFlawToAdd[quality.id];
-                        onAddExtraOrFlawToQuality(miracle.id, quality.id, 'flaw', val === 'custom_flaw' ? undefined : val);
-                        setSelectedFlawToAdd(prev => ({...prev, [quality.id]: ""}));
-                    }} disabled={!selectedFlawToAdd[quality.id]}>Add</Button>
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-         {miracle.definitionId?.startsWith('archetype-mandatory-') &&
-            <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
-        }
-      </CardContent>
-    </>
-  );
+
+                {/* Extras Section */}
+                <div className="mt-3 pt-2 border-t border-dashed">
+                  <Label className="text-xs font-semibold">Extras</Label>
+                  {quality.extras.map(extra => (
+                    <div key={extra.id} className="flex items-center space-x-2 my-1 text-xs p-1 bg-primary/10 rounded-md">
+                      {extra.isCustom ? (
+                        <>
+                          <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
+                          <Input
+                            type="number"
+                            value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? String(extra.costModifier) : ''}
+                            onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
+                            className="w-16 h-7 text-xs" placeholder="Cost"
+                          />
+                        </>
+                      ) : (
+                        <span className="flex-grow">{extra.name} ({extra.costModifier > 0 ? '+' : ''}{extra.costModifier})</span>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'extra', extra.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                    </div>
+                  ))}
+                  <div className="flex items-end space-x-1 mt-1">
+                      <Select
+                          value={selectedExtraToAdd[quality.id] || ""}
+                          onValueChange={val => setSelectedExtraToAdd(prev => ({...prev, [quality.id]: val}))}
+                      >
+                          <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Extra..."/></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="custom_extra">Custom Extra</SelectItem>
+                              {PREDEFINED_EXTRAS.map(ex => <SelectItem key={ex.id} value={ex.id}>{ex.name} ({ex.costModifier > 0 ? '+' : ''}{ex.costModifier})</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      <Button size="sm" className="h-8 text-xs" onClick={() => {
+                          const val = selectedExtraToAdd[quality.id];
+                          onAddExtraOrFlawToQuality(miracle.id, quality.id, 'extra', val === 'custom_extra' ? undefined : val);
+                          setSelectedExtraToAdd(prev => ({...prev, [quality.id]: ""}));
+                      }} disabled={!selectedExtraToAdd[quality.id]}>Add</Button>
+                  </div>
+                </div>
+
+                {/* Flaws Section */}
+                <div className="mt-3 pt-2 border-t border-dashed">
+                  <Label className="text-xs font-semibold">Flaws</Label>
+                   {quality.flaws.map(flaw => (
+                    <div key={flaw.id} className="flex items-center space-x-2 my-1 text-xs p-1 bg-destructive/10 rounded-md">
+                      {flaw.isCustom ? (
+                        <>
+                          <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
+                          <Input
+                            type="number"
+                            value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? String(flaw.costModifier) : ''}
+                            onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
+                            className="w-16 h-7 text-xs" placeholder="Cost"
+                          />
+                        </>
+                      ) : (
+                        <span className="flex-grow">{flaw.name} ({flaw.costModifier})</span>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'flaw', flaw.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                    </div>
+                  ))}
+                   <div className="flex items-end space-x-1 mt-1">
+                      <Select
+                          value={selectedFlawToAdd[quality.id] || ""}
+                          onValueChange={val => setSelectedFlawToAdd(prev => ({...prev, [quality.id]: val}))}
+                      >
+                          <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Flaw..." /></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="custom_flaw">Custom Flaw</SelectItem>
+                              {PREDEFINED_FLAWS.map(fl => <SelectItem key={fl.id} value={fl.id}>{fl.name} ({fl.costModifier})</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                       <Button size="sm" className="h-8 text-xs" onClick={() => {
+                          const val = selectedFlawToAdd[quality.id];
+                          onAddExtraOrFlawToQuality(miracle.id, quality.id, 'flaw', val === 'custom_flaw' ? undefined : val);
+                          setSelectedFlawToAdd(prev => ({...prev, [quality.id]: ""}));
+                      }} disabled={!selectedFlawToAdd[quality.id]}>Add</Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+           {isUnremovableIntrinsicMandated &&
+              <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
+          }
+        </CardContent>
+      </>
+    );
+  }
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" >
+    <Accordion type="multiple" className="w-full space-y-6" collapsible>
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>
@@ -726,7 +722,7 @@ export function CharacterTabContent({
               {isDiscarded ? (
                 <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded-md">
                   <p><strong>This attribute is discarded due to the Custom Stats intrinsic.</strong></p>
-                  <p className="mt-1">{discardedDescription}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{discardedDescription}</p>
                 </div>
               ) : (
                 <>

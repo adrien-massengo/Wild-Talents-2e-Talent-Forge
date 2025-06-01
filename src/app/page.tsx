@@ -168,7 +168,7 @@ export default function HomePage() {
           newBasicInfo.intrinsicVulnerableConfig = {};
 
           
-          updatedMiracles = updatedMiracles.filter(m => !m.definitionId?.startsWith('archetype-mandatory-'));
+          updatedMiracles = updatedMiracles.filter(m => !m.definitionId?.startsWith('archetype-mandatory-') && !(archetype.id === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents'));
 
 
           (archetype.intrinsicMQIds || []).forEach(mqId => {
@@ -178,7 +178,7 @@ export default function HomePage() {
                 newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey]?.[mqId] || (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' || intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {count:0, extraBoxes:0} : {});
                  if (intrinsicDef.id === 'mandatory_power') {
                     // @ts-ignore
-                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0;
+                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (ARCHETYPES.find(a => a.id === value)?.mandatoryPowerText ? 1 : 0);
                     // @ts-ignore
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
                     updatedMiracles = handleIntrinsicConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value) as MiracleDefinition[];
@@ -329,7 +329,7 @@ export default function HomePage() {
       if (configKey === 'intrinsicMandatoryPowerConfig' && field === 'count') {
           const newCount = Math.max(0, Number(value) || 0);
           const mandatoryMiraclesForThisIntrinsic = updatedMiracles.filter(m => 
-            m.isMandatory && m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`)
+            m.isMandatory && (m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) || (archetypeIdForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents'))
           );
           const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
 
@@ -344,7 +344,7 @@ export default function HomePage() {
                       if (template) {
                           newMandatoryMiracle = {
                               id: `miracle-arch-mandatory-${intrinsicId}-${Date.now()}-${i}`,
-                              definitionId: template.definitionId, // Keep template definitionId
+                              definitionId: template.definitionId, 
                               name: template.name,
                               dice: '0D', 
                               hardDice: '2HD', 
@@ -368,7 +368,7 @@ export default function HomePage() {
                       }
                   }
                   
-                  if (!newMandatoryMiracle) { // Fallback to generic if not Godlike Talent or template missing
+                  if (!newMandatoryMiracle) { 
                       newMandatoryMiracle = {
                           id: `miracle-archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`,
                           definitionId: `archetype-mandatory-${intrinsicId}-${Date.now()}-${i}`, 
@@ -388,7 +388,7 @@ export default function HomePage() {
               const miraclesToRemove = Math.abs(difference);
               let removedCount = 0;
               updatedMiracles = updatedMiracles.filter(m => {
-                  if (m.isMandatory && m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) && removedCount < miraclesToRemove) {
+                  if (m.isMandatory && (m.definitionId?.startsWith(`archetype-mandatory-${intrinsicId}-`) || (archetypeIdForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents')) && removedCount < miraclesToRemove) {
                       removedCount++;
                       return false;
                   }
@@ -559,8 +559,10 @@ export default function HomePage() {
 
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
      const miracle = characterData.miracles.find(m => m.id === miracleId);
-     if (miracle && miracle.definitionId?.startsWith('archetype-mandatory-') && field === 'isMandatory' && !value) {
-       toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic.", variant: "destructive"});
+     const isUnremovableIntrinsicMandated = miracle && miracle.isMandatory && (miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents');
+
+     if (isUnremovableIntrinsicMandated && field === 'isMandatory' && !value) {
+       toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic or specific archetype rule.", variant: "destructive"});
        return;
      }
 
@@ -1021,7 +1023,10 @@ export default function HomePage() {
 
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
   
-  const displayTotalWill = hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic ? 0 : displayTotalBaseWill + currentPurchasedWill;
+  let displayTotalWill = displayTotalBaseWill + currentPurchasedWill;
+  if (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) {
+    displayTotalWill = 0;
+  }
   
   const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
   const uninvestedBaseWill = displayTotalBaseWill - totalInvestedInMotivations;
@@ -1111,3 +1116,4 @@ export default function HomePage() {
     
 
     
+
