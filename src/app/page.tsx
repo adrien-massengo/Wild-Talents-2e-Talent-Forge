@@ -12,8 +12,9 @@ import { GmToolsTabContent } from "@/components/tabs/gm-tools-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
+import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
-import { PREDEFINED_MIRACLES_TEMPLATES, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
+import { PREDEFINED_MIRACLES_TEMPLATES, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS } from "@/lib/miracles-definitions";
 import type { 
     AllergyEffectType, AllergySubstanceType, BruteFrailType, DiscardedAttributeType, ArchetypeDefinition,
     InhumanStatsSettings, InhumanStatSetting, AttributeCondition
@@ -94,7 +95,7 @@ export interface BasicInfo {
         extraBoxes: number;
     }
   };
-  inhumanStatsSettings?: InhumanStatsSettings; // Added for Inhuman Stats config
+  inhumanStatsSettings?: InhumanStatsSettings;
 }
 
 export interface CharacterData {
@@ -120,6 +121,49 @@ export interface CharacterData {
   willpowerPointLimit?: number;
   miraclePointLimit?: number;
 }
+
+// GM Settings Interfaces
+interface GmPointRestrictions {
+  overallPointLimit?: number;
+  archetypePointLimit?: number;
+  statPointLimit?: number;
+  willpowerPointLimit?: number;
+  skillPointLimit?: number;
+  miraclePointLimit?: number;
+}
+
+interface GmToggleableItems {
+  [id: string]: boolean; // true if allowed
+}
+
+interface GmWillpowerRestrictions {
+  maxBaseWill?: number;
+  maxTotalWill?: number;
+}
+
+interface GmMiracleNumericRestrictions {
+  maxPowerQualityLevels?: number;
+  maxDicePerType?: number; 
+}
+
+export interface GmSettings {
+  pointRestrictions: GmPointRestrictions;
+  sampleArchetypes: GmToggleableItems;
+  metaQualitiesSource: GmToggleableItems;
+  metaQualitiesPermission: GmToggleableItems;
+  metaQualitiesIntrinsic: GmToggleableItems;
+  sampleSkills: GmToggleableItems;
+  willpowerRestrictions: GmWillpowerRestrictions;
+  miracleRestrictions: {
+    allowedSampleMiracles: GmToggleableItems;
+    allowedQualities: GmToggleableItems;
+    allowedCapacities: GmToggleableItems;
+    allowedExtras: GmToggleableItems;
+    allowedFlaws: GmToggleableItems;
+    numericRestrictions: GmMiracleNumericRestrictions;
+  };
+}
+
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
 const ALL_STATS: (keyof CharacterData['stats'])[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
@@ -167,32 +211,64 @@ const initialCharacterData: CharacterData = {
   miraclePointLimit: undefined,
 };
 
+
+const initialGmSettings: GmSettings = {
+  pointRestrictions: {
+    overallPointLimit: undefined,
+    archetypePointLimit: undefined,
+    statPointLimit: undefined,
+    willpowerPointLimit: undefined,
+    skillPointLimit: undefined,
+    miraclePointLimit: undefined,
+  },
+  sampleArchetypes: ARCHETYPES.reduce((acc, arch) => { if(arch.id !== 'custom') acc[arch.id] = true; return acc; }, {} as GmToggleableItems),
+  metaQualitiesSource: SOURCE_META_QUALITIES.reduce((acc, mq) => { acc[mq.id] = true; return acc; }, {} as GmToggleableItems),
+  metaQualitiesPermission: PERMISSION_META_QUALITIES.reduce((acc, mq) => { acc[mq.id] = true; return acc; }, {} as GmToggleableItems),
+  metaQualitiesIntrinsic: INTRINSIC_META_QUALITIES.reduce((acc, mq) => { acc[mq.id] = true; return acc; }, {} as GmToggleableItems),
+  sampleSkills: SKILL_DEFINITIONS.reduce((acc, skill) => { acc[skill.id] = true; return acc; }, {} as GmToggleableItems),
+  willpowerRestrictions: {
+    maxBaseWill: undefined,
+    maxTotalWill: undefined,
+  },
+  miracleRestrictions: {
+    allowedSampleMiracles: PREDEFINED_MIRACLES_TEMPLATES.reduce((acc, miracle) => { if(miracle.definitionId) acc[miracle.definitionId] = true; return acc; }, {} as GmToggleableItems),
+    allowedQualities: POWER_QUALITY_DEFINITIONS.reduce((acc, pq) => { acc[pq.key] = true; return acc; }, {} as GmToggleableItems),
+    allowedCapacities: POWER_CAPACITY_OPTIONS.reduce((acc, cap) => { acc[cap.value] = true; return acc; }, {} as GmToggleableItems),
+    allowedExtras: PREDEFINED_EXTRAS.reduce((acc, extra) => { acc[extra.id] = true; return acc; }, {} as GmToggleableItems),
+    allowedFlaws: PREDEFINED_FLAWS.reduce((acc, flaw) => { acc[flaw.id] = true; return acc; }, {} as GmToggleableItems),
+    numericRestrictions: {
+      maxPowerQualityLevels: undefined,
+      maxDicePerType: undefined,
+    },
+  },
+};
+
+
 export default function HomePage() {
   const [characterData, setCharacterData] = React.useState<CharacterData>(initialCharacterData);
+  const [gmSettings, setGmSettings] = React.useState<GmSettings>(initialGmSettings);
   const { toast } = useToast();
 
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
-    const prev = characterData; // Use current state for checks
-    const previousArchetypeId = prev.basicInfo.selectedArchetypeId;
+    const prev = characterData; 
+    let potentialArchetypeCost = 0;
 
     if (field === 'selectedArchetypeId') {
         const newArchetypeDef = ARCHETYPES.find(arch => arch.id === value);
-        if (newArchetypeDef && newArchetypeDef.id !== 'custom' && prev.archetypePointLimit !== undefined && newArchetypeDef.points > prev.archetypePointLimit) {
-            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef.name}. Its cost (${newArchetypeDef.points}) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
-            return; 
-        }
-        
-        let tempNewBasicInfo = { ...prev.basicInfo, [field]: value };
-        if (newArchetypeDef && value === 'custom') {
-            const currentCustomCost = calculateCurrentArchetypeCost(tempNewBasicInfo);
-            if (prev.archetypePointLimit !== undefined && currentCustomCost > prev.archetypePointLimit) {
-                 toast({ title: "Archetype Limit Exceeded", description: `Changing to Custom Archetype with current Meta-Qualities (${currentCustomCost}pts) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}. Adjust Meta-Qualities first.`, variant: "destructive" });
-                 return;
+        if (newArchetypeDef) {
+            potentialArchetypeCost = newArchetypeDef.points;
+             if (newArchetypeDef.id === 'custom') {
+                potentialArchetypeCost = calculateCurrentArchetypeCost({ ...prev.basicInfo, selectedArchetypeId: 'custom' });
             }
+        }
+       
+        if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
+            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef?.name || 'this archetype'}. Its cost (${potentialArchetypeCost}) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+            return; 
         }
     }
 
-    setCharacterData(current => { // current is the latest state from React
+    setCharacterData(current => {
       let newBasicInfo = { ...current.basicInfo, [field]: value };
       let newWillpower = { ...current.willpower };
       let updatedMiracles = [...current.miracles];
@@ -204,7 +280,8 @@ export default function HomePage() {
 
       if (field === 'selectedArchetypeId') {
         const newArchetypeDef = ARCHETYPES.find(arch => arch.id === value);
-        // Cost checks already done outside setCharacterData, so we proceed with updates
+        const previousArchetypeId = current.basicInfo.selectedArchetypeId;
+
         if (previousArchetypeId === 'godlike_talent' && value !== 'godlike_talent') {
           updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
         }
@@ -255,14 +332,18 @@ export default function HomePage() {
                  if (intrinsicDef.id === 'mandatory_power') {
                     const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (newArchetypeDef.mandatoryPowerText ? 1 : 0);
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
-                    // This handleMetaQualityConfigChange might need to be refactored if it calls toast
-                    // For now, assuming it returns updatedMiracles directly or is safe
+                    
                     const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value, current);
                     if (Array.isArray(result)) {
                         updatedMiracles = result;
-                    } else {
-                        // This case should not happen if calledFromArchetypeChange is true
-                        return result; // this would be a full CharacterData, not right for this flow.
+                    } else { // This implies cost check failed, and full state was returned.
+                       // This means the toast was shown inside handleMetaQualityConfigChange
+                       // We should bail out of this specific update to avoid inconsistent state.
+                       // However, because handleMetaQualityConfigChange doesn't throw an error or return a specific signal
+                       // for failure when calledFromArchetypeChange is true, it's hard to stop the outer setCharacterData.
+                       // The ideal fix is for handleMetaQualityConfigChange to return a signal/throw if a sub-change fails
+                       // even when calledFromArchetypeChange. For now, we assume it modified updatedMiracles correctly or returned
+                       // the original miracles.
                     }
                 }
             }
@@ -334,8 +415,8 @@ export default function HomePage() {
     mqId: string,
     isSelected: boolean
   ) => {
-    const prev = characterData; // Use current state for checks
-    const tempBasicInfoForCostCheck = JSON.parse(JSON.stringify(prev.basicInfo)); // Deep clone for simulation
+    const prev = characterData; 
+    const tempBasicInfoForCostCheck = JSON.parse(JSON.stringify(prev.basicInfo)); 
 
     let currentSelection: string[] = [];
     if (mqType === 'source') currentSelection = [...tempBasicInfoForCostCheck.selectedSourceMQIds];
@@ -359,7 +440,7 @@ export default function HomePage() {
       return; 
     }
     
-    setCharacterData(current => { // current is the latest state
+    setCharacterData(current => { 
       const newBasicInfo = { ...current.basicInfo };
       let currentActualSelection: string[] = [];
       let newWillpower = { ...current.willpower };
@@ -380,9 +461,9 @@ export default function HomePage() {
           currentActualSelection.push(mqId);
            if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
-                // This handleMetaQualityConfigChange call needs to be carefully reviewed
+                
                 const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
-                if(Array.isArray(result)) updatedMiracles = result; else return result;
+                if(Array.isArray(result)) { updatedMiracles = result; } else { /* Toast was shown, and full state returned */ return current; }
            }
            if (mqType === 'intrinsic' && mqId === 'no_base_will') {
               newWillpower.purchasedBaseWill = 0;
@@ -408,7 +489,7 @@ export default function HomePage() {
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
                  if (intrinsicDef.id === 'mandatory_power') {
                     const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
-                    if(Array.isArray(result)) updatedMiracles = result; else return result;
+                    if(Array.isArray(result)) {updatedMiracles = result;} else { return current; }
                 }
             }
             if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
@@ -446,8 +527,8 @@ export default function HomePage() {
     currentMiraclesParam?: MiracleDefinition[],
     calledFromArchetypeChange?: boolean,
     archetypeIdForContext?: string,
-    currentStateForCheck?: CharacterData // Pass current state for checks
-  ): MiracleDefinition[] | CharacterData => { // Return type signature changed
+    currentStateForCheck?: CharacterData 
+  ): MiracleDefinition[] | CharacterData => { 
     
     const stateForChecks = currentStateForCheck || characterData;
     const tempNewBasicInfoForCostCheck = JSON.parse(JSON.stringify(stateForChecks.basicInfo)); 
@@ -486,14 +567,8 @@ export default function HomePage() {
 
     if (stateForChecks.archetypePointLimit !== undefined && potentialArchetypeCost > stateForChecks.archetypePointLimit) {
         toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality configuration change would make the archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${stateForChecks.archetypePointLimit}.`, variant: "destructive" });
-        // If called from archetype change, we need to return the miracles as they were to avoid state issues.
-        // Otherwise, we return the original state to prevent the change.
         return calledFromArchetypeChange ? (currentMiraclesParam || stateForChecks.miracles) : stateForChecks;
     }
-
-    // If we are here, the cost check passed or it's a call from archetype change that needs to proceed.
-    // The actual setCharacterData will happen outside if not calledFromArchetypeChange.
-    // If calledFromArchetypeChange, it's part of a larger setCharacterData update, so we compute new miracles.
 
     let updatedMiracles = [...(currentMiraclesParam || stateForChecks.miracles)];
 
@@ -558,10 +633,9 @@ export default function HomePage() {
     }
 
     if (calledFromArchetypeChange) {
-        return updatedMiracles; // Return only miracles for archetype change context
+        return updatedMiracles; 
     }
 
-    // For direct calls, setCharacterData
     setCharacterData(prev => {
         const newBasicInfo = { ...prev.basicInfo };
         let inhumanStatsUpdate = false;
@@ -598,7 +672,7 @@ export default function HomePage() {
         }
         return { ...prev, basicInfo: newBasicInfo, miracles: inhumanStatsUpdate ? prev.miracles : updatedMiracles };
     });
-    return []; // Should not be used by caller if not from archetype change
+    return []; 
   };
 
 
@@ -607,7 +681,7 @@ export default function HomePage() {
     dieType: keyof StatDetail,
     value: string
   ) => {
-    const prev = characterData; // Use current state for checks
+    const prev = characterData; 
     const discardedAttr = getDiscardedAttributeFromBasicInfo(prev.basicInfo);
     const currentTotalStatCost = calculateTotalStatPoints(prev.stats, discardedAttr);
     const costOfStatBeingChanged = calculateSingleStatPoints(prev.stats[statName], statName, discardedAttr);
@@ -622,7 +696,7 @@ export default function HomePage() {
       return; 
     }
 
-    setCharacterData(current => ({ // current is latest state
+    setCharacterData(current => ({ 
       ...current,
       stats: {
         ...current.stats,
@@ -632,7 +706,7 @@ export default function HomePage() {
   };
 
   const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
-    const prev = characterData; // Use current state for checks
+    const prev = characterData; 
     const hasNoBaseWillIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
     const hasNoWillpowerIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
     let processedValue = isNaN(value) ? 0 : Math.max(0, value);
@@ -653,7 +727,7 @@ export default function HomePage() {
       return; 
     }
     
-    setCharacterData(current => { // current is latest state
+    setCharacterData(current => { 
       let newProcessedValue = isNaN(value) ? 0 : Math.max(0, value);
       if (field === 'purchasedBaseWill' && current.basicInfo.selectedIntrinsicMQIds.includes('no_base_will')) newProcessedValue = 0;
       if (field === 'purchasedWill' && (current.basicInfo.selectedIntrinsicMQIds.includes('no_base_will') || current.basicInfo.selectedIntrinsicMQIds.includes('no_willpower'))) newProcessedValue = 0;
@@ -666,7 +740,7 @@ export default function HomePage() {
   };
 
   const handleAddSkill = (skillDef: PredefinedSkillDef) => {
-    const prev = characterData; // Use current state for checks
+    const prev = characterData; 
     const newSkillCost = calculateSingleSkillPoints({
       id: '', definitionId: '', name: '', baseName: '', linkedAttribute: skillDef.linkedAttribute, description: '',
       dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: false
@@ -677,7 +751,7 @@ export default function HomePage() {
       return; 
     }
 
-    setCharacterData(current => { // current is latest state
+    setCharacterData(current => { 
       const newSkillInstance: SkillInstance = {
         id: Date.now().toString(),
         definitionId: skillDef.id,
@@ -699,7 +773,7 @@ export default function HomePage() {
   };
 
   const handleAddCustomSkill = () => {
-    const prev = characterData; // Use current state for checks
+    const prev = characterData; 
     const newSkillCost = calculateSingleSkillPoints({
       id: '', definitionId: '', name: '', baseName: '', linkedAttribute: 'body', description: '',
       dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: true
@@ -709,7 +783,7 @@ export default function HomePage() {
       toast({ title: "Skill Limit Exceeded", description: `Adding a custom skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
       return; 
     }
-    setCharacterData(current => { // current is latest state
+    setCharacterData(current => { 
       const newCustomSkill: SkillInstance = {
         id: Date.now().toString(),
         definitionId: `custom-${Date.now().toString()}`,
@@ -739,14 +813,13 @@ export default function HomePage() {
     field: keyof SkillInstance,
     value: string | AttributeName
   ) => {
-    const prev = characterData; // Use current state for checks
+    const prev = characterData; 
     const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
     const skillBeingChanged = prev.skills.find(s => s.id === skillId);
     if (!skillBeingChanged) return;
 
     const costOfSkillBeingChanged = calculateSingleSkillPoints(skillBeingChanged);
     
-    // Simulate the change
     const tempSkillForCheck = { ...skillBeingChanged, [field]: value };
     if (field === 'typeSpecification' && tempSkillForCheck.hasType) {
       tempSkillForCheck.name = `${tempSkillForCheck.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
@@ -762,7 +835,7 @@ export default function HomePage() {
       return; 
     }
     
-    setCharacterData(current => { // current is latest state
+    setCharacterData(current => { 
       return {
         ...current,
         skills: current.skills.map(skill => {
@@ -782,7 +855,6 @@ export default function HomePage() {
     });
   };
 
-  // Unified miracle update handler
   const updateMiraclesIfAllowed = (
       updater: (currentMiracles: MiracleDefinition[], currentSkills: SkillInstance[]) => MiracleDefinition[],
       toastTitle: string,
@@ -812,7 +884,7 @@ export default function HomePage() {
           };
         } else {
           const template = PREDEFINED_MIRACLES_TEMPLATES.find(m => m.definitionId === type);
-          if (!template) return currentMiracles; // Should not happen ideally
+          if (!template) return currentMiracles; 
           newMiracle = {
             ...template, id: `miracle-${template.definitionId}-${Date.now()}`,
             dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
@@ -843,7 +915,7 @@ export default function HomePage() {
     }
     updateMiraclesIfAllowed(
       (currentMiracles) => currentMiracles.filter(m => m.id !== miracleId),
-       "Miracle Limit Exceeded", // Unlikely for removal, but for consistency
+       "Miracle Limit Exceeded", 
        (cost, limit) => `This change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
     );
   };
@@ -885,7 +957,7 @@ export default function HomePage() {
       (currentMiracles) => currentMiracles.map(m =>
         m.id === miracleId ? { ...m, qualities: m.qualities.filter(q => q.id !== qualityId) } : m
       ),
-      "Miracle Limit Exceeded", // Unlikely
+      "Miracle Limit Exceeded", 
       (cost, limit) => `This change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
     );
   };
@@ -980,7 +1052,7 @@ export default function HomePage() {
           })
         } : m
       ),
-       "Miracle Limit Exceeded", // Unlikely
+       "Miracle Limit Exceeded", 
        (cost, limit) => `This change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
     );
   };
@@ -1039,22 +1111,22 @@ export default function HomePage() {
     const intendedNewSubLimitValue = isNaN(rawNumericValue) || rawNumericValue < 0 ? undefined : rawNumericValue;
   
     const { 
-        pointLimit: currentOverallLimit, // Use current state for overallLimit
-        archetypePointLimit: currentArchetypeLimit, 
-        statPointLimit: currentStatLimit, 
-        skillPointLimit: currentSkillLimit, 
-        willpowerPointLimit: currentWillpowerLimit, 
-        miraclePointLimit: currentMiracleLimit 
-      } = characterData; // Use current characterData
+        pointLimit: currentOverallLimitFromState,
+        archetypePointLimit: currentArchetypeLimitFromState, 
+        statPointLimit: currentStatLimitFromState, 
+        skillPointLimit: currentSkillLimitFromState, 
+        willpowerPointLimit: currentWillpowerLimitFromState, 
+        miraclePointLimit: currentMiracleLimitFromState 
+      } = characterData; 
   
       let sumOfOtherSubLimits = 0;
-      if (limitType !== 'archetype') sumOfOtherSubLimits += (currentArchetypeLimit || 0);
-      if (limitType !== 'stat') sumOfOtherSubLimits += (currentStatLimit || 0);
-      if (limitType !== 'willpower') sumOfOtherSubLimits += (currentWillpowerLimit || 0);
-      if (limitType !== 'skill') sumOfOtherSubLimits += (currentSkillLimit || 0);
-      if (limitType !== 'miracle') sumOfOtherSubLimits += (currentMiracleLimit || 0);
+      if (limitType !== 'archetype') sumOfOtherSubLimits += (currentArchetypeLimitFromState || 0);
+      if (limitType !== 'stat') sumOfOtherSubLimits += (currentStatLimitFromState || 0);
+      if (limitType !== 'willpower') sumOfOtherSubLimits += (currentWillpowerLimitFromState || 0);
+      if (limitType !== 'skill') sumOfOtherSubLimits += (currentSkillLimitFromState || 0);
+      if (limitType !== 'miracle') sumOfOtherSubLimits += (currentMiracleLimitFromState || 0);
   
-      const overallLimit = currentOverallLimit || 0; 
+      const overallLimit = currentOverallLimitFromState || 0; 
       let finalNewSubLimitValue = intendedNewSubLimitValue;
       let showToast = false;
       let toastMessage = "";
@@ -1081,9 +1153,8 @@ export default function HomePage() {
         });
       }
       
-      setCharacterData(prev => ({ // Updater now doesn't call toast
+      setCharacterData(prev => ({ 
         ...prev, 
-        // @ts-ignore
         [`${limitType}PointLimit`]: finalNewSubLimitValue 
       }));
   };
@@ -1283,6 +1354,95 @@ export default function HomePage() {
        toast({ title: "Export Error", description: "Could not export character data.", variant: "destructive" });
     }
   };
+  
+  // GM Settings Handlers
+  const handleGmPointLimitChange = (limitType: keyof GmPointRestrictions, value: string) => {
+    const numericValue = parseInt(value, 10);
+    const processedValue = isNaN(numericValue) || numericValue < 0 ? undefined : numericValue;
+    setGmSettings(prev => ({
+      ...prev,
+      pointRestrictions: {
+        ...prev.pointRestrictions,
+        [limitType]: processedValue,
+      }
+    }));
+  };
+
+  const handleGmToggleableItemChange = (
+    category: keyof Pick<GmSettings, 'sampleArchetypes' | 'metaQualitiesSource' | 'metaQualitiesPermission' | 'metaQualitiesIntrinsic' | 'sampleSkills'> | 
+              keyof GmSettings['miracleRestrictions'], // for miracle sub-categories
+    itemId: string,
+    isChecked: boolean
+  ) => {
+    setGmSettings(prev => {
+      const newSettings = { ...prev };
+      if (category === 'allowedSampleMiracles' || category === 'allowedQualities' || category === 'allowedCapacities' || category === 'allowedExtras' || category === 'allowedFlaws') {
+        newSettings.miracleRestrictions = {
+          ...newSettings.miracleRestrictions,
+          [category]: {
+            // @ts-ignore
+            ...(newSettings.miracleRestrictions[category] || {}),
+            [itemId]: isChecked,
+          }
+        };
+      } else {
+         // @ts-ignore
+        newSettings[category] = {
+           // @ts-ignore
+          ...(newSettings[category] || {}),
+          [itemId]: isChecked,
+        };
+      }
+      return newSettings;
+    });
+  };
+  
+  const handleGmWillpowerRestrictionChange = (field: keyof GmWillpowerRestrictions, value: string) => {
+    const numericValue = parseInt(value, 10);
+    const processedValue = isNaN(numericValue) || numericValue < 0 ? undefined : numericValue;
+    setGmSettings(prev => ({
+      ...prev,
+      willpowerRestrictions: {
+        ...prev.willpowerRestrictions,
+        [field]: processedValue,
+      }
+    }));
+  };
+
+  const handleGmMiracleNumericRestrictionChange = (field: keyof GmMiracleNumericRestrictions, value: string) => {
+    const numericValue = parseInt(value, 10);
+    const processedValue = isNaN(numericValue) || numericValue < 0 ? undefined : numericValue;
+    setGmSettings(prev => ({
+      ...prev,
+      miracleRestrictions: {
+        ...prev.miracleRestrictions,
+        numericRestrictions: {
+          ...prev.miracleRestrictions.numericRestrictions,
+          [field]: processedValue,
+        }
+      }
+    }));
+  };
+
+  const handleExportGmSettings = () => {
+    try {
+      const jsonString = JSON.stringify(gmSettings, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "wild_talents_gm_settings.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "GM Settings Exported", description: "GM settings downloaded as wild_talents_gm_settings.json." });
+    } catch (error) {
+       console.error("Failed to export GM settings:", error);
+       toast({ title: "Export Error", description: "Could not export GM settings.", variant: "destructive" });
+    }
+  };
+
 
   const getDiscardedAttributeFromBasicInfo = (bInfo: BasicInfo): DiscardedAttributeType => {
     if (bInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
@@ -1398,7 +1558,14 @@ export default function HomePage() {
                 />
               </TabsContent>
               <TabsContent value="gm-tools" className="mt-0">
-                <GmToolsTabContent />
+                <GmToolsTabContent 
+                  gmSettings={gmSettings}
+                  onPointLimitChange={handleGmPointLimitChange}
+                  onToggleableItemChange={handleGmToggleableItemChange}
+                  onWillpowerRestrictionChange={handleGmWillpowerRestrictionChange}
+                  onMiracleNumericRestrictionChange={handleGmMiracleNumericRestrictionChange}
+                  onExportSettings={handleExportGmSettings}
+                />
               </TabsContent>
             </div>
           </ScrollArea>
