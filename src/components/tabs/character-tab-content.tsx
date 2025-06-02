@@ -76,9 +76,6 @@ const statsDefinitions: StatDefinition[] = [
   { name: 'command', label: 'Command', description: 'The Command Stat measures your force of personality, your capacity for leadership, and your composure in the face of crisis. With high Command you remain uncracked under great pressure and people instinctively listen to you in a crisis.' },
 ];
 
-const hardDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}HD`);
-const wiggleDiceOptions = Array.from({ length: 11 }, (_, i) => `${i}WD`);
-
 const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
 
 export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: MiracleDefinition, allPowerQualityDefinitions: ReturnType<typeof getDynamicPowerQualityDefinitions>): number => {
@@ -97,7 +94,6 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
   const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
-
 
   const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
   const costHD = HDice * Math.max(0, perHardDieCostFactor);
@@ -307,27 +303,23 @@ export function CharacterTabContent({
     canUseHardWiggleDiceForSkills
   } = React.useMemo(() => {
     const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
-
     const hasHypertrained = selectedPermissions.includes('hypertrained');
     const hasOtherHyperskillPermission = [
-      'inventor',
-      'one_power',
-      'power_theme',
-      'super_permission',
-      'super_equipment'
+      'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
     ].some(id => selectedPermissions.includes(id));
+    
     const canAddHS = hasHypertrained || hasOtherHyperskillPermission;
-
     const canAddHStat = ['prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
     const canAddStandard = ['inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
-    const canUseHardWiggleForStats = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
+    
+    const canUseHardWiggleForStatsPerm = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
     const canUseHardWiggleForSkillsPerm = selectedPermissions.includes('peak_performer');
     
     return { 
       canAddHyperskillQuality: canAddHS, 
       canAddHyperstatQuality: canAddHStat, 
       canAddStandardMiracleQuality: canAddStandard,
-      canUseHardWiggleDiceForStats: canUseHardWiggleForStats,
+      canUseHardWiggleDiceForStats: canUseHardWiggleForStatsPerm,
       canUseHardWiggleDiceForSkills: canUseHardWiggleForSkillsPerm
     };
   }, [characterData.basicInfo.selectedPermissionMQIds]);
@@ -362,13 +354,7 @@ export function CharacterTabContent({
                 return canAddStandardMiracleQuality;
             } else if (type.startsWith('hyperstat_')) {
                 return canAddHyperstatQuality;
-            } else if (type.startsWith('hyperskill_')) { // This check will be against generic 'hyperskill' for template, specific skill linked at instantiation
-                const skillIdFromTemplate = type.substring('hyperskill_'.length);
-                 // If the template specifies a hyperskill, check if THAT skill exists for the character
-                 // OR if the template is more generic and just needs 'canAddHyperskillQuality'
-                 // For now, templates with specific hyperskill IDs would require that exact skill ID to be present.
-                 // This might need refinement if templates are meant to be more abstract.
-                 // For simplicity, if it IS a hyperskill, we need general hyperskill permission.
+            } else if (type.startsWith('hyperskill_')) { 
                 return canAddHyperskillQuality;
             }
             return false; 
@@ -387,10 +373,14 @@ export function CharacterTabContent({
       addMiracleTooltipContent = "No predefined miracle templates match your current permissions. You can still add a custom miracle.";
   }
 
+  const peakPerformerDiceCap = 5;
+  const inhumanDiceCap = 10;
+  const generateDiceOptions = (cap: number, suffix: 'HD' | 'WD') => Array.from({ length: cap + 1 }, (_, i) => `${i}${suffix}`);
+
 
   const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
-    const maxStatNormalDice = 5;
-    return Array.from({ length: maxStatNormalDice }, (_, i) => `${i + 1}D`);
+    const maxStatNormalDice = 5; // Skills are capped by stat normal dice, usually 5
+    return Array.from({ length: maxStatNormalDice + 1 }, (_, i) => `${i}D`); // 0D to 5D
   };
 
   const handleAddPredefinedSkill = () => {
@@ -482,11 +472,11 @@ export function CharacterTabContent({
               </Select>
               <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>{hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>{generateDiceOptions(10, 'HD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={miracle.wiggleDice} onValueChange={(v) => onMiracleChange(miracle.id, 'wiggleDice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>{wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>{generateDiceOptions(10, 'WD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
@@ -811,6 +801,18 @@ export function CharacterTabContent({
           {statsDefinitions.map((stat) => {
             const isDiscarded = discardedAttribute === stat.name;
             const discardedDescription = isDiscarded && customStatsDefinition?.customStatsDiscardOptions?.find(opt => opt.value === stat.name)?.description;
+            
+            const showHardWiggleForThisStat = canUseHardWiggleDiceForStats && !isDiscarded;
+            let statHardDiceOptions = generateDiceOptions(0, 'HD');
+            let statWiggleDiceOptions = generateDiceOptions(0, 'WD');
+
+            if (showHardWiggleForThisStat) {
+                const cap = characterData.basicInfo.selectedPermissionMQIds.includes('inhuman_stats')
+                            ? inhumanDiceCap
+                            : peakPerformerDiceCap;
+                statHardDiceOptions = generateDiceOptions(cap, 'HD');
+                statWiggleDiceOptions = generateDiceOptions(cap, 'WD');
+            }
 
             return (
             <div key={stat.name} className="p-4 border rounded-lg bg-card/50 shadow-sm">
@@ -838,7 +840,7 @@ export function CharacterTabContent({
                         </SelectContent>
                       </Select>
                     </div>
-                    {canUseHardWiggleDiceForStats && (
+                    {showHardWiggleForThisStat && (
                       <>
                         <div>
                           <Label htmlFor={`${stat.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
@@ -850,7 +852,7 @@ export function CharacterTabContent({
                               <SelectValue placeholder="Select hard dice" />
                             </SelectTrigger>
                             <SelectContent>
-                              {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                              {statHardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>
@@ -864,7 +866,7 @@ export function CharacterTabContent({
                               <SelectValue placeholder="Select wiggle dice" />
                             </SelectTrigger>
                             <SelectContent>
-                              {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                              {statWiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>
@@ -916,7 +918,16 @@ export function CharacterTabContent({
         )}
 
         <div className="space-y-6">
-          {characterData.skills.map((skill) => (
+          {characterData.skills.map((skill) => {
+            const showHardWiggleForThisSkill = canUseHardWiggleDiceForSkills;
+            let skillHardDiceOptions = generateDiceOptions(0, 'HD');
+            let skillWiggleDiceOptions = generateDiceOptions(0, 'WD');
+
+            if (showHardWiggleForThisSkill) {
+                skillHardDiceOptions = generateDiceOptions(peakPerformerDiceCap, 'HD');
+                skillWiggleDiceOptions = generateDiceOptions(peakPerformerDiceCap, 'WD');
+            }
+            return (
             <div key={skill.id} className="p-4 border rounded-lg bg-card/50 shadow-sm">
               <div className="flex justify-between items-start mb-2">
                 {skill.isCustom ? (
@@ -983,7 +994,7 @@ export function CharacterTabContent({
                     </SelectContent>
                   </Select>
                 </div>
-                {canUseHardWiggleDiceForSkills && (
+                {showHardWiggleForThisSkill && (
                   <>
                     <div>
                       <Label htmlFor={`${skill.id}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
@@ -995,7 +1006,7 @@ export function CharacterTabContent({
                           <SelectValue placeholder="HD" />
                         </SelectTrigger>
                         <SelectContent>
-                          {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                          {skillHardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1009,7 +1020,7 @@ export function CharacterTabContent({
                           <SelectValue placeholder="WD" />
                         </SelectTrigger>
                         <SelectContent>
-                          {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                          {skillWiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1028,7 +1039,7 @@ export function CharacterTabContent({
               )}
 
             </div>
-          ))}
+          )})}
         </div>
       </CollapsibleSectionItem>
 
