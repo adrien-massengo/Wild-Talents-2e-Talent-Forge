@@ -159,7 +159,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                   onCheckedChange={(checked) => onMQSelectionChange(mq.id, !!checked)}
                 />
                 <Label htmlFor={`${mqType}-${mq.id}`} className="text-sm font-medium flex-grow">
-                  {mq.label} ({typeof mq.points === 'function' ? 'Var' : mq.points} Pts)
+                  {mq.label}
                 </Label>
               </div>
               {selectedMQIds.includes(mq.id) && (
@@ -353,13 +353,21 @@ export function CharacterTabContent({
   } = React.useMemo(() => {
     const selectedPermissions = basicInfo.selectedPermissionMQIds;
     const hasHypertrained = selectedPermissions.includes('hypertrained');
-    const hasOtherHyperskillPermission = [
-      'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
-    ].some(id => selectedPermissions.includes(id));
+    const hasPrimeSpecimen = selectedPermissions.includes('prime_specimen');
+    const hasSuperPermission = selectedPermissions.includes('super_permission'); // General 'Super' allows most things
+    const hasPowerTheme = selectedPermissions.includes('power_theme');
+    const hasInventor = selectedPermissions.includes('inventor');
+    const hasOnePower = selectedPermissions.includes('one_power');
+    const hasSuperEquipment = selectedPermissions.includes('super_equipment');
     
-    const canAddHS = hasHypertrained || hasOtherHyperskillPermission;
-    const canAddHStat = ['prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
-    const canAddStandard = ['inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
+    // Logic for Hyperskills
+    const canAddHS = hasHypertrained || hasInventor || hasOnePower || hasPowerTheme || hasSuperPermission || hasSuperEquipment;
+    
+    // Logic for Hyperstats
+    const canAddHStat = hasPrimeSpecimen || hasInventor || hasOnePower || hasPowerTheme || hasSuperPermission || hasSuperEquipment;
+    
+    // Logic for Standard Miracles (Attacks, Defends, Useful)
+    const canAddStandard = hasInventor || hasOnePower || hasPowerTheme || hasSuperPermission || hasSuperEquipment;
         
     return { 
       canAddHyperskillQuality: canAddHS, 
@@ -435,16 +443,16 @@ export function CharacterTabContent({
 
     let maxNormal = 5;
     let maxHDWD = 0; 
-    let showHDWD = hasPeakPerformerPerm || (hasInhumanStatsPerm && statSetting?.condition === 'superior');
+    let showHDWD = (hasInhumanStatsPerm && statSetting?.condition === 'superior') || hasPeakPerformerPerm;
 
 
     if (hasInhumanStatsPerm && statSetting) {
         if (statSetting.condition === 'superior') {
             maxNormal = 10;
-            maxHDWD = 10;
+            maxHDWD = hasPeakPerformerPerm ? 10 : 10; // Superior grants up to 10 for HD/WD
         } else if (statSetting.condition === 'inferior') {
             maxNormal = statSetting.inferiorMaxDice || 4;
-            maxHDWD = hasPeakPerformerPerm ? Math.min(maxNormal, 5) : 0;
+            maxHDWD = hasPeakPerformerPerm ? Math.min(maxNormal, 5) : 0; // Peak Performer still capped at 5 for HD/WD if stat is inferior OR by stat's own lower cap
         } else { // normal condition under inhuman_stats (usually means default 5D)
             maxNormal = 5;
             maxHDWD = hasPeakPerformerPerm ? 5 : 0;
@@ -469,9 +477,13 @@ export function CharacterTabContent({
 
     if (hasPeakPerformerPerm) {
         const peakPerformerCap = 5;
-        // HD/WD for skills under Peak Performer is capped at 5, OR by the linked attribute's own HD/WD cap if that's lower (e.g. inferior stat)
-        // It also cannot exceed the skill's normal dice cap.
-        skillMaxHDWD = Math.min(skillMaxNormal, peakPerformerCap, linkedStatLimits.maxHDWD > 0 ? linkedStatLimits.maxHDWD : peakPerformerCap );
+        skillMaxHDWD = Math.min(skillMaxNormal, peakPerformerCap);
+        // If inhuman_stats: superior for the linked attribute, skill HD/WD can go up to 10, so use linkedStatLimits.maxHDWD
+        if (basicInfo.selectedPermissionMQIds.includes('inhuman_stats') && basicInfo.inhumanStatsSettings?.[linkedAttribute]?.condition === 'superior') {
+          skillMaxHDWD = Math.min(skillMaxNormal, linkedStatLimits.maxHDWD);
+        } else { // Otherwise, cap at 5 or the linked attribute's normal dice max if inferior.
+          skillMaxHDWD = Math.min(skillMaxNormal, peakPerformerCap);
+        }
     }
     if (!skillShowHDWD) skillMaxHDWD = 0;
     
