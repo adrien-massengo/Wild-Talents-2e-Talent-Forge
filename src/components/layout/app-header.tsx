@@ -4,7 +4,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Save, Upload, Download, Settings, Moon, Sun } from "lucide-react";
+import { Save, Upload, Download, Settings, Moon, Sun, ChevronRight, ChevronLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogFooter, // Added for potential future use, not strictly needed now
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -23,9 +24,20 @@ interface AppHeaderProps {
   onExport: () => void;
 }
 
+type SettingsView = 'main' | 'appearance';
+
 export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+  const [settingsView, setSettingsView] = React.useState<SettingsView>('main');
+
+  const handleOpenChange = (open: boolean) => {
+    setIsSettingsOpen(open);
+    if (!open) {
+      // Reset to main view when dialog is closed
+      setSettingsView('main');
+    }
+  };
 
   return (
     <header className="mb-8 p-4 bg-card shadow-md rounded-lg">
@@ -44,7 +56,7 @@ export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
 
-          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+          <Dialog open={isSettingsOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
               <Button variant="outline" size="icon" aria-label="Open Settings">
                 <Settings className="h-5 w-5" />
@@ -52,24 +64,53 @@ export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Settings</DialogTitle>
-                <DialogDescription>
-                  Manage your application preferences here.
-                </DialogDescription>
+                <DialogTitle>
+                  {settingsView === 'appearance' ? 'Appearance Settings' : 'Settings'}
+                </DialogTitle>
+                {settingsView === 'main' && (
+                  <DialogDescription>
+                    Manage your application preferences here.
+                  </DialogDescription>
+                )}
               </DialogHeader>
+
               <div className="grid gap-4 py-4">
-                <div className="flex items-center space-x-2 justify-between">
-                  <Label htmlFor="dark-mode-toggle" className="flex items-center">
-                    {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
-                    Dark Mode
-                  </Label>
-                  <Switch
-                    id="dark-mode-toggle"
-                    checked={theme === 'dark'}
-                    onCheckedChange={toggleTheme}
-                    aria-label="Toggle dark mode"
-                  />
-                </div>
+                {settingsView === 'main' && (
+                  <Button
+                    variant="ghost"
+                    className="flex justify-between items-center w-full text-left px-3 py-2 hover:bg-accent"
+                    onClick={() => setSettingsView('appearance')}
+                  >
+                    <span>Appearance</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
+
+                {settingsView === 'appearance' && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSettingsView('main')}
+                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground"
+                      aria-label="Back to main settings"
+                    >
+                      <ChevronLeft className="mr-1 h-4 w-4" />
+                      Back to Settings
+                    </Button>
+                    <div className="flex items-center space-x-2 justify-between px-2">
+                      <Label htmlFor="dark-mode-toggle" className="flex items-center">
+                        {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                        Dark Mode
+                      </Label>
+                      <Switch
+                        id="dark-mode-toggle"
+                        checked={theme === 'dark'}
+                        onCheckedChange={toggleTheme}
+                        aria-label="Toggle dark mode"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </DialogContent>
           </Dialog>
