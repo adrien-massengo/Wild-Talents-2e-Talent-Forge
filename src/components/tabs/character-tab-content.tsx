@@ -367,19 +367,14 @@ export function CharacterTabContent({
     const selectedPermissions = basicInfo.selectedPermissionMQIds;
     const hasHypertrained = selectedPermissions.includes('hypertrained');
     const hasPrimeSpecimen = selectedPermissions.includes('prime_specimen');
-    const hasSuperPermission = selectedPermissions.includes('super_permission'); // General 'Super' allows most things
+    const hasSuperPermission = selectedPermissions.includes('super_permission'); 
     const hasPowerTheme = selectedPermissions.includes('power_theme');
     const hasInventor = selectedPermissions.includes('inventor');
     const hasOnePower = selectedPermissions.includes('one_power');
     const hasSuperEquipment = selectedPermissions.includes('super_equipment');
     
-    // Logic for Hyperskills
     const canAddHS = hasHypertrained || hasInventor || hasOnePower || hasPowerTheme || hasSuperPermission || hasSuperEquipment;
-    
-    // Logic for Hyperstats
     const canAddHStat = hasPrimeSpecimen || hasInventor || hasOnePower || hasPowerTheme || hasSuperPermission || hasSuperEquipment;
-    
-    // Logic for Standard Miracles (Attacks, Defends, Useful)
     const canAddStandard = hasInventor || hasOnePower || hasPowerTheme || hasSuperPermission || hasSuperEquipment;
         
     return { 
@@ -409,13 +404,6 @@ export function CharacterTabContent({
     });
   }, [canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
 
-  const finalFilteredMiracleTemplates = React.useMemo(() => {
-    return initialFilteredMiracleTemplates.filter(template =>
-        template.definitionId && (gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId] === undefined || gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId])
-    );
-  }, [initialFilteredMiracleTemplates, gmSettings.miracleRestrictions.allowedSampleMiracles]);
-
-
   const initialFilteredDynamicPqDefs = React.useMemo(() => {
       const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
       return allDynamicDefs.filter(def => {
@@ -438,6 +426,27 @@ export function CharacterTabContent({
     );
   }, [initialFilteredDynamicPqDefs, gmSettings.miracleRestrictions.allowedQualities]);
 
+  const finalFilteredMiracleTemplates = React.useMemo(() => {
+    return initialFilteredMiracleTemplates.filter(template => {
+      // 1. Check if the template itself is directly allowed by GM settings (direct toggle)
+      const isTemplateDirectlyAllowed = template.definitionId &&
+        (gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId] === undefined ||
+         gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId]);
+  
+      if (!isTemplateDirectlyAllowed) {
+        return false;
+      }
+  
+      // 2. Check if all constituent qualities of this template are currently allowed by GM quality restrictions
+      //    finalFilteredDynamicPqDefs already respects gmSettings.miracleRestrictions.allowedQualities
+      const allConstituentQualitiesAllowed = template.qualities.every(templateQuality => {
+        return finalFilteredDynamicPqDefs.some(allowedDef => allowedDef.key === templateQuality.type);
+      });
+  
+      return allConstituentQualitiesAllowed;
+    });
+  }, [initialFilteredMiracleTemplates, gmSettings.miracleRestrictions.allowedSampleMiracles, finalFilteredDynamicPqDefs]);
+
 
   const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
   const onePowerLimitReached = basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
@@ -456,7 +465,6 @@ export function CharacterTabContent({
 
   const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD') => {
       const options = [];
-      // Ensure 0D is always an option for Normal Dice in Miracles, stats, skills still start from 1D unless specified
       if (suffix === 'D') options.push('0D'); 
       for (let i = (suffix === 'D' ? 1 : 0); i <= cap; i++) {
           options.push(`${i}${suffix}`);
@@ -478,19 +486,18 @@ export function CharacterTabContent({
     if (hasInhumanStatsPerm && statSetting) {
         if (statSetting.condition === 'superior') {
             maxNormal = 10;
-            maxHDWD = hasPeakPerformerPerm ? 10 : 10; // Superior grants up to 10 for HD/WD
+            maxHDWD = hasPeakPerformerPerm ? 10 : 10; 
         } else if (statSetting.condition === 'inferior') {
             maxNormal = statSetting.inferiorMaxDice || 4;
-            maxHDWD = hasPeakPerformerPerm ? Math.min(maxNormal, 5) : 0; // Peak Performer still capped at 5 for HD/WD if stat is inferior OR by stat's own lower cap
-        } else { // normal condition under inhuman_stats (usually means default 5D)
+            maxHDWD = hasPeakPerformerPerm ? Math.min(maxNormal, 5) : 0; 
+        } else { 
             maxNormal = 5;
             maxHDWD = hasPeakPerformerPerm ? 5 : 0;
         }
-    } else if (hasPeakPerformerPerm) { // No Inhuman Stats, but has Peak Performer
+    } else if (hasPeakPerformerPerm) { 
         maxNormal = 5;
         maxHDWD = 5;
     }
-    // If showHDWD is false, effectively cap maxHDWD to 0 for generation purposes
     if (!showHDWD) maxHDWD = 0;
 
     return { maxNormal, maxHDWD, showHDWD };
@@ -507,10 +514,9 @@ export function CharacterTabContent({
     if (hasPeakPerformerPerm) {
         const peakPerformerCap = 5;
         skillMaxHDWD = Math.min(skillMaxNormal, peakPerformerCap);
-        // If inhuman_stats: superior for the linked attribute, skill HD/WD can go up to 10, so use linkedStatLimits.maxHDWD
         if (basicInfo.selectedPermissionMQIds.includes('inhuman_stats') && basicInfo.inhumanStatsSettings?.[linkedAttribute]?.condition === 'superior') {
           skillMaxHDWD = Math.min(skillMaxNormal, linkedStatLimits.maxHDWD);
-        } else { // Otherwise, cap at 5 or the linked attribute's normal dice max if inferior.
+        } else { 
           skillMaxHDWD = Math.min(skillMaxNormal, peakPerformerCap);
         }
     }
@@ -543,7 +549,38 @@ export function CharacterTabContent({
   const mandatoryMiracles = characterData.miracles.filter(m => m.isMandatory);
   const regularMiracles = characterData.miracles.filter(m => !m.isMandatory);
 
-  const selectedArchetype = ARCHETYPES.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
+  const filteredArchetypes = React.useMemo(() => {
+    return ARCHETYPES.filter(arch => {
+      if (arch.id === 'custom') return true; // Custom is always available
+
+      // Check if archetype itself is allowed
+      const isArchAllowed = gmSettings.sampleArchetypes[arch.id] === undefined || gmSettings.sampleArchetypes[arch.id];
+      if (!isArchAllowed) return false;
+
+      // Check if all its required Source MQs are allowed
+      const sourceMQsAllowed = arch.sourceMQIds.every(mqId => 
+        gmSettings.metaQualitiesSource[mqId] === undefined || gmSettings.metaQualitiesSource[mqId]
+      );
+      if (!sourceMQsAllowed) return false;
+
+      // Check if all its required Permission MQs are allowed
+      const permissionMQsAllowed = arch.permissionMQIds.every(mqId =>
+        gmSettings.metaQualitiesPermission[mqId] === undefined || gmSettings.metaQualitiesPermission[mqId]
+      );
+      if (!permissionMQsAllowed) return false;
+      
+      // Check if all its required Intrinsic MQs are allowed
+      const intrinsicMQsAllowed = arch.intrinsicMQIds.every(mqId =>
+        gmSettings.metaQualitiesIntrinsic[mqId] === undefined || gmSettings.metaQualitiesIntrinsic[mqId]
+      );
+      if (!intrinsicMQsAllowed) return false;
+
+      return true;
+    });
+  }, [gmSettings]);
+
+  const selectedArchetype = filteredArchetypes.find(arch => arch.id === characterData.basicInfo.selectedArchetypeId);
+
 
   const calculateDisplayedNDFactor = (quality: MiracleQuality) => {
     const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills); 
@@ -823,9 +860,7 @@ export function CharacterTabContent({
             <Select value={characterData.basicInfo.selectedArchetypeId} onValueChange={(value) => onBasicInfoChange('selectedArchetypeId', value)}>
               <SelectTrigger id="archetype"><SelectValue placeholder="Select Archetype..." /></SelectTrigger>
               <SelectContent>
-                {ARCHETYPES
-                  .filter(arch => arch.id === 'custom' || (gmSettings.sampleArchetypes[arch.id] === undefined || gmSettings.sampleArchetypes[arch.id]))
-                  .map(arch => <SelectItem key={arch.id} value={arch.id}>{arch.name}</SelectItem>)}
+                {filteredArchetypes.map(arch => <SelectItem key={arch.id} value={arch.id}>{arch.name}</SelectItem>)}
               </SelectContent>
             </Select>
             {selectedArchetype && selectedArchetype.id !== 'custom' && (
@@ -1313,4 +1348,5 @@ export function CharacterTabContent({
     
 
     
+
 
