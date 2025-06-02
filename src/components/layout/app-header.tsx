@@ -4,7 +4,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Save, Upload, Download, Settings, Moon, Sun, ChevronRight, ChevronLeft } from "lucide-react";
+import { Save, Upload, Download, Settings, Moon, Sun, ChevronRight, ChevronLeft, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ interface AppHeaderProps {
   onExport: () => void;
 }
 
-type SettingsView = 'main' | 'appearance';
+type SettingsView = 'main' | 'appearance' | 'characters';
 type ThemeOption = 'light' | 'dark';
 
 export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
@@ -47,12 +47,6 @@ export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
           Wild Talents 2e: Talent Forge
         </h1>
         <div className="flex space-x-2 items-center">
-          <Button variant="outline" onClick={onSave} aria-label="Save Character">
-            <Save className="mr-2 h-4 w-4" /> Save
-          </Button>
-          <Button variant="outline" onClick={onLoad} aria-label="Load Character">
-            <Upload className="mr-2 h-4 w-4" /> Load
-          </Button>
           <Button variant="outline" onClick={onExport} aria-label="Export Character">
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
@@ -66,25 +60,68 @@ export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>
-                  {settingsView === 'appearance' ? 'Appearance Settings' : 'Settings'}
+                  {settingsView === 'appearance' ? 'Appearance Settings' : settingsView === 'characters' ? 'Character Settings' : 'Settings'}
                 </DialogTitle>
                 {settingsView === 'main' && (
                   <DialogDescription>
-                    Manage your application preferences here.
+                    Manage your application preferences and character actions here.
+                  </DialogDescription>
+                )}
+                 {settingsView === 'characters' && (
+                  <DialogDescription>
+                    Save or load your character data.
                   </DialogDescription>
                 )}
               </DialogHeader>
 
               <div className="grid gap-4 py-4">
                 {settingsView === 'main' && (
-                  <Button
-                    variant="ghost"
-                    className="flex justify-between items-center w-full text-left px-3 py-2 hover:bg-accent"
-                    onClick={() => setSettingsView('appearance')}
-                  >
-                    <span>Appearance</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      className="flex justify-between items-center w-full text-left px-3 py-2 hover:bg-accent"
+                      onClick={() => setSettingsView('characters')}
+                    >
+                      <div className="flex items-center">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Character Actions</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="flex justify-between items-center w-full text-left px-3 py-2 hover:bg-accent"
+                      onClick={() => setSettingsView('appearance')}
+                    >
+                      <div className="flex items-center">
+                        {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                        <span>Appearance</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+
+                {settingsView === 'characters' && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSettingsView('main')}
+                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground"
+                      aria-label="Back to main settings"
+                    >
+                      <ChevronLeft className="mr-1 h-4 w-4" />
+                      Back to Settings
+                    </Button>
+                    <div className="flex flex-col space-y-3 px-2">
+                       <Button variant="outline" onClick={() => { onSave(); handleOpenChange(false);}} aria-label="Save Character">
+                        <Save className="mr-2 h-4 w-4" /> Save Character
+                      </Button>
+                      <Button variant="outline" onClick={() => { onLoad(); handleOpenChange(false);}} aria-label="Load Character">
+                        <Upload className="mr-2 h-4 w-4" /> Load Character
+                      </Button>
+                    </div>
+                  </>
                 )}
 
                 {settingsView === 'appearance' && (
