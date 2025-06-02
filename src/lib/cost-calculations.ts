@@ -1,7 +1,8 @@
+
 // src/lib/cost-calculations.ts
-import type { StatDetail, SkillInstance, MiracleDefinition, BasicInfo as PageBasicInfo, CharacterData as PageCharacterData } from '@/app/page';
+import type { StatDetail, SkillInstance, BasicInfo as PageBasicInfo, CharacterData as PageCharacterData } from '@/app/page';
 import type { DiscardedAttributeType } from '@/lib/character-definitions';
-import { getDynamicPowerQualityDefinitions, MiracleQuality as MiracleQualityDef } from '@/lib/miracles-definitions';
+import { getDynamicPowerQualityDefinitions, type MiracleQuality as MiracleQualityDef, type MiracleDefinition } from '@/lib/miracles-definitions';
 import { calculateMetaQualitiesPointCost as calculateRawMetaQualitiesPointCost, ARCHETYPES, INTRINSIC_META_QUALITIES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES } from '@/lib/character-definitions';
 
 // Re-export types from character-definitions if they are specific to costs or MQs
@@ -9,7 +10,7 @@ export { calculateRawMetaQualitiesPointCost, ARCHETYPES, INTRINSIC_META_QUALITIE
 
 
 // Calculate Cost of a Single Stat
-export const calculateSingleStatPoints = (stat: StatDetail | undefined, statName?: keyof PageBasicInfo['stats'], discardedAttribute?: DiscardedAttributeType): number => {
+export const calculateSingleStatPoints = (stat: StatDetail | undefined, statName?: keyof PageCharacterData['stats'], discardedAttribute?: DiscardedAttributeType): number => {
   if (!stat || (discardedAttribute && statName === discardedAttribute)) return 0;
   const normalDice = parseInt(stat.dice?.replace('D', ''), 10) || 0;
   const hardDice = parseInt(stat.hardDice?.replace('HD', ''), 10) || 0;
@@ -20,7 +21,7 @@ export const calculateSingleStatPoints = (stat: StatDetail | undefined, statName
 // Calculate Total Stat Cost
 export const calculateTotalStatPoints = (stats: PageCharacterData['stats'], discardedAttribute?: DiscardedAttributeType): number => {
   return Object.entries(stats || {}).reduce((sum, [key, stat]) => {
-    return sum + calculateSingleStatPoints(stat, key as keyof PageBasicInfo['stats'], discardedAttribute);
+    return sum + calculateSingleStatPoints(stat, key as keyof PageCharacterData['stats'], discardedAttribute);
   }, 0);
 };
 
@@ -101,3 +102,4 @@ export const calculateCurrentArchetypeCost = (basicInfo: PageBasicInfo): number 
     ? selectedArchetypeDef.points 
     : calculateRawMetaQualitiesPointCost(basicInfo);
 };
+
