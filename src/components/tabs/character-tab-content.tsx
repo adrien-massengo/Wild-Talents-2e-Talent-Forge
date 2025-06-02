@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { calculateSingleMiracleTotalCost } from "@/lib/cost-calculations";
 
 
 interface CharacterTabContentProps {
@@ -90,38 +91,6 @@ const ALL_STATS_KEYS = statsDefinitions.map(s => s.name);
 
 const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
 
-export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: MiracleDefinition, allPowerQualityDefinitions: ReturnType<typeof getDynamicPowerQualityDefinitions>): number => {
-  const NDice = parseInt(miracle.dice.replace('D', '')) || 0;
-  const HDice = parseInt(miracle.hardDice.replace('HD', '')) || 0;
-  const WDice = parseInt(miracle.wiggleDice.replace('WD', '')) || 0;
-
-  const qualityDef = allPowerQualityDefinitions.find(def => def.key === quality.type);
-  if (!qualityDef) return 0;
-
-  const baseCostFactor = qualityDef.baseCostFactor;
-  let totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
-  let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
-
-  const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
-  
-  const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
-  const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
-
-
-  const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
-  const costHD = HDice * Math.max(0, perHardDieCostFactor);
-
-  const perWiggleDieCostFactor = (baseCostFactor * 4) + effectiveCostModifier;
-  const costWD = WDice * Math.max(0, perWiggleDieCostFactor);
-
-  return costND + costHD + costWD;
-};
-
-export const calculateMiracleTotalCost = (miracle: MiracleDefinition, skills: SkillInstance[]): number => {
-  if (miracle.isMandatory) return 0;
-  const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
-  return miracle.qualities.reduce((sum, quality) => sum + calculateMiracleQualityCost(quality, miracle, dynamicPqDefs), 0);
-};
 
 interface MQCollapsibleProps {
   title: string;
@@ -607,6 +576,8 @@ export function CharacterTabContent({
     
     const gmMaxDice = gmSettings.miracleRestrictions.numericRestrictions.maxDicePerType;
     const gmMaxQualityLevels = gmSettings.miracleRestrictions.numericRestrictions.maxPowerQualityLevels;
+    
+    const miracleCostPerND = miracle.qualities.reduce((sum, quality) => sum + calculateDisplayedNDFactor(quality), 0);
 
     return (
       <>
@@ -669,20 +640,27 @@ export function CharacterTabContent({
             />
           </div>
           
-          <p className="text-sm mt-3 pt-3 border-t border-dashed">
-            <strong>Miracle Quality Cost Factors (per ND):</strong>
-            {miracle.qualities.length > 0 ? (
-              <ul className="list-disc list-inside pl-2 text-xs">
-                {miracle.qualities.map(q => {
-                  const qDef = finalFilteredDynamicPqDefs.find(def => def.key === q.type);
-                  const factor = calculateDisplayedNDFactor(q);
-                  return <li key={`${miracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor}</li>;
-                })}
-              </ul>
-            ) : (
-              <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
-            )}
-          </p>
+          <div className="mt-3 pt-3 border-t border-dashed">
+            <p className="text-sm">
+              <strong>Miracle Quality Cost Factors (per ND):</strong>
+              {miracle.qualities.length > 0 ? (
+                <ul className="list-disc list-inside pl-2 text-xs">
+                  {miracle.qualities.map(q => {
+                    const qDef = finalFilteredDynamicPqDefs.find(def => def.key === q.type);
+                    const factor = calculateDisplayedNDFactor(q);
+                    return <li key={`${miracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor}</li>;
+                  })}
+                </ul>
+              ) : (
+                <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
+              )}
+            </p>
+            <p className="font-semibold mt-1">Miracle Cost per ND: {miracleCostPerND} points</p>
+            <p className="font-semibold mt-1">
+              Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateSingleMiracleTotalCost(miracle, characterData.skills)} points`}
+            </p>
+          </div>
+
 
           <div className="space-y-3 mt-3">
             <div className="flex justify-between items-center">
@@ -854,11 +832,6 @@ export function CharacterTabContent({
               </Card>
             ))}
           </div>
-
-          <p className="font-semibold mt-1">
-            Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
-          </p>
-
            {isIntrinsicMandatedUnremovable &&
               <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
           }
