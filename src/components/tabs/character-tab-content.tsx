@@ -428,6 +428,7 @@ export function CharacterTabContent({
 
   const finalFilteredMiracleTemplates = React.useMemo(() => {
     return initialFilteredMiracleTemplates.filter(template => {
+      // Check if the template itself is directly allowed by GM settings
       const isTemplateDirectlyAllowed = template.definitionId &&
         (gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId] === undefined ||
          gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId]);
@@ -436,7 +437,9 @@ export function CharacterTabContent({
         return false;
       }
   
+      // Check if all constituent qualities of the template are allowed by GM settings
       const allConstituentQualitiesAllowed = template.qualities.every(templateQuality => {
+        // Check against the list of quality types that are *already filtered* by GM settings AND character permissions
         return finalFilteredDynamicPqDefs.some(allowedDef => allowedDef.key === templateQuality.type);
       });
   
@@ -552,16 +555,16 @@ export function CharacterTabContent({
 
   const filteredArchetypes = React.useMemo(() => {
     return ARCHETYPES.filter(arch => {
-      if (arch.id === 'custom') return true; 
-
-      const isArchAllowed = gmSettings.sampleArchetypes[arch.id] === undefined || gmSettings.sampleArchetypes[arch.id];
-      if (!isArchAllowed) return false;
-
-      const sourceMQsAllowed = arch.sourceMQIds.every(mqId => 
+      if (arch.id === 'custom') return true;
+  
+      const isArchAllowedByGMSettings = gmSettings.sampleArchetypes[arch.id] === undefined || gmSettings.sampleArchetypes[arch.id];
+      if (!isArchAllowedByGMSettings) return false;
+  
+      const sourceMQsAllowed = arch.sourceMQIds.every(mqId =>
         gmSettings.metaQualitiesSource[mqId] === undefined || gmSettings.metaQualitiesSource[mqId]
       );
       if (!sourceMQsAllowed) return false;
-
+  
       const permissionMQsAllowed = arch.permissionMQIds.every(mqId =>
         gmSettings.metaQualitiesPermission[mqId] === undefined || gmSettings.metaQualitiesPermission[mqId]
       );
@@ -571,7 +574,7 @@ export function CharacterTabContent({
         gmSettings.metaQualitiesIntrinsic[mqId] === undefined || gmSettings.metaQualitiesIntrinsic[mqId]
       );
       if (!intrinsicMQsAllowed) return false;
-
+  
       return true;
     });
   }, [gmSettings]);
@@ -665,11 +668,6 @@ export function CharacterTabContent({
               className="text-sm"
             />
           </div>
-
-          <p className="font-semibold">
-            Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
-          </p>
-
 
           <div className="space-y-3 mt-3">
             <div className="flex justify-between items-center">
@@ -841,6 +839,26 @@ export function CharacterTabContent({
               </Card>
             ))}
           </div>
+
+          <p className="text-sm mt-3 pt-3 border-t border-dashed">
+            <strong>Miracle Quality Cost Factors (per ND):</strong>
+            {miracle.qualities.length > 0 ? (
+              <ul className="list-disc list-inside pl-2 text-xs">
+                {miracle.qualities.map(q => {
+                  const qDef = finalFilteredDynamicPqDefs.find(def => def.key === q.type);
+                  const factor = calculateDisplayedNDFactor(q);
+                  return <li key={`${miracle.id}-${q.id}-factor`}>{qDef?.label || q.type}: {factor}</li>;
+                })}
+              </ul>
+            ) : (
+              <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
+            )}
+          </p>
+
+          <p className="font-semibold mt-1">
+            Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
+          </p>
+
            {isIntrinsicMandatedUnremovable &&
               <p className="text-xs italic text-muted-foreground mt-3">This miracle is mandated by an archetype intrinsic. Its "Mandatory" status cannot be unchecked, and it cannot be removed directly from this list (its existence is tied to the intrinsic configuration).</p>
           }
@@ -1352,6 +1370,7 @@ export function CharacterTabContent({
     
 
     
+
 
 
 
