@@ -397,7 +397,6 @@ export function CharacterTabContent({
 
   const finalFilteredMiracleTemplates = React.useMemo(() => {
     return initialFilteredMiracleTemplates.filter(template => {
-      // Check if the template itself is directly allowed by GM settings
       const isTemplateDirectlyAllowed = template.definitionId &&
         (gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId] === undefined ||
          gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId]);
@@ -406,9 +405,7 @@ export function CharacterTabContent({
         return false;
       }
   
-      // Check if all constituent qualities of the template are allowed by GM settings
       const allConstituentQualitiesAllowed = template.qualities.every(templateQuality => {
-        // Check against the list of quality types that are *already filtered* by GM settings AND character permissions
         return finalFilteredDynamicPqDefs.some(allowedDef => allowedDef.key === templateQuality.type);
       });
   
@@ -418,13 +415,38 @@ export function CharacterTabContent({
 
 
   const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
-  const onePowerLimitReached = basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
+  
+  const onePowerLimitReached = React.useMemo(() => {
+    const hasOnePowerPermission = basicInfo.selectedPermissionMQIds.includes('one_power');
+    if (!hasOnePowerPermission) {
+      return false; 
+    }
+
+    // If Mystic, their mandatory Cosmic Power counts as their one power.
+    if (basicInfo.selectedArchetypeId === 'mystic') {
+      // Check if the mandatory Cosmic Power exists for the Mystic
+      const mysticHasMandatoryCosmicPower = characterData.miracles.some(m => 
+        m.isMandatory && m.definitionId === 'cosmic_power'
+      );
+      return mysticHasMandatoryCosmicPower; // Limit is reached if their mandatory power is present
+    }
+    
+    // For other cases with "One Power", count non-mandatory miracles.
+    // If they have at least one non-mandatory miracle, the limit is reached.
+    return characterData.miracles.filter(m => !m.isMandatory).length >= 1;
+
+  }, [basicInfo.selectedPermissionMQIds, basicInfo.selectedArchetypeId, characterData.miracles]);
+
 
   const isAddMiracleOverallDisabled = onePowerLimitReached || !canCharacterAddAnyMiracle;
 
   let addMiracleTooltipContent = "";
   if (onePowerLimitReached) {
-      addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1 regular miracle).";
+      if (basicInfo.selectedArchetypeId === 'mystic' && basicInfo.selectedPermissionMQIds.includes('one_power')) {
+        addMiracleTooltipContent = "Cannot add regular miracles; the Mystic's mandatory Cosmic Power fulfills the 'One Power' permission.";
+      } else if (basicInfo.selectedPermissionMQIds.includes('one_power')) {
+        addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1 regular miracle already selected).";
+      }
   } else if (!canCharacterAddAnyMiracle) {
       addMiracleTooltipContent = "No permissions selected that allow adding new miracles or specific miracle qualities.";
   } else if (finalFilteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0) {
@@ -644,7 +666,7 @@ export function CharacterTabContent({
           </div>
           
           <div className="mt-3 pt-3 border-t border-dashed">
-             <div className="text-sm">
+            <div className="text-sm">
               <strong>Miracle Quality Cost Factors (per ND):</strong>
               {miracle.qualities.length > 0 ? (
                 <ul className="list-disc list-inside pl-2 text-xs">
@@ -1339,4 +1361,3 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
-
