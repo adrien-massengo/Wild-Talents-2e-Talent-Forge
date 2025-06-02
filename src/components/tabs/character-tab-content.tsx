@@ -417,7 +417,15 @@ export function CharacterTabContent({
       addMiracleTooltipContent = "No predefined miracle templates match your current permissions. You can still add a custom miracle.";
   }
 
-  const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD') => Array.from({ length: cap + 1 }, (_, i) => `${i}${suffix}`);
+  const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD') => {
+      const options = [];
+      // Ensure 0D is always an option for Normal Dice in Miracles, stats, skills still start from 1D unless specified
+      if (suffix === 'D') options.push('0D'); 
+      for (let i = (suffix === 'D' ? 1 : 0); i <= cap; i++) {
+          options.push(`${i}${suffix}`);
+      }
+      return options;
+  };
 
 
   const getStatDiceLimits = (statName: keyof CharacterData['stats']): { maxNormal: number; maxHDWD: number; showHDWD: boolean } => {
@@ -426,36 +434,28 @@ export function CharacterTabContent({
     const statSetting = basicInfo.inhumanStatsSettings?.[statName];
 
     let maxNormal = 5;
-    let maxHDWD = 0;
-    let showHDWD = false;
+    let maxHDWD = 0; 
+    let showHDWD = hasPeakPerformerPerm || (hasInhumanStatsPerm && statSetting?.condition === 'superior');
+
 
     if (hasInhumanStatsPerm && statSetting) {
         if (statSetting.condition === 'superior') {
             maxNormal = 10;
             maxHDWD = 10;
-            showHDWD = true;
         } else if (statSetting.condition === 'inferior') {
             maxNormal = statSetting.inferiorMaxDice || 4;
-            if (hasPeakPerformerPerm) {
-                maxHDWD = Math.min(5, maxNormal); // Peak performer HD/WD can't exceed inferior cap, nor 5
-                showHDWD = true;
-            }
-        } else { // normal condition with inhuman_stats (should not typically happen if properly managed)
+            maxHDWD = hasPeakPerformerPerm ? Math.min(maxNormal, 5) : 0;
+        } else { // normal condition under inhuman_stats (usually means default 5D)
             maxNormal = 5;
-            if (hasPeakPerformerPerm) {
-                maxHDWD = 5;
-                showHDWD = true;
-            }
+            maxHDWD = hasPeakPerformerPerm ? 5 : 0;
         }
     } else if (hasPeakPerformerPerm) { // No Inhuman Stats, but has Peak Performer
         maxNormal = 5;
         maxHDWD = 5;
-        showHDWD = true;
-    } else { // No relevant permissions
-        maxNormal = 5;
-        maxHDWD = 0;
-        showHDWD = false;
     }
+    // If showHDWD is false, effectively cap maxHDWD to 0 for generation purposes
+    if (!showHDWD) maxHDWD = 0;
+
     return { maxNormal, maxHDWD, showHDWD };
   };
   
@@ -463,23 +463,17 @@ export function CharacterTabContent({
     const linkedStatLimits = getStatDiceLimits(linkedAttribute);
     const hasPeakPerformerPerm = basicInfo.selectedPermissionMQIds.includes('peak_performer');
     
-    // Skill Normal Dice are capped by the linked attribute's maxNormal.
-    // Skill HD/WD are only shown if Peak Performer is active.
-    // Skill HD/WD max is the *lesser* of the linked attribute's maxHDWD (if superior) OR Peak Performer's cap (5),
-    // but also cannot exceed the skill's normal dice cap (which is linked attribute's normal dice cap).
-    
     const skillMaxNormal = linkedStatLimits.maxNormal;
     let skillMaxHDWD = 0;
-    let skillShowHDWD = false;
+    let skillShowHDWD = hasPeakPerformerPerm;
 
     if (hasPeakPerformerPerm) {
-        skillShowHDWD = true;
-        // If linked stat is superior, it can go up to its max (10), otherwise capped at 5 by Peak Performer.
-        // And it can't exceed the skill's own normal dice cap.
         const peakPerformerCap = 5;
-        const inhumanSuperiorCap = (basicInfo.inhumanStatsSettings?.[linkedAttribute]?.condition === 'superior') ? linkedStatLimits.maxHDWD : peakPerformerCap;
-        skillMaxHDWD = Math.min(skillMaxNormal, inhumanSuperiorCap);
+        // HD/WD for skills under Peak Performer is capped at 5, OR by the linked attribute's own HD/WD cap if that's lower (e.g. inferior stat)
+        // It also cannot exceed the skill's normal dice cap.
+        skillMaxHDWD = Math.min(skillMaxNormal, peakPerformerCap, linkedStatLimits.maxHDWD > 0 ? linkedStatLimits.maxHDWD : peakPerformerCap );
     }
+    if (!skillShowHDWD) skillMaxHDWD = 0;
     
     return { maxNormal: skillMaxNormal, maxHDWD: skillMaxHDWD, showHDWD: skillShowHDWD };
   };
@@ -666,24 +660,31 @@ export function CharacterTabContent({
                 {/* Extras Section */}
                 <div className="mt-3 pt-2 border-t border-dashed">
                   <Label className="text-xs font-semibold">Extras</Label>
-                  {quality.extras.map(extra => (
-                    <div key={extra.id} className="flex items-center space-x-2 my-1 text-xs p-1 bg-primary/10 rounded-md">
-                      {extra.isCustom ? (
-                        <>
-                          <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
-                          <Input
-                            type="number"
-                            value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? String(extra.costModifier) : ''}
-                            onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
-                            className="w-16 h-7 text-xs" placeholder="Cost"
-                          />
-                        </>
-                      ) : (
-                        <span className="flex-grow">{extra.name} ({extra.costModifier > 0 ? '+' : ''}{extra.costModifier})</span>
+                  {quality.extras.map(extra => {
+                    const definition = !extra.isCustom && PREDEFINED_EXTRAS.find(def => def.id === extra.definitionId);
+                    return (
+                    <div key={extra.id} className="my-1 text-xs p-1 bg-primary/10 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        {extra.isCustom ? (
+                          <>
+                            <Input value={extra.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra Name" className="flex-grow h-7 text-xs"/>
+                            <Input
+                              type="number"
+                              value={(typeof extra.costModifier === 'number' && !isNaN(extra.costModifier)) ? String(extra.costModifier) : ''}
+                              onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)}
+                              className="w-16 h-7 text-xs" placeholder="Cost"
+                            />
+                          </>
+                        ) : (
+                          <span className="flex-grow">{extra.name} ({extra.costModifier > 0 ? '+' : ''}{extra.costModifier})</span>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'extra', extra.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                      </div>
+                      {definition && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{definition.description}</p>
                       )}
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'extra', extra.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                     </div>
-                  ))}
+                  )})}
                   <div className="flex items-end space-x-1 mt-1">
                       <Select
                           value={selectedExtraToAdd[quality.id] || ""}
@@ -706,24 +707,31 @@ export function CharacterTabContent({
                 {/* Flaws Section */}
                 <div className="mt-3 pt-2 border-t border-dashed">
                   <Label className="text-xs font-semibold">Flaws</Label>
-                   {quality.flaws.map(flaw => (
-                    <div key={flaw.id} className="flex items-center space-x-2 my-1 text-xs p-1 bg-destructive/10 rounded-md">
-                      {flaw.isCustom ? (
-                        <>
-                          <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
-                          <Input
-                            type="number"
-                            value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? String(flaw.costModifier) : ''}
-                            onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
-                            className="w-16 h-7 text-xs" placeholder="Cost"
-                          />
-                        </>
-                      ) : (
-                        <span className="flex-grow">{flaw.name} ({flaw.costModifier})</span>
+                   {quality.flaws.map(flaw => {
+                    const definition = !flaw.isCustom && PREDEFINED_FLAWS.find(def => def.id === flaw.definitionId);
+                    return (
+                    <div key={flaw.id} className="my-1 text-xs p-1 bg-destructive/10 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        {flaw.isCustom ? (
+                          <>
+                            <Input value={flaw.name} onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw Name" className="flex-grow h-7 text-xs"/>
+                            <Input
+                              type="number"
+                              value={(typeof flaw.costModifier === 'number' && !isNaN(flaw.costModifier)) ? String(flaw.costModifier) : ''}
+                              onChange={e => onExtraOrFlawChange(miracle.id, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)}
+                              className="w-16 h-7 text-xs" placeholder="Cost"
+                            />
+                          </>
+                        ) : (
+                          <span className="flex-grow">{flaw.name} ({flaw.costModifier})</span>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'flaw', flaw.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
+                      </div>
+                      {definition && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{definition.description}</p>
                       )}
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveExtraOrFlawFromQuality(miracle.id, quality.id, 'flaw', flaw.id)}><Trash2 className="h-3 w-3 text-destructive"/></Button>
                     </div>
-                  ))}
+                  )})}
                    <div className="flex items-end space-x-1 mt-1">
                       <Select
                           value={selectedFlawToAdd[quality.id] || ""}
@@ -1247,5 +1255,7 @@ export function CharacterTabContent({
 
     
 
+
+    
 
     
