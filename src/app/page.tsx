@@ -172,12 +172,31 @@ export default function HomePage() {
   const { toast } = useToast();
 
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
-    setCharacterData(prev => {
-      const previousArchetypeId = prev.basicInfo.selectedArchetypeId;
-      let newBasicInfo = { ...prev.basicInfo, [field]: value };
-      let newWillpower = { ...prev.willpower };
-      let updatedMiracles = [...prev.miracles];
-      let newInhumanStatsSettings = prev.basicInfo.inhumanStatsSettings || 
+    const prev = characterData; // Use current state for checks
+    const previousArchetypeId = prev.basicInfo.selectedArchetypeId;
+
+    if (field === 'selectedArchetypeId') {
+        const newArchetypeDef = ARCHETYPES.find(arch => arch.id === value);
+        if (newArchetypeDef && newArchetypeDef.id !== 'custom' && prev.archetypePointLimit !== undefined && newArchetypeDef.points > prev.archetypePointLimit) {
+            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef.name}. Its cost (${newArchetypeDef.points}) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+            return; 
+        }
+        
+        let tempNewBasicInfo = { ...prev.basicInfo, [field]: value };
+        if (newArchetypeDef && value === 'custom') {
+            const currentCustomCost = calculateCurrentArchetypeCost(tempNewBasicInfo);
+            if (prev.archetypePointLimit !== undefined && currentCustomCost > prev.archetypePointLimit) {
+                 toast({ title: "Archetype Limit Exceeded", description: `Changing to Custom Archetype with current Meta-Qualities (${currentCustomCost}pts) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}. Adjust Meta-Qualities first.`, variant: "destructive" });
+                 return;
+            }
+        }
+    }
+
+    setCharacterData(current => { // current is the latest state from React
+      let newBasicInfo = { ...current.basicInfo, [field]: value };
+      let newWillpower = { ...current.willpower };
+      let updatedMiracles = [...current.miracles];
+      let newInhumanStatsSettings = current.basicInfo.inhumanStatsSettings || 
         ALL_STATS.reduce((acc, statName) => {
             acc[statName] = { condition: 'normal' };
             return acc;
@@ -185,23 +204,7 @@ export default function HomePage() {
 
       if (field === 'selectedArchetypeId') {
         const newArchetypeDef = ARCHETYPES.find(arch => arch.id === value);
-        
-        // Check Archetype Point Limit
-        if (newArchetypeDef && newArchetypeDef.id !== 'custom' && prev.archetypePointLimit !== undefined && newArchetypeDef.points > prev.archetypePointLimit) {
-            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef.name}. Its cost (${newArchetypeDef.points}) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
-            return prev; // Revert change
-        }
-        // Also, if changing to 'custom', the cost will be calculated from MQs, so check that below.
-         if (newArchetypeDef && value === 'custom') {
-            // For custom, the cost is MQs. We need to ensure current MQs don't exceed limit.
-            const currentCustomCost = calculateCurrentArchetypeCost(newBasicInfo); // basicInfo with new 'custom' archetypeId
-            if (prev.archetypePointLimit !== undefined && currentCustomCost > prev.archetypePointLimit) {
-                 toast({ title: "Archetype Limit Exceeded", description: `Changing to Custom Archetype with current Meta-Qualities (${currentCustomCost}pts) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}. Adjust Meta-Qualities first.`, variant: "destructive" });
-                 return prev;
-            }
-        }
-
-
+        // Cost checks already done outside setCharacterData, so we proceed with updates
         if (previousArchetypeId === 'godlike_talent' && value !== 'godlike_talent') {
           updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
         }
@@ -226,11 +229,11 @@ export default function HomePage() {
           newBasicInfo.selectedIntrinsicMQIds = newArchetypeDef.intrinsicMQIds || [];
           
           const currentIntrinsicConfigs = {
-            intrinsicAllergyConfig: { ...prev.basicInfo.intrinsicAllergyConfig },
-            intrinsicBruteFrailConfig: { ...prev.basicInfo.intrinsicBruteFrailConfig },
-            intrinsicCustomStatsConfig: { ...prev.basicInfo.intrinsicCustomStatsConfig },
-            intrinsicMandatoryPowerConfig: { ...prev.basicInfo.intrinsicMandatoryPowerConfig },
-            intrinsicVulnerableConfig: { ...prev.basicInfo.intrinsicVulnerableConfig },
+            intrinsicAllergyConfig: { ...current.basicInfo.intrinsicAllergyConfig },
+            intrinsicBruteFrailConfig: { ...current.basicInfo.intrinsicBruteFrailConfig },
+            intrinsicCustomStatsConfig: { ...current.basicInfo.intrinsicCustomStatsConfig },
+            intrinsicMandatoryPowerConfig: { ...current.basicInfo.intrinsicMandatoryPowerConfig },
+            intrinsicVulnerableConfig: { ...current.basicInfo.intrinsicVulnerableConfig },
           };
           
           newBasicInfo.intrinsicAllergyConfig = {};
@@ -252,7 +255,15 @@ export default function HomePage() {
                  if (intrinsicDef.id === 'mandatory_power') {
                     const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (newArchetypeDef.mandatoryPowerText ? 1 : 0);
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
-                    updatedMiracles = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value) as MiracleDefinition[];
+                    // This handleMetaQualityConfigChange might need to be refactored if it calls toast
+                    // For now, assuming it returns updatedMiracles directly or is safe
+                    const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value, current);
+                    if (Array.isArray(result)) {
+                        updatedMiracles = result;
+                    } else {
+                        // This case should not happen if calledFromArchetypeChange is true
+                        return result; // this would be a full CharacterData, not right for this flow.
+                    }
                 }
             }
           });
@@ -261,15 +272,14 @@ export default function HomePage() {
                     acc[statName] = { condition: 'normal' };
                     return acc;
                 }, {} as InhumanStatsSettings);
-            } else if (!prev.basicInfo.selectedPermissionMQIds.includes('inhuman_stats') && newBasicInfo.selectedPermissionMQIds.includes('inhuman_stats')) {
-                 newInhumanStatsSettings = prev.basicInfo.inhumanStatsSettings && Object.keys(prev.basicInfo.inhumanStatsSettings).length > 0
-                    ? prev.basicInfo.inhumanStatsSettings
+            } else if (!current.basicInfo.selectedPermissionMQIds.includes('inhuman_stats') && newBasicInfo.selectedPermissionMQIds.includes('inhuman_stats')) {
+                 newInhumanStatsSettings = current.basicInfo.inhumanStatsSettings && Object.keys(current.basicInfo.inhumanStatsSettings).length > 0
+                    ? current.basicInfo.inhumanStatsSettings
                     : ALL_STATS.reduce((acc, statName) => {
                           acc[statName] = { condition: 'normal' };
                           return acc;
                       }, {} as InhumanStatsSettings);
             }
-
           
           if (newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
             newWillpower.purchasedBaseWill = 0;
@@ -279,7 +289,7 @@ export default function HomePage() {
           }
         } 
       }
-      return { ...prev, basicInfo: {...newBasicInfo, inhumanStatsSettings: newInhumanStatsSettings }, willpower: newWillpower, miracles: updatedMiracles };
+      return { ...current, basicInfo: {...newBasicInfo, inhumanStatsSettings: newInhumanStatsSettings }, willpower: newWillpower, miracles: updatedMiracles };
     });
   };
   
@@ -324,36 +334,36 @@ export default function HomePage() {
     mqId: string,
     isSelected: boolean
   ) => {
-    setCharacterData(prev => {
-      const tempBasicInfo = { ...prev.basicInfo };
-      let currentSelection: string[] = [];
+    const prev = characterData; // Use current state for checks
+    const tempBasicInfoForCostCheck = JSON.parse(JSON.stringify(prev.basicInfo)); // Deep clone for simulation
 
-      if (mqType === 'source') currentSelection = [...tempBasicInfo.selectedSourceMQIds];
-      else if (mqType === 'permission') currentSelection = [...tempBasicInfo.selectedPermissionMQIds];
-      else if (mqType === 'intrinsic') currentSelection = [...tempBasicInfo.selectedIntrinsicMQIds];
+    let currentSelection: string[] = [];
+    if (mqType === 'source') currentSelection = [...tempBasicInfoForCostCheck.selectedSourceMQIds];
+    else if (mqType === 'permission') currentSelection = [...tempBasicInfoForCostCheck.selectedPermissionMQIds];
+    else if (mqType === 'intrinsic') currentSelection = [...tempBasicInfoForCostCheck.selectedIntrinsicMQIds];
 
-      if (isSelected) {
-        if (!currentSelection.includes(mqId)) currentSelection.push(mqId);
-      } else {
-        currentSelection = currentSelection.filter(id => id !== mqId);
-      }
-      
-      if (mqType === 'source') tempBasicInfo.selectedSourceMQIds = currentSelection;
-      else if (mqType === 'permission') tempBasicInfo.selectedPermissionMQIds = currentSelection;
-      else if (mqType === 'intrinsic') tempBasicInfo.selectedIntrinsicMQIds = currentSelection;
-      tempBasicInfo.selectedArchetypeId = 'custom'; // Changing MQs always results in a custom archetype
+    if (isSelected) {
+      if (!currentSelection.includes(mqId)) currentSelection.push(mqId);
+    } else {
+      currentSelection = currentSelection.filter(id => id !== mqId);
+    }
+    
+    if (mqType === 'source') tempBasicInfoForCostCheck.selectedSourceMQIds = currentSelection;
+    else if (mqType === 'permission') tempBasicInfoForCostCheck.selectedPermissionMQIds = currentSelection;
+    else if (mqType === 'intrinsic') tempBasicInfoForCostCheck.selectedIntrinsicMQIds = currentSelection;
+    tempBasicInfoForCostCheck.selectedArchetypeId = 'custom'; 
 
-      const potentialArchetypeCost = calculateCurrentArchetypeCost(tempBasicInfo);
-      if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
-        toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality change would make the custom archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
-        return prev; // Revert
-      }
-
-      // If cost is fine, proceed with actual update
-      const newBasicInfo = { ...prev.basicInfo };
+    const potentialArchetypeCost = calculateCurrentArchetypeCost(tempBasicInfoForCostCheck);
+    if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
+      toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality change would make the custom archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+      return; 
+    }
+    
+    setCharacterData(current => { // current is the latest state
+      const newBasicInfo = { ...current.basicInfo };
       let currentActualSelection: string[] = [];
-      let newWillpower = { ...prev.willpower };
-      let newInhumanStatsSettings = prev.basicInfo.inhumanStatsSettings || 
+      let newWillpower = { ...current.willpower };
+      let newInhumanStatsSettings = current.basicInfo.inhumanStatsSettings || 
         ALL_STATS.reduce((acc, statName) => {
             acc[statName] = { condition: 'normal' };
             return acc;
@@ -363,14 +373,16 @@ export default function HomePage() {
       else if (mqType === 'permission') currentActualSelection = [...newBasicInfo.selectedPermissionMQIds];
       else if (mqType === 'intrinsic') currentActualSelection = [...newBasicInfo.selectedIntrinsicMQIds];
 
-      let updatedMiracles = [...prev.miracles];
+      let updatedMiracles = [...current.miracles];
 
       if (isSelected) {
         if (!currentActualSelection.includes(mqId)) {
           currentActualSelection.push(mqId);
            if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
-                updatedMiracles = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId) as MiracleDefinition[];
+                // This handleMetaQualityConfigChange call needs to be carefully reviewed
+                const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
+                if(Array.isArray(result)) updatedMiracles = result; else return result;
            }
            if (mqType === 'intrinsic' && mqId === 'no_base_will') {
               newWillpower.purchasedBaseWill = 0;
@@ -395,7 +407,8 @@ export default function HomePage() {
                  // @ts-ignore
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
                  if (intrinsicDef.id === 'mandatory_power') {
-                    updatedMiracles = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, false, newBasicInfo.selectedArchetypeId) as MiracleDefinition[];
+                    const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
+                    if(Array.isArray(result)) updatedMiracles = result; else return result;
                 }
             }
             if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
@@ -403,7 +416,7 @@ export default function HomePage() {
             } else if (mqId === 'no_willpower' && newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')){
                  newWillpower.purchasedWill = 0; 
             }
-            if (newBasicInfo.selectedArchetypeId === 'godlike_talent' && mqId === 'mandatory_power') { // This check seems redundant as archetype becomes custom
+            if (newBasicInfo.selectedArchetypeId === 'godlike_talent' && mqId === 'mandatory_power') {
                 updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
             }
         }
@@ -421,7 +434,7 @@ export default function HomePage() {
       
       newBasicInfo.selectedArchetypeId = 'custom';
 
-      return { ...prev, basicInfo: {...newBasicInfo, inhumanStatsSettings: newInhumanStatsSettings }, willpower: newWillpower, miracles: updatedMiracles };
+      return { ...current, basicInfo: {...newBasicInfo, inhumanStatsSettings: newInhumanStatsSettings }, willpower: newWillpower, miracles: updatedMiracles };
     });
   };
   
@@ -432,57 +445,124 @@ export default function HomePage() {
     valueOrSubField: any, 
     currentMiraclesParam?: MiracleDefinition[],
     calledFromArchetypeChange?: boolean,
-    archetypeIdForContext?: string
-  ): MiracleDefinition[] | CharacterData => {
-    let finalMiracles: MiracleDefinition[] | undefined = undefined;
-
-    setCharacterData(prev => {
-        // Create a temporary newBasicInfo to calculate potential cost for intrinsics
-        const tempNewBasicInfo = JSON.parse(JSON.stringify(prev.basicInfo)); // Deep clone
-        if (configKey !== 'inhumanStatsSettings') {
+    archetypeIdForContext?: string,
+    currentStateForCheck?: CharacterData // Pass current state for checks
+  ): MiracleDefinition[] | CharacterData => { // Return type signature changed
+    
+    const stateForChecks = currentStateForCheck || characterData;
+    const tempNewBasicInfoForCostCheck = JSON.parse(JSON.stringify(stateForChecks.basicInfo)); 
+    if (configKey !== 'inhumanStatsSettings') {
+        // @ts-ignore
+        tempNewBasicInfoForCostCheck[configKey] = {
             // @ts-ignore
-            tempNewBasicInfo[configKey] = {
+            ...(stateForChecks.basicInfo[configKey] || {}),
+            [metaQualityId]: {
                 // @ts-ignore
-                ...(prev.basicInfo[configKey] || {}),
-                [metaQualityId]: {
-                    // @ts-ignore
-                    ...(prev.basicInfo[configKey]?.[metaQualityId] || {}),
-                    [fieldOrStatName]: valueOrSubField,
-                }
-            };
-        } else { // For inhumanStatsSettings
-            const statName = fieldOrStatName as keyof CharacterData['stats'];
-            const { field: subField, value: subValue } = valueOrSubField as { field: keyof InhumanStatSetting, value: any };
-            tempNewBasicInfo.inhumanStatsSettings = {
-                ...(tempNewBasicInfo.inhumanStatsSettings || {}),
-                [statName]: {
-                    ...(tempNewBasicInfo.inhumanStatsSettings?.[statName] || { condition: 'normal' }),
-                    [subField]: subValue,
-                }
-            };
-            if (subField === 'condition' && subValue !== 'inferior') { // @ts-ignore
-                delete tempNewBasicInfo.inhumanStatsSettings[statName].inferiorMaxDice;
+                ...(stateForChecks.basicInfo[configKey]?.[metaQualityId] || {}),
+                [fieldOrStatName]: valueOrSubField,
             }
-            if (subField === 'condition' && subValue === 'inferior' && !tempNewBasicInfo.inhumanStatsSettings?.[statName]?.inferiorMaxDice) { // @ts-ignore
-                tempNewBasicInfo.inhumanStatsSettings[statName].inferiorMaxDice = 4;
+        };
+    } else { 
+        const statName = fieldOrStatName as keyof CharacterData['stats'];
+        const { field: subField, value: subValue } = valueOrSubField as { field: keyof InhumanStatSetting, value: any };
+        tempNewBasicInfoForCostCheck.inhumanStatsSettings = {
+            ...(tempNewBasicInfoForCostCheck.inhumanStatsSettings || {}),
+            [statName]: {
+                ...(tempNewBasicInfoForCostCheck.inhumanStatsSettings?.[statName] || { condition: 'normal' }),
+                [subField]: subValue,
             }
+        };
+        if (subField === 'condition' && subValue !== 'inferior') { // @ts-ignore
+            delete tempNewBasicInfoForCostCheck.inhumanStatsSettings[statName].inferiorMaxDice;
         }
-        
-        // If this MQ change makes the archetype custom, check its cost
-        const archetypeIdForCostCheck = calledFromArchetypeChange ? archetypeIdForContext : 'custom';
-        const basicInfoForCostCheck = { ...tempNewBasicInfo, selectedArchetypeId: archetypeIdForCostCheck };
-        
-        const potentialArchetypeCost = calculateCurrentArchetypeCost(basicInfoForCostCheck);
-
-        if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
-            toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality configuration change would make the archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
-            if (calledFromArchetypeChange && finalMiracles) return finalMiracles; // Special handling for archetype change
-            return prev; // Revert
+        if (subField === 'condition' && subValue === 'inferior' && !tempNewBasicInfoForCostCheck.inhumanStatsSettings?.[statName]?.inferiorMaxDice) { // @ts-ignore
+            tempNewBasicInfoForCostCheck.inhumanStatsSettings[statName].inferiorMaxDice = 4;
         }
+    }
+    
+    const archetypeIdForCostCheck = calledFromArchetypeChange ? archetypeIdForContext : 'custom';
+    const basicInfoForCostCheck = { ...tempNewBasicInfoForCostCheck, selectedArchetypeId: archetypeIdForCostCheck };
+    const potentialArchetypeCost = calculateCurrentArchetypeCost(basicInfoForCostCheck);
 
+    if (stateForChecks.archetypePointLimit !== undefined && potentialArchetypeCost > stateForChecks.archetypePointLimit) {
+        toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality configuration change would make the archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${stateForChecks.archetypePointLimit}.`, variant: "destructive" });
+        // If called from archetype change, we need to return the miracles as they were to avoid state issues.
+        // Otherwise, we return the original state to prevent the change.
+        return calledFromArchetypeChange ? (currentMiraclesParam || stateForChecks.miracles) : stateForChecks;
+    }
 
-        // If cost is fine, proceed with actual update
-        const miraclesToUpdate = currentMiraclesParam || prev.miracles;
+    // If we are here, the cost check passed or it's a call from archetype change that needs to proceed.
+    // The actual setCharacterData will happen outside if not calledFromArchetypeChange.
+    // If calledFromArchetypeChange, it's part of a larger setCharacterData update, so we compute new miracles.
+
+    let updatedMiracles = [...(currentMiraclesParam || stateForChecks.miracles)];
+
+    if (configKey === 'intrinsicMandatoryPowerConfig' && fieldOrStatName === 'count') {
+      const newCount = Math.max(0, Number(valueOrSubField) || 0);
+      const currentArchetypeForContext = archetypeIdForContext || stateForChecks.basicInfo.selectedArchetypeId;
+      
+      const mandatoryMiraclesForThisIntrinsic = updatedMiracles.filter(m => 
+        m.isMandatory && 
+        (
+          m.definitionId?.startsWith(`archetype-mandatory-${metaQualityId}-`) || 
+          (currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power')
+        )
+      );
+      const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
+
+      if (difference > 0) { 
+          for (let i = 0; i < difference; i++) {
+              let newMandatoryMiracle: MiracleDefinition | undefined = undefined;
+              if (currentArchetypeForContext === 'godlike_talent' && metaQualityId === 'mandatory_power') {
+                  const pgtExists = updatedMiracles.some(m => m.definitionId === 'perceive_godlike_talents' && m.isMandatory);
+                  if (!pgtExists) { 
+                    const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'perceive_godlike_talents');
+                    if (template) {
+                        newMandatoryMiracle = {
+                            ...template, 
+                            id: `miracle-arch-mandatory-pgt-${Date.now()}-${i}`,
+                            dice: '0D', hardDice: '2HD', wiggleDice: '0WD',
+                            qualities: template.qualities.map(tq => ({ 
+                              ...tq, id: `quality-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                              extras: tq.extras.map(tex => ({ ...tex, id: `extra-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`})),
+                              flaws: tq.flaws.map(tfl => ({ ...tfl, id: `flaw-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`})),
+                            })), isCustom: false, isMandatory: true,
+                        };
+                    }
+                  }
+              }
+              if (!newMandatoryMiracle) { 
+                  newMandatoryMiracle = {
+                      id: `miracle-archetype-mandatory-${metaQualityId}-${Date.now()}-${i}`,
+                      definitionId: `archetype-mandatory-${metaQualityId}-${Date.now()}-${i}`, 
+                      name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===metaQualityId)?.label || 'Intrinsic'})`,
+                      dice: '1D', hardDice: '0HD', wiggleDice: '0WD', qualities: [],
+                      description: `This power is mandated by the ${INTRINSIC_META_QUALITIES.find(imq=>imq.id===metaQualityId)?.label || 'selected'} intrinsic.`,
+                      isCustom: true, isMandatory: true,
+                  };
+              }
+              if (newMandatoryMiracle) updatedMiracles.push(newMandatoryMiracle);
+          }
+      } else if (difference < 0) { 
+          const miraclesToRemoveCount = Math.abs(difference);
+          let removedCount = 0;
+          updatedMiracles = updatedMiracles.filter(m => {
+              const isPGTForGodlike = currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power';
+              const isGenericMandatoryForIntrinsic = m.definitionId?.startsWith(`archetype-mandatory-${metaQualityId}-`);
+              if (m.isMandatory && (isPGTForGodlike || isGenericMandatoryForIntrinsic) && removedCount < miraclesToRemoveCount) {
+                  removedCount++; return false; 
+              }
+              return true; 
+          });
+      }
+    }
+
+    if (calledFromArchetypeChange) {
+        return updatedMiracles; // Return only miracles for archetype change context
+    }
+
+    // For direct calls, setCharacterData
+    setCharacterData(prev => {
         const newBasicInfo = { ...prev.basicInfo };
         let inhumanStatsUpdate = false;
 
@@ -516,100 +596,9 @@ export default function HomePage() {
                }
              };
         }
-
-
-      let updatedMiracles = [...miraclesToUpdate];
-
-      if (configKey === 'intrinsicMandatoryPowerConfig' && fieldOrStatName === 'count') {
-          const newCount = Math.max(0, Number(valueOrSubField) || 0);
-          const currentArchetypeForContext = archetypeIdForContext || prev.basicInfo.selectedArchetypeId;
-          
-          const mandatoryMiraclesForThisIntrinsic = updatedMiracles.filter(m => 
-            m.isMandatory && 
-            (
-              m.definitionId?.startsWith(`archetype-mandatory-${metaQualityId}-`) || 
-              (currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power')
-            )
-          );
-
-          const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
-
-          if (difference > 0) { 
-              for (let i = 0; i < difference; i++) {
-                  let newMandatoryMiracle: MiracleDefinition | undefined = undefined;
-                  
-                  if (currentArchetypeForContext === 'godlike_talent' && metaQualityId === 'mandatory_power') {
-                      const pgtExists = updatedMiracles.some(m => m.definitionId === 'perceive_godlike_talents' && m.isMandatory);
-                      if (!pgtExists) { 
-                        const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'perceive_godlike_talents');
-                        if (template) {
-                            newMandatoryMiracle = {
-                                ...template, 
-                                id: `miracle-arch-mandatory-pgt-${Date.now()}-${i}`,
-                                dice: '0D', 
-                                hardDice: '2HD', 
-                                wiggleDice: '0WD',
-                                qualities: template.qualities.map(tq => ({ 
-                                  ...tq,
-                                  id: `quality-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
-                                  extras: tq.extras.map(tex => ({
-                                    ...tex,
-                                    id: `extra-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
-                                  })),
-                                  flaws: tq.flaws.map(tfl => ({
-                                    ...tfl,
-                                    id: `flaw-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
-                                  })),
-                                })),
-                                isCustom: false, 
-                                isMandatory: true,
-                            };
-                        }
-                      }
-                  }
-                  
-                  if (!newMandatoryMiracle) { 
-                      newMandatoryMiracle = {
-                          id: `miracle-archetype-mandatory-${metaQualityId}-${Date.now()}-${i}`,
-                          definitionId: `archetype-mandatory-${metaQualityId}-${Date.now()}-${i}`, 
-                          name: `Mandatory Power (${INTRINSIC_META_QUALITIES.find(imq=>imq.id===metaQualityId)?.label || 'Intrinsic'})`,
-                          dice: '1D',
-                          hardDice: '0HD',
-                          wiggleDice: '0WD',
-                          qualities: [],
-                          description: `This power is mandated by the ${INTRINSIC_META_QUALITIES.find(imq=>imq.id===metaQualityId)?.label || 'selected'} intrinsic.`,
-                          isCustom: true, 
-                          isMandatory: true,
-                      };
-                  }
-                  if (newMandatoryMiracle) { 
-                    updatedMiracles.push(newMandatoryMiracle);
-                  }
-              }
-          } else if (difference < 0) { 
-              const miraclesToRemoveCount = Math.abs(difference);
-              let removedCount = 0;
-              updatedMiracles = updatedMiracles.filter(m => {
-                  const isPGTForGodlike = currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power';
-                  const isGenericMandatoryForIntrinsic = m.definitionId?.startsWith(`archetype-mandatory-${metaQualityId}-`);
-
-                  if (m.isMandatory && (isPGTForGodlike || isGenericMandatoryForIntrinsic) && removedCount < miraclesToRemoveCount) {
-                      removedCount++;
-                      return false; 
-                  }
-                  return true; 
-              });
-          }
-          finalMiracles = updatedMiracles;
-          if (calledFromArchetypeChange) return prev; 
-          return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
-      }
-      finalMiracles = updatedMiracles; 
-      if (calledFromArchetypeChange) return prev;
-      return { ...prev, basicInfo: newBasicInfo, miracles: inhumanStatsUpdate ? prev.miracles : updatedMiracles };
+        return { ...prev, basicInfo: newBasicInfo, miracles: inhumanStatsUpdate ? prev.miracles : updatedMiracles };
     });
-
-    return finalMiracles || []; 
+    return []; // Should not be used by caller if not from archetype change
   };
 
 
@@ -618,72 +607,77 @@ export default function HomePage() {
     dieType: keyof StatDetail,
     value: string
   ) => {
-    setCharacterData(prev => {
-      const discardedAttr = getDiscardedAttributeFromBasicInfo(prev.basicInfo);
-      const currentTotalStatCost = calculateTotalStatPoints(prev.stats, discardedAttr);
-      const costOfStatBeingChanged = calculateSingleStatPoints(prev.stats[statName], statName, discardedAttr);
-      
-      const potentialNewStatDetail = { ...prev.stats[statName], [dieType]: value };
-      const costOfPotentialNewStat = calculateSingleStatPoints(potentialNewStatDetail, statName, discardedAttr);
-      
-      const potentialNewTotalStatCost = currentTotalStatCost - costOfStatBeingChanged + costOfPotentialNewStat;
+    const prev = characterData; // Use current state for checks
+    const discardedAttr = getDiscardedAttributeFromBasicInfo(prev.basicInfo);
+    const currentTotalStatCost = calculateTotalStatPoints(prev.stats, discardedAttr);
+    const costOfStatBeingChanged = calculateSingleStatPoints(prev.stats[statName], statName, discardedAttr);
+    
+    const potentialNewStatDetail = { ...prev.stats[statName], [dieType]: value };
+    const costOfPotentialNewStat = calculateSingleStatPoints(potentialNewStatDetail, statName, discardedAttr);
+    
+    const potentialNewTotalStatCost = currentTotalStatCost - costOfStatBeingChanged + costOfPotentialNewStat;
 
-      if (prev.statPointLimit !== undefined && potentialNewTotalStatCost > prev.statPointLimit) {
-        toast({ title: "Stat Limit Exceeded", description: `Changing ${statName} would make total stat cost ${potentialNewTotalStatCost}pts, exceeding the limit of ${prev.statPointLimit}.`, variant: "destructive" });
-        return prev;
-      }
+    if (prev.statPointLimit !== undefined && potentialNewTotalStatCost > prev.statPointLimit) {
+      toast({ title: "Stat Limit Exceeded", description: `Changing ${statName} would make total stat cost ${potentialNewTotalStatCost}pts, exceeding the limit of ${prev.statPointLimit}.`, variant: "destructive" });
+      return; 
+    }
 
-      return {
-        ...prev,
-        stats: {
-          ...prev.stats,
-          [statName]: potentialNewStatDetail,
-        },
-      };
-    });
+    setCharacterData(current => ({ // current is latest state
+      ...current,
+      stats: {
+        ...current.stats,
+        [statName]: { ...current.stats[statName], [dieType]: value },
+      },
+    }));
   };
 
   const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
-    setCharacterData(prev => {
-      const hasNoBaseWillIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
-      const hasNoWillpowerIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
-      let processedValue = isNaN(value) ? 0 : Math.max(0, value);
+    const prev = characterData; // Use current state for checks
+    const hasNoBaseWillIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
+    const hasNoWillpowerIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
+    let processedValue = isNaN(value) ? 0 : Math.max(0, value);
 
-      if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) processedValue = 0;
-      if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) processedValue = 0;
+    if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) processedValue = 0;
+    if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) processedValue = 0;
 
-      const tempWillpower = { ...prev.willpower, [field]: processedValue };
-      const potentialWillpowerCost = calculateTotalWillpowerPoints(
-        tempWillpower.purchasedBaseWill,
-        tempWillpower.purchasedWill,
-        hasNoBaseWillIntrinsic,
-        hasNoWillpowerIntrinsic
-      );
+    const tempWillpowerForCheck = { ...prev.willpower, [field]: processedValue };
+    const potentialWillpowerCost = calculateTotalWillpowerPoints(
+      tempWillpowerForCheck.purchasedBaseWill,
+      tempWillpowerForCheck.purchasedWill,
+      hasNoBaseWillIntrinsic,
+      hasNoWillpowerIntrinsic
+    );
 
-      if (prev.willpowerPointLimit !== undefined && potentialWillpowerCost > prev.willpowerPointLimit) {
-        toast({ title: "Willpower Limit Exceeded", description: `This change would make Willpower cost ${potentialWillpowerCost}pts, exceeding the limit of ${prev.willpowerPointLimit}.`, variant: "destructive" });
-        return prev;
-      }
+    if (prev.willpowerPointLimit !== undefined && potentialWillpowerCost > prev.willpowerPointLimit) {
+      toast({ title: "Willpower Limit Exceeded", description: `This change would make Willpower cost ${potentialWillpowerCost}pts, exceeding the limit of ${prev.willpowerPointLimit}.`, variant: "destructive" });
+      return; 
+    }
+    
+    setCharacterData(current => { // current is latest state
+      let newProcessedValue = isNaN(value) ? 0 : Math.max(0, value);
+      if (field === 'purchasedBaseWill' && current.basicInfo.selectedIntrinsicMQIds.includes('no_base_will')) newProcessedValue = 0;
+      if (field === 'purchasedWill' && (current.basicInfo.selectedIntrinsicMQIds.includes('no_base_will') || current.basicInfo.selectedIntrinsicMQIds.includes('no_willpower'))) newProcessedValue = 0;
       
       return {
-        ...prev,
-        willpower: tempWillpower,
+        ...current,
+        willpower: { ...current.willpower, [field]: newProcessedValue },
       };
     });
   };
 
   const handleAddSkill = (skillDef: PredefinedSkillDef) => {
-    setCharacterData(prev => {
-      const newSkillCost = calculateSingleSkillPoints({
-        id: '', definitionId: '', name: '', baseName: '', linkedAttribute: skillDef.linkedAttribute, description: '',
-        dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: false
-      });
-      const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
-      if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
-        toast({ title: "Skill Limit Exceeded", description: `Adding this skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
-        return prev;
-      }
+    const prev = characterData; // Use current state for checks
+    const newSkillCost = calculateSingleSkillPoints({
+      id: '', definitionId: '', name: '', baseName: '', linkedAttribute: skillDef.linkedAttribute, description: '',
+      dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: false
+    });
+    const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
+    if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
+      toast({ title: "Skill Limit Exceeded", description: `Adding this skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+      return; 
+    }
 
+    setCharacterData(current => { // current is latest state
       const newSkillInstance: SkillInstance = {
         id: Date.now().toString(),
         definitionId: skillDef.id,
@@ -700,21 +694,22 @@ export default function HomePage() {
         sampleTypes: skillDef.sampleTypes,
         hasType: skillDef.hasType,
       };
-      return { ...prev, skills: [...prev.skills, newSkillInstance] };
+      return { ...current, skills: [...current.skills, newSkillInstance] };
     });
   };
 
   const handleAddCustomSkill = () => {
-    setCharacterData(prev => {
-      const newSkillCost = calculateSingleSkillPoints({
-        id: '', definitionId: '', name: '', baseName: '', linkedAttribute: 'body', description: '',
-        dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: true
-      });
-      const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
-      if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
-        toast({ title: "Skill Limit Exceeded", description: `Adding a custom skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
-        return prev;
-      }
+    const prev = characterData; // Use current state for checks
+    const newSkillCost = calculateSingleSkillPoints({
+      id: '', definitionId: '', name: '', baseName: '', linkedAttribute: 'body', description: '',
+      dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: true
+    });
+    const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
+    if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
+      toast({ title: "Skill Limit Exceeded", description: `Adding a custom skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+      return; 
+    }
+    setCharacterData(current => { // current is latest state
       const newCustomSkill: SkillInstance = {
         id: Date.now().toString(),
         definitionId: `custom-${Date.now().toString()}`,
@@ -728,7 +723,7 @@ export default function HomePage() {
         isCustom: true,
         typeSpecification: '',
       };
-      return { ...prev, skills: [...prev.skills, newCustomSkill] };
+      return { ...current, skills: [...current.skills, newCustomSkill] };
     });
   };
 
@@ -744,77 +739,96 @@ export default function HomePage() {
     field: keyof SkillInstance,
     value: string | AttributeName
   ) => {
-    setCharacterData(prev => {
-      const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
-      const skillBeingChanged = prev.skills.find(s => s.id === skillId);
-      if (!skillBeingChanged) return prev;
+    const prev = characterData; // Use current state for checks
+    const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
+    const skillBeingChanged = prev.skills.find(s => s.id === skillId);
+    if (!skillBeingChanged) return;
 
-      const costOfSkillBeingChanged = calculateSingleSkillPoints(skillBeingChanged);
-      const tempSkill = { ...skillBeingChanged, [field]: value };
-      // If name changed for custom skill, update baseName. If typeSpec changed, update name.
-      if (field === 'typeSpecification' && tempSkill.hasType) {
-        tempSkill.name = `${tempSkill.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
-      }
-      if (field === 'name' && tempSkill.isCustom) {
-         tempSkill.baseName = value as string;
-      }
+    const costOfSkillBeingChanged = calculateSingleSkillPoints(skillBeingChanged);
+    
+    // Simulate the change
+    const tempSkillForCheck = { ...skillBeingChanged, [field]: value };
+    if (field === 'typeSpecification' && tempSkillForCheck.hasType) {
+      tempSkillForCheck.name = `${tempSkillForCheck.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
+    }
+    if (field === 'name' && tempSkillForCheck.isCustom) {
+       tempSkillForCheck.baseName = value as string;
+    }
+    const costOfPotentialNewSkill = calculateSingleSkillPoints(tempSkillForCheck);
+    const potentialNewTotalSkillCost = currentTotalSkillCost - costOfSkillBeingChanged + costOfPotentialNewSkill;
 
-      const costOfPotentialNewSkill = calculateSingleSkillPoints(tempSkill);
-      const potentialNewTotalSkillCost = currentTotalSkillCost - costOfSkillBeingChanged + costOfPotentialNewSkill;
-
-      if (prev.skillPointLimit !== undefined && potentialNewTotalSkillCost > prev.skillPointLimit) {
-        toast({ title: "Skill Limit Exceeded", description: `This skill change would make total skill cost ${potentialNewTotalSkillCost}pts, exceeding the limit of ${prev.skillPointLimit}.`, variant: "destructive" });
-        return prev;
-      }
-      
+    if (prev.skillPointLimit !== undefined && potentialNewTotalSkillCost > prev.skillPointLimit) {
+      toast({ title: "Skill Limit Exceeded", description: `This skill change would make total skill cost ${potentialNewTotalSkillCost}pts, exceeding the limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+      return; 
+    }
+    
+    setCharacterData(current => { // current is latest state
       return {
-        ...prev,
-        skills: prev.skills.map(skill => skill.id === skillId ? tempSkill : skill),
+        ...current,
+        skills: current.skills.map(skill => {
+          if (skill.id === skillId) {
+            const updatedSkill = { ...skill, [field]: value };
+            if (field === 'typeSpecification' && updatedSkill.hasType) {
+              updatedSkill.name = `${updatedSkill.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
+            }
+            if (field === 'name' && updatedSkill.isCustom) {
+               updatedSkill.baseName = value as string;
+            }
+            return updatedSkill;
+          }
+          return skill;
+        }),
       };
     });
   };
 
-  const withMiracleCostCheck = (
-    miracleUpdater: (prev: CharacterData) => CharacterData 
-  ): ((prev: CharacterData) => CharacterData) => {
-    return (prev: CharacterData) => {
-      const potentialNextState = miracleUpdater(prev);
-      const potentialMiracleCost = calculateTotalMiraclePoints(potentialNextState.miracles, potentialNextState.skills);
-      
-      if (prev.miraclePointLimit !== undefined && potentialMiracleCost > prev.miraclePointLimit) {
-        toast({ title: "Miracle Limit Exceeded", description: `This change would make total miracle cost ${potentialMiracleCost}pts, exceeding the limit of ${prev.miraclePointLimit}.`, variant: "destructive"});
-        return prev; // Revert
-      }
-      return potentialNextState;
-    };
+  // Unified miracle update handler
+  const updateMiraclesIfAllowed = (
+      updater: (currentMiracles: MiracleDefinition[], currentSkills: SkillInstance[]) => MiracleDefinition[],
+      toastTitle: string,
+      toastDescriptionFn: (cost: number, limit:number) => string
+    ) => {
+    const prev = characterData;
+    const newMiracles = updater(prev.miracles, prev.skills);
+    const potentialMiracleCost = calculateTotalMiraclePoints(newMiracles, prev.skills);
+
+    if (prev.miraclePointLimit !== undefined && potentialMiracleCost > prev.miraclePointLimit) {
+        toast({ title: toastTitle, description: toastDescriptionFn(potentialMiracleCost, prev.miraclePointLimit), variant: "destructive"});
+        return;
+    }
+    setCharacterData(current => ({...current, miracles: newMiracles}));
   };
 
+
   const handleAddMiracle = (type: 'custom' | string) => {
-    setCharacterData(withMiracleCostCheck(prev => {
-      let newMiracle: MiracleDefinition;
-      if (type === 'custom') {
-        newMiracle = {
-          id: `miracle-${Date.now()}`,
-          name: 'New Custom Miracle',
-          dice: '1D', hardDice: '0HD', wiggleDice: '0WD', qualities: [],
-          description: 'Custom miracle description.', isCustom: true, isMandatory: false,
-        };
-      } else {
-        const template = PREDEFINED_MIRACLES_TEMPLATES.find(m => m.definitionId === type);
-        if (!template) return prev;
-        newMiracle = {
-          ...template, id: `miracle-${template.definitionId}-${Date.now()}`,
-          dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
-          qualities: template.qualities.map(q => ({
-              ...q, id: `quality-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-              extras: q.extras.map(ex => ({...ex, id: `extra-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
-              flaws: q.flaws.map(fl => ({...fl, id: `flaw-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
-          })), 
-          isCustom: false, isMandatory: false, 
-        };
-      }
-      return { ...prev, miracles: [...prev.miracles, newMiracle] };
-    }));
+    updateMiraclesIfAllowed(
+      (currentMiracles, currentSkills) => {
+        let newMiracle: MiracleDefinition;
+        if (type === 'custom') {
+          newMiracle = {
+            id: `miracle-${Date.now()}`, name: 'New Custom Miracle',
+            dice: '1D', hardDice: '0HD', wiggleDice: '0WD', qualities: [],
+            description: 'Custom miracle description.', isCustom: true, isMandatory: false,
+          };
+        } else {
+          const template = PREDEFINED_MIRACLES_TEMPLATES.find(m => m.definitionId === type);
+          if (!template) return currentMiracles; // Should not happen ideally
+          newMiracle = {
+            ...template, id: `miracle-${template.definitionId}-${Date.now()}`,
+            dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
+            qualities: template.qualities.map(q => ({
+                ...q, id: `quality-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+                extras: q.extras.map(ex => ({...ex, id: `extra-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
+                flaws: q.flaws.map(fl => ({...fl, id: `flaw-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
+            })), 
+            isCustom: false, isMandatory: false, 
+          };
+        }
+        return [...currentMiracles, newMiracle];
+      },
+      "Miracle Limit Exceeded",
+      (cost, limit) => `Adding this miracle would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleRemoveMiracle = (miracleId: string) => {
@@ -827,11 +841,11 @@ export default function HomePage() {
         toast({ title: "Cannot remove intrinsic-mandated miracle", description: "This miracle's existence is tied to an archetype or intrinsic setting.", variant: "destructive"});
         return;
     }
-    // Cost check not strictly needed for removal, but good practice for consistency if logic changes
-    setCharacterData(withMiracleCostCheck(prev => ({
-      ...prev,
-      miracles: prev.miracles.filter(m => m.id !== miracleId),
-    })));
+    updateMiraclesIfAllowed(
+      (currentMiracles) => currentMiracles.filter(m => m.id !== miracleId),
+       "Miracle Limit Exceeded", // Unlikely for removal, but for consistency
+       (cost, limit) => `This change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
@@ -844,34 +858,36 @@ export default function HomePage() {
        toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic or specific archetype rule.", variant: "destructive"});
        return;
      }
-
-    setCharacterData(withMiracleCostCheck(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m => m.id === miracleId ? { ...m, [field]: value } : m),
-    })));
+    updateMiraclesIfAllowed(
+      (currentMiracles) => currentMiracles.map(m => m.id === miracleId ? { ...m, [field]: value } : m),
+      "Miracle Limit Exceeded",
+      (cost, limit) => `This miracle change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleAddMiracleQuality = (miracleId: string) => {
-    setCharacterData(withMiracleCostCheck(prev => {
-      const newQuality: MiracleQuality = {
-        id: `quality-${Date.now()}`, type: 'useful', capacity: 'touch', levels: 0, extras: [], flaws: [],
-      };
-      return {
-        ...prev,
-        miracles: prev.miracles.map(m =>
+    updateMiraclesIfAllowed(
+      (currentMiracles) => {
+        const newQuality: MiracleQuality = {
+          id: `quality-${Date.now()}`, type: 'useful', capacity: 'touch', levels: 0, extras: [], flaws: [],
+        };
+        return currentMiracles.map(m =>
           m.id === miracleId ? { ...m, qualities: [...m.qualities, newQuality] } : m
-        ),
-      };
-    }));
+        );
+      },
+      "Miracle Limit Exceeded",
+      (cost, limit) => `Adding this quality would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleRemoveMiracleQuality = (miracleId: string, qualityId: string) => {
-    setCharacterData(withMiracleCostCheck(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m =>
+    updateMiraclesIfAllowed(
+      (currentMiracles) => currentMiracles.map(m =>
         m.id === miracleId ? { ...m, qualities: m.qualities.filter(q => q.id !== qualityId) } : m
       ),
-    })));
+      "Miracle Limit Exceeded", // Unlikely
+      (cost, limit) => `This change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleMiracleQualityChange = (
@@ -880,9 +896,8 @@ export default function HomePage() {
     field: keyof MiracleQuality,
     value: any
   ) => {
-    setCharacterData(withMiracleCostCheck(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m =>
+    updateMiraclesIfAllowed(
+      (currentMiracles) => currentMiracles.map(m =>
         m.id === miracleId ? {
           ...m,
           qualities: m.qualities.map(q => {
@@ -898,7 +913,9 @@ export default function HomePage() {
           })
         } : m
       ),
-    })));
+      "Miracle Limit Exceeded",
+      (cost, limit) => `This quality change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleAddExtraOrFlawToQuality = (
@@ -907,25 +924,24 @@ export default function HomePage() {
     itemType: 'extra' | 'flaw',
     definitionId?: string
   ) => {
-    setCharacterData(withMiracleCostCheck(prev => {
-      let newItem: AppliedExtraOrFlaw;
-      if (definitionId) {
-        const collection = itemType === 'extra' ? PREDEFINED_EXTRAS : PREDEFINED_FLAWS;
-        const definition = collection.find(item => item.id === definitionId);
-        if (!definition) return prev;
-        newItem = {
-          id: `${itemType}-def-${definition.id}-${Date.now()}`, definitionId: definition.id,
-          name: definition.name, costModifier: definition.costModifier, isCustom: false,
-        };
-      } else { 
-        newItem = {
-          id: `custom-${itemType}-${Date.now()}`, name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
-          costModifier: itemType === 'extra' ? 1 : -1, isCustom: true,
-        };
-      }
-      return {
-        ...prev,
-        miracles: prev.miracles.map(m =>
+    updateMiraclesIfAllowed(
+      (currentMiracles) => {
+        let newItem: AppliedExtraOrFlaw;
+        if (definitionId) {
+          const collection = itemType === 'extra' ? PREDEFINED_EXTRAS : PREDEFINED_FLAWS;
+          const definition = collection.find(item => item.id === definitionId);
+          if (!definition) return currentMiracles;
+          newItem = {
+            id: `${itemType}-def-${definition.id}-${Date.now()}`, definitionId: definition.id,
+            name: definition.name, costModifier: definition.costModifier, isCustom: false,
+          };
+        } else { 
+          newItem = {
+            id: `custom-${itemType}-${Date.now()}`, name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
+            costModifier: itemType === 'extra' ? 1 : -1, isCustom: true,
+          };
+        }
+        return currentMiracles.map(m =>
           m.id === miracleId ? {
             ...m,
             qualities: m.qualities.map(q => {
@@ -937,9 +953,11 @@ export default function HomePage() {
               return q;
             })
           } : m
-        ),
-      };
-    }));
+        );
+      },
+      "Miracle Limit Exceeded",
+      (cost, limit) => `Adding this ${itemType} would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleRemoveExtraOrFlawFromQuality = (
@@ -948,9 +966,8 @@ export default function HomePage() {
     itemType: 'extra' | 'flaw',
     itemId: string
   ) => {
-    setCharacterData(withMiracleCostCheck(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m =>
+    updateMiraclesIfAllowed(
+      (currentMiracles) => currentMiracles.map(m =>
         m.id === miracleId ? {
           ...m,
           qualities: m.qualities.map(q => {
@@ -963,7 +980,9 @@ export default function HomePage() {
           })
         } : m
       ),
-    })));
+       "Miracle Limit Exceeded", // Unlikely
+       (cost, limit) => `This change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
 
   const handleExtraOrFlawChange = (
@@ -974,9 +993,8 @@ export default function HomePage() {
     field: keyof AppliedExtraOrFlaw,
     value: string | number
   ) => {
-     setCharacterData(withMiracleCostCheck(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m =>
+     updateMiraclesIfAllowed(
+      (currentMiracles) => currentMiracles.map(m =>
         m.id === miracleId ? {
           ...m,
           qualities: m.qualities.map(q => {
@@ -1001,7 +1019,9 @@ export default function HomePage() {
           })
         } : m
       ),
-    })));
+      "Miracle Limit Exceeded",
+      (cost, limit) => `This ${itemType} change would make total miracle cost ${cost}pts, exceeding the limit of ${limit}.`
+    );
   };
   
   const handlePointLimitChange = (value: number) => {
@@ -1018,21 +1038,27 @@ export default function HomePage() {
     const rawNumericValue = parseInt(value, 10);
     const intendedNewSubLimitValue = isNaN(rawNumericValue) || rawNumericValue < 0 ? undefined : rawNumericValue;
   
-    setCharacterData(prev => {
-      const { 
-        pointLimit, archetypePointLimit, statPointLimit, 
-        skillPointLimit, willpowerPointLimit, miraclePointLimit 
-      } = prev;
+    const { 
+        pointLimit: currentOverallLimit, // Use current state for overallLimit
+        archetypePointLimit: currentArchetypeLimit, 
+        statPointLimit: currentStatLimit, 
+        skillPointLimit: currentSkillLimit, 
+        willpowerPointLimit: currentWillpowerLimit, 
+        miraclePointLimit: currentMiracleLimit 
+      } = characterData; // Use current characterData
   
       let sumOfOtherSubLimits = 0;
-      if (limitType !== 'archetype') sumOfOtherSubLimits += (archetypePointLimit || 0);
-      if (limitType !== 'stat') sumOfOtherSubLimits += (statPointLimit || 0);
-      if (limitType !== 'willpower') sumOfOtherSubLimits += (willpowerPointLimit || 0);
-      if (limitType !== 'skill') sumOfOtherSubLimits += (skillPointLimit || 0);
-      if (limitType !== 'miracle') sumOfOtherSubLimits += (miraclePointLimit || 0);
+      if (limitType !== 'archetype') sumOfOtherSubLimits += (currentArchetypeLimit || 0);
+      if (limitType !== 'stat') sumOfOtherSubLimits += (currentStatLimit || 0);
+      if (limitType !== 'willpower') sumOfOtherSubLimits += (currentWillpowerLimit || 0);
+      if (limitType !== 'skill') sumOfOtherSubLimits += (currentSkillLimit || 0);
+      if (limitType !== 'miracle') sumOfOtherSubLimits += (currentMiracleLimit || 0);
   
-      const overallLimit = pointLimit || 0; 
+      const overallLimit = currentOverallLimit || 0; 
       let finalNewSubLimitValue = intendedNewSubLimitValue;
+      let showToast = false;
+      let toastMessage = "";
+      let toastTitle = "Limit Adjusted";
   
       if (intendedNewSubLimitValue !== undefined) {
         if ((sumOfOtherSubLimits + intendedNewSubLimitValue) > overallLimit) {
@@ -1040,17 +1066,26 @@ export default function HomePage() {
           finalNewSubLimitValue = Math.max(0, maxAllowedForThisSubLimit); 
           
           if (intendedNewSubLimitValue > finalNewSubLimitValue) {
-            toast({ 
-              title: "Limit Adjusted", 
-              description: `The entered ${limitType} limit (${intendedNewSubLimitValue}) was automatically adjusted to ${finalNewSubLimitValue} to not exceed the Overall Point Limit (${overallLimit}).`,
-              variant: "default"
-            });
+            showToast = true;
+            toastTitle = "Limit Adjusted";
+            toastMessage = `The entered ${limitType} limit (${intendedNewSubLimitValue}) was automatically adjusted to ${finalNewSubLimitValue} to not exceed the Overall Point Limit (${overallLimit}).`;
           }
         }
       }
-      // @ts-ignore
-      return { ...prev, [`${limitType}PointLimit`]: finalNewSubLimitValue };
-    });
+
+      if (showToast) {
+        toast({ 
+          title: toastTitle, 
+          description: toastMessage,
+          variant: "default"
+        });
+      }
+      
+      setCharacterData(prev => ({ // Updater now doesn't call toast
+        ...prev, 
+        // @ts-ignore
+        [`${limitType}PointLimit`]: finalNewSubLimitValue 
+      }));
   };
 
 
@@ -1388,3 +1423,6 @@ export default function HomePage() {
 
 
 
+
+
+    
