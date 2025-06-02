@@ -71,13 +71,11 @@ export const calculateSingleMiracleQualityCost = (quality: MiracleQualityDef, mi
   const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
   
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
-  const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
+  const actualQualityNormalDieCostFactor = Math.max(1, perNormalDieCostFactor);
 
-  const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
-  const costHD = HDice * Math.max(0, perHardDieCostFactor);
-
-  const perWiggleDieCostFactor = (baseCostFactor * 4) + effectiveCostModifier;
-  const costWD = WDice * Math.max(0, perWiggleDieCostFactor);
+  const costND = NDice > 0 ? NDice * actualQualityNormalDieCostFactor : 0;
+  const costHD = HDice > 0 ? HDice * actualQualityNormalDieCostFactor * 2 : 0;
+  const costWD = WDice > 0 ? WDice * actualQualityNormalDieCostFactor * 4 : 0;
 
   return costND + costHD + costWD;
 };
