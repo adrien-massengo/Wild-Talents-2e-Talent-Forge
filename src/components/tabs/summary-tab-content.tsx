@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 interface SummaryTabContentProps {
   characterData: CharacterData;
   onPointLimitChange: (value: number) => void;
+  onSubPointLimitChange: (limitType: 'stat' | 'skill' | 'willpower' | 'miracle', value: string) => void;
   discardedAttribute?: DiscardedAttributeType;
   calculatedBaseWillFromStats: number;
   totalBaseWill: number;
@@ -99,6 +100,7 @@ const getEffectiveNormalDiceForEffects = (item: StatDetail | SkillInstance | und
 export function SummaryTabContent({ 
     characterData, 
     onPointLimitChange, 
+    onSubPointLimitChange,
     discardedAttribute,
     calculatedBaseWillFromStats,
     totalBaseWill,
@@ -108,7 +110,7 @@ export function SummaryTabContent({
     hasNoBaseWillIntrinsic,
     hasNoWillpowerIntrinsic,
 }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills, miracles, pointLimit } = characterData;
+  const { basicInfo, stats, willpower, skills, miracles, pointLimit, statPointLimit, skillPointLimit, willpowerPointLimit, miraclePointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
   const totalStatPoints = Object.entries(stats || {}).reduce((sum, [key, stat]) => {
@@ -190,24 +192,72 @@ export function SummaryTabContent({
           </CardHeader>
           <CardContent className="space-y-3">
             <p>Archetype Cost: {currentArchetypePointCost}</p>
-            <p>Stat Cost: {totalStatPoints}</p>
-            <p>Willpower Cost: {totalWillpowerPoints}</p>
-            <p>Skill Cost: {totalSkillPoints}</p>
-            <p>Miracle Cost: {totalMiraclePoints}</p>
+            <p>Stat Cost: {totalStatPoints} {statPointLimit !== undefined ? `/ ${statPointLimit}` : ''}</p>
+            <p>Willpower Cost: {totalWillpowerPoints} {willpowerPointLimit !== undefined ? `/ ${willpowerPointLimit}` : ''}</p>
+            <p>Skill Cost: {totalSkillPoints} {skillPointLimit !== undefined ? `/ ${skillPointLimit}` : ''}</p>
+            <p>Miracle Cost: {totalMiraclePoints} {miraclePointLimit !== undefined ? `/ ${miraclePointLimit}` : ''}</p>
             <hr className="my-2" />
             <p className="font-bold text-lg">Current Cost: {grandTotalPoints} / {pointLimit}</p>
              <div className="grid grid-cols-2 items-center gap-2">
-              <Label htmlFor="point-limit" className="font-medium">Point Limit:</Label>
+              <Label htmlFor="point-limit" className="font-medium">Overall Point Limit:</Label>
               <Input
                 id="point-limit"
                 type="number"
                 min="0"
                 value={String(pointLimit)}
-                onChange={(e) => onPointLimitChange(parseInt(e.target.value, 10) || 250)}
+                onChange={(e) => onPointLimitChange(parseInt(e.target.value, 10) || 0)}
                 className="w-24"
               />
             </div>
-            <p className="text-sm text-muted-foreground">Remaining Points: {pointLimit - grandTotalPoints}</p>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="stat-point-limit" className="font-medium">Stat Point Limit:</Label>
+              <Input
+                id="stat-point-limit"
+                type="number"
+                min="0"
+                placeholder="None"
+                value={statPointLimit === undefined ? '' : String(statPointLimit)}
+                onChange={(e) => onSubPointLimitChange('stat', e.target.value)}
+                className="w-24"
+              />
+            </div>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="skill-point-limit" className="font-medium">Skill Point Limit:</Label>
+              <Input
+                id="skill-point-limit"
+                type="number"
+                min="0"
+                placeholder="None"
+                value={skillPointLimit === undefined ? '' : String(skillPointLimit)}
+                onChange={(e) => onSubPointLimitChange('skill', e.target.value)}
+                className="w-24"
+              />
+            </div>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="willpower-point-limit" className="font-medium">Willpower Point Limit:</Label>
+              <Input
+                id="willpower-point-limit"
+                type="number"
+                min="0"
+                placeholder="None"
+                value={willpowerPointLimit === undefined ? '' : String(willpowerPointLimit)}
+                onChange={(e) => onSubPointLimitChange('willpower', e.target.value)}
+                className="w-24"
+              />
+            </div>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="miracle-point-limit" className="font-medium">Miracle Point Limit:</Label>
+              <Input
+                id="miracle-point-limit"
+                type="number"
+                min="0"
+                placeholder="None"
+                value={miraclePointLimit === undefined ? '' : String(miraclePointLimit)}
+                onChange={(e) => onSubPointLimitChange('miracle', e.target.value)}
+                className="w-24"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">Remaining Points (Overall): {pointLimit - grandTotalPoints}</p>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>

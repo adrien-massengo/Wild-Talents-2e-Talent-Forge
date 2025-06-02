@@ -104,6 +104,10 @@ export interface CharacterData {
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
   pointLimit: number;
+  statPointLimit?: number;
+  skillPointLimit?: number;
+  willpowerPointLimit?: number;
+  miraclePointLimit?: number;
 }
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
@@ -145,6 +149,10 @@ const initialCharacterData: CharacterData = {
   skills: [],
   miracles: [],
   pointLimit: 250,
+  statPointLimit: undefined,
+  skillPointLimit: undefined,
+  willpowerPointLimit: undefined,
+  miraclePointLimit: undefined,
 };
 
 export default function HomePage() {
@@ -174,7 +182,8 @@ export default function HomePage() {
         if (newArchetype && newArchetype.id !== previousArchetypeId) {
              updatedMiracles = updatedMiracles.filter(m => {
                 const isGenericMandatory = m.definitionId?.startsWith('archetype-mandatory-');
-                if (m.definitionId === 'perceive_godlike_talents') return true; 
+                if (m.definitionId === 'perceive_godlike_talents' && value !== 'godlike_talent') return false; // Remove if not godlike anymore
+                if (m.definitionId === 'perceive_godlike_talents' && value === 'godlike_talent') return true; // Keep if becoming godlike
                 if (isGenericMandatory) {
                     if (value === 'custom') return false; 
                     const newArchHasMandatoryPowerIntrinsic = newArchetype?.intrinsicMQIds.includes('mandatory_power');
@@ -663,9 +672,11 @@ export default function HomePage() {
 
   const handleRemoveMiracle = (miracleId: string) => {
      const miracleToRemove = characterData.miracles.find(m => m.id === miracleId);
-     if (miracleToRemove?.isMandatory && 
+     const isIntrinsicMandatedUnremovable = miracleToRemove && miracleToRemove.isMandatory && 
         (miracleToRemove.definitionId?.startsWith('archetype-mandatory-') || 
-         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracleToRemove.definitionId === 'perceive_godlike_talents'))) {
+         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracleToRemove.definitionId === 'perceive_godlike_talents'));
+
+     if (isIntrinsicMandatedUnremovable) {
         toast({ title: "Cannot remove intrinsic-mandated miracle", description: "This miracle's existence is tied to an archetype or intrinsic setting.", variant: "destructive"});
         return;
     }
@@ -861,6 +872,17 @@ export default function HomePage() {
     }));
   };
 
+  const handleSubPointLimitChange = (
+    limitType: 'stat' | 'skill' | 'willpower' | 'miracle',
+    value: string
+  ) => {
+    const numericValue = parseInt(value, 10);
+    setCharacterData(prev => ({
+      ...prev,
+      [`${limitType}PointLimit`]: isNaN(numericValue) || numericValue < 0 ? undefined : numericValue,
+    }));
+  };
+
 
   const handleSaveCharacter = () => {
     try {
@@ -1045,6 +1067,10 @@ export default function HomePage() {
             };
           }) : [],
           pointLimit: typeof parsedData.pointLimit === 'number' && parsedData.pointLimit >=0 ? parsedData.pointLimit : initialCharacterData.pointLimit,
+          statPointLimit: typeof parsedData.statPointLimit === 'number' && parsedData.statPointLimit >=0 ? parsedData.statPointLimit : initialCharacterData.statPointLimit,
+          skillPointLimit: typeof parsedData.skillPointLimit === 'number' && parsedData.skillPointLimit >=0 ? parsedData.skillPointLimit : initialCharacterData.skillPointLimit,
+          willpowerPointLimit: typeof parsedData.willpowerPointLimit === 'number' && parsedData.willpowerPointLimit >=0 ? parsedData.willpowerPointLimit : initialCharacterData.willpowerPointLimit,
+          miraclePointLimit: typeof parsedData.miraclePointLimit === 'number' && parsedData.miraclePointLimit >=0 ? parsedData.miraclePointLimit : initialCharacterData.miraclePointLimit,
         };
 
         for (const statKey in initialCharacterData.stats) {
@@ -1223,6 +1249,7 @@ export default function HomePage() {
                 <SummaryTabContent
                   characterData={characterData}
                   onPointLimitChange={handlePointLimitChange}
+                  onSubPointLimitChange={handleSubPointLimitChange}
                   discardedAttribute={discardedAttribute}
                   calculatedBaseWillFromStats={displayCalculatedBaseWillFromStats}
                   totalBaseWill={displayTotalBaseWill}
