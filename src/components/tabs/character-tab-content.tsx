@@ -571,8 +571,11 @@ export function CharacterTabContent({
 
   const renderMiracleCardContent = (miracle: MiracleDefinition) => {
     const isIntrinsicMandatedUnremovable = miracle.isMandatory && 
-        (miracle.definitionId?.startsWith('archetype-mandatory-') || 
-         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
+        (
+          miracle.definitionId?.startsWith('archetype-mandatory-') || 
+          (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents') ||
+          (characterData.basicInfo.selectedArchetypeId === 'mystic' && miracle.definitionId === 'cosmic_power')
+        );
     
     const gmMaxDice = gmSettings.miracleRestrictions.numericRestrictions.maxDicePerType;
     const gmMaxQualityLevels = gmSettings.miracleRestrictions.numericRestrictions.maxPowerQualityLevels;
@@ -641,7 +644,7 @@ export function CharacterTabContent({
           </div>
           
           <div className="mt-3 pt-3 border-t border-dashed">
-            <p className="text-sm">
+             <div className="text-sm">
               <strong>Miracle Quality Cost Factors (per ND):</strong>
               {miracle.qualities.length > 0 ? (
                 <ul className="list-disc list-inside pl-2 text-xs">
@@ -654,7 +657,7 @@ export function CharacterTabContent({
               ) : (
                 <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
               )}
-            </p>
+            </div>
             <p className="font-semibold mt-1">Miracle Cost per ND: {miracleCostPerND} points</p>
             <p className="font-semibold mt-1">
               Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateSingleMiracleTotalCost(miracle, characterData.skills)} points`}
@@ -1336,3 +1339,4 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
