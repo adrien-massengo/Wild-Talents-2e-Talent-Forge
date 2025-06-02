@@ -12,10 +12,10 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
-  DialogFooter, // Added for potential future use, not strictly needed now
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "@/hooks/use-theme";
 
 interface AppHeaderProps {
@@ -25,9 +25,10 @@ interface AppHeaderProps {
 }
 
 type SettingsView = 'main' | 'appearance';
+type ThemeOption = 'light' | 'dark';
 
 export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [settingsView, setSettingsView] = React.useState<SettingsView>('main');
 
@@ -98,16 +99,19 @@ export function AppHeader({ onSave, onLoad, onExport }: AppHeaderProps) {
                       Back to Settings
                     </Button>
                     <div className="flex items-center space-x-2 justify-between px-2">
-                      <Label htmlFor="dark-mode-toggle" className="flex items-center">
+                      <Label htmlFor="theme-select" className="flex items-center">
                         {theme === 'dark' ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
-                        Dark Mode
+                        Theme
                       </Label>
-                      <Switch
-                        id="dark-mode-toggle"
-                        checked={theme === 'dark'}
-                        onCheckedChange={toggleTheme}
-                        aria-label="Toggle dark mode"
-                      />
+                      <Select value={theme} onValueChange={(value) => setTheme(value as ThemeOption)}>
+                        <SelectTrigger id="theme-select" className="w-[180px]">
+                          <SelectValue placeholder="Select theme" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="light">Light</SelectItem>
+                          <SelectItem value="dark">Dark</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </>
                 )}
