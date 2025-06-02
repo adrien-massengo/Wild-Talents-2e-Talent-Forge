@@ -878,11 +878,47 @@ export default function HomePage() {
     limitType: 'archetype' | 'stat' | 'skill' | 'willpower' | 'miracle',
     value: string
   ) => {
-    const numericValue = parseInt(value, 10);
-    setCharacterData(prev => ({
-      ...prev,
-      [`${limitType}PointLimit`]: isNaN(numericValue) || numericValue < 0 ? undefined : numericValue,
-    }));
+    const rawNumericValue = parseInt(value, 10);
+    const intendedNewSubLimitValue = isNaN(rawNumericValue) || rawNumericValue < 0 ? undefined : rawNumericValue;
+  
+    setCharacterData(prev => {
+      const { 
+        pointLimit, 
+        archetypePointLimit, 
+        statPointLimit, 
+        skillPointLimit, 
+        willpowerPointLimit, 
+        miraclePointLimit 
+      } = prev;
+  
+      let sumOfOtherSubLimits = 0;
+      if (limitType !== 'archetype') sumOfOtherSubLimits += (archetypePointLimit || 0);
+      if (limitType !== 'stat') sumOfOtherSubLimits += (statPointLimit || 0);
+      if (limitType !== 'willpower') sumOfOtherSubLimits += (willpowerPointLimit || 0);
+      if (limitType !== 'skill') sumOfOtherSubLimits += (skillPointLimit || 0);
+      if (limitType !== 'miracle') sumOfOtherSubLimits += (miraclePointLimit || 0);
+  
+      const overallLimit = pointLimit || 0; 
+      
+      let finalNewSubLimitValue = intendedNewSubLimitValue;
+  
+      if (intendedNewSubLimitValue !== undefined) {
+        if ((sumOfOtherSubLimits + intendedNewSubLimitValue) > overallLimit) {
+          const maxAllowedForThisSubLimit = overallLimit - sumOfOtherSubLimits;
+          finalNewSubLimitValue = Math.max(0, maxAllowedForThisSubLimit); 
+          
+          if (intendedNewSubLimitValue > finalNewSubLimitValue) {
+            toast({ 
+              title: "Limit Adjusted", 
+              description: `The entered ${limitType} limit (${intendedNewSubLimitValue}) was automatically adjusted to ${finalNewSubLimitValue} to not exceed the Overall Point Limit (${overallLimit}).`,
+              variant: "default"
+            });
+          }
+        }
+      }
+      // @ts-ignore
+      return { ...prev, [`${limitType}PointLimit`]: finalNewSubLimitValue };
+    });
   };
 
 
@@ -1286,4 +1322,5 @@ export default function HomePage() {
 
 
     
+
 

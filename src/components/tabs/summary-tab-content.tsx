@@ -134,6 +134,13 @@ export function SummaryTabContent({
 
 
   const grandTotalPoints = totalStatPoints + totalWillpowerPoints + totalSkillPoints + totalMiraclePoints + currentArchetypePointCost;
+  
+  const sumOfSubLimits = 
+    (archetypePointLimit || 0) +
+    (statPointLimit || 0) +
+    (willpowerPointLimit || 0) +
+    (skillPointLimit || 0) +
+    (miraclePointLimit || 0);
 
   const getStatEffectDescription = (statName: keyof CharacterData['stats'], statValue: StatDetail) => {
     const effectiveDice = Math.min(getEffectiveNormalDiceForEffects(statValue), 10);
@@ -269,6 +276,11 @@ export function SummaryTabContent({
                 className="w-24"
               />
             </div>
+            {sumOfSubLimits > pointLimit && (
+              <p className="text-sm text-destructive mt-2">
+                Warning: The sum of category point limits ({sumOfSubLimits}) exceeds the Overall Point Limit ({pointLimit}).
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">Remaining Points (Overall): {pointLimit - grandTotalPoints}</p>
           </CardContent>
         </Card>
@@ -503,4 +515,5 @@ export function SummaryTabContent({
   
 
     
+
 
