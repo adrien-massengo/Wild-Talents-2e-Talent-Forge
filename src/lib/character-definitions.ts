@@ -96,7 +96,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Sources: Divine, Paranormal',
     permissionText: 'Permissions: Super',
     description: 'You’re not the God, but a god, surely; or perhaps you are related to a divine entity of some sort and have been exiled to spend your unnaturally long life in the mortal realm.',
-    sourceMQIds: ['divine'],
+    sourceMQIds: ['divine', 'paranormal_source'],
     permissionMQIds: ['super_permission'],
     intrinsicMQIds: [],
   },
@@ -391,6 +391,8 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   });
   return totalPoints;
 }
+
+    
 
     
 
