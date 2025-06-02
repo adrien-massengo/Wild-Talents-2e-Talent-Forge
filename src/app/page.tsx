@@ -250,7 +250,7 @@ export default function HomePage() {
   const { toast } = useToast();
 
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
-    const prev = characterData; 
+    const currentCharacterState = characterData; 
     let potentialArchetypeCost = 0;
 
     if (field === 'selectedArchetypeId') {
@@ -258,12 +258,12 @@ export default function HomePage() {
         if (newArchetypeDef) {
             potentialArchetypeCost = newArchetypeDef.points;
              if (newArchetypeDef.id === 'custom') {
-                potentialArchetypeCost = calculateCurrentArchetypeCost({ ...prev.basicInfo, selectedArchetypeId: 'custom' });
+                potentialArchetypeCost = calculateCurrentArchetypeCost({ ...currentCharacterState.basicInfo, selectedArchetypeId: 'custom' });
             }
         }
        
-        if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
-            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef?.name || 'this archetype'}. Its cost (${potentialArchetypeCost}) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+        if (currentCharacterState.archetypePointLimit !== undefined && potentialArchetypeCost > currentCharacterState.archetypePointLimit) {
+            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef?.name || 'this archetype'}. Its cost (${potentialArchetypeCost}) exceeds the Archetype Point Limit of ${currentCharacterState.archetypePointLimit}.`, variant: "destructive" });
             return; 
         }
     }
@@ -409,8 +409,8 @@ export default function HomePage() {
     mqId: string,
     isSelected: boolean
   ) => {
-    const prev = characterData; 
-    const tempBasicInfoForCostCheck = JSON.parse(JSON.stringify(prev.basicInfo)); 
+    const currentCharacterState = characterData; 
+    const tempBasicInfoForCostCheck = JSON.parse(JSON.stringify(currentCharacterState.basicInfo)); 
 
     let currentSelection: string[] = [];
     if (mqType === 'source') currentSelection = [...tempBasicInfoForCostCheck.selectedSourceMQIds];
@@ -429,8 +429,8 @@ export default function HomePage() {
     tempBasicInfoForCostCheck.selectedArchetypeId = 'custom'; 
 
     const potentialArchetypeCost = calculateCurrentArchetypeCost(tempBasicInfoForCostCheck);
-    if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
-      toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality change would make the custom archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+    if (currentCharacterState.archetypePointLimit !== undefined && potentialArchetypeCost > currentCharacterState.archetypePointLimit) {
+      toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality change would make the custom archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${currentCharacterState.archetypePointLimit}.`, variant: "destructive" });
       return; 
     }
     
@@ -675,18 +675,18 @@ export default function HomePage() {
     dieType: keyof StatDetail,
     value: string
   ) => {
-    const prev = characterData; 
-    const discardedAttr = getDiscardedAttributeFromBasicInfo(prev.basicInfo);
-    const currentTotalStatCost = calculateTotalStatPoints(prev.stats, discardedAttr);
-    const costOfStatBeingChanged = calculateSingleStatPoints(prev.stats[statName], statName, discardedAttr);
+    const currentCharacterState = characterData; 
+    const discardedAttr = getDiscardedAttributeFromBasicInfo(currentCharacterState.basicInfo);
+    const currentTotalStatCost = calculateTotalStatPoints(currentCharacterState.stats, discardedAttr);
+    const costOfStatBeingChanged = calculateSingleStatPoints(currentCharacterState.stats[statName], statName, discardedAttr);
     
-    const potentialNewStatDetail = { ...prev.stats[statName], [dieType]: value };
+    const potentialNewStatDetail = { ...currentCharacterState.stats[statName], [dieType]: value };
     const costOfPotentialNewStat = calculateSingleStatPoints(potentialNewStatDetail, statName, discardedAttr);
     
     const potentialNewTotalStatCost = currentTotalStatCost - costOfStatBeingChanged + costOfPotentialNewStat;
 
-    if (prev.statPointLimit !== undefined && potentialNewTotalStatCost > prev.statPointLimit) {
-      toast({ title: "Stat Limit Exceeded", description: `Changing ${statName} would make total stat cost ${potentialNewTotalStatCost}pts, exceeding the limit of ${prev.statPointLimit}.`, variant: "destructive" });
+    if (currentCharacterState.statPointLimit !== undefined && potentialNewTotalStatCost > currentCharacterState.statPointLimit) {
+      toast({ title: "Stat Limit Exceeded", description: `Changing ${statName} would make total stat cost ${potentialNewTotalStatCost}pts, exceeding the limit of ${currentCharacterState.statPointLimit}.`, variant: "destructive" });
       return; 
     }
 
@@ -700,15 +700,15 @@ export default function HomePage() {
   };
 
   const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
-    const prev = characterData; 
-    const hasNoBaseWillIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
-    const hasNoWillpowerIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
+    const currentCharacterState = characterData; 
+    const hasNoBaseWillIntrinsic = currentCharacterState.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
+    const hasNoWillpowerIntrinsic = currentCharacterState.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
     let processedValue = isNaN(value) ? 0 : Math.max(0, value);
 
     if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) processedValue = 0;
     if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) processedValue = 0;
 
-    const tempWillpowerForCheck = { ...prev.willpower, [field]: processedValue };
+    const tempWillpowerForCheck = { ...currentCharacterState.willpower, [field]: processedValue };
     const potentialWillpowerCost = calculateTotalWillpowerPoints(
       tempWillpowerForCheck.purchasedBaseWill,
       tempWillpowerForCheck.purchasedWill,
@@ -716,8 +716,8 @@ export default function HomePage() {
       hasNoWillpowerIntrinsic
     );
 
-    if (prev.willpowerPointLimit !== undefined && potentialWillpowerCost > prev.willpowerPointLimit) {
-      toast({ title: "Willpower Limit Exceeded", description: `This change would make Willpower cost ${potentialWillpowerCost}pts, exceeding the limit of ${prev.willpowerPointLimit}.`, variant: "destructive" });
+    if (currentCharacterState.willpowerPointLimit !== undefined && potentialWillpowerCost > currentCharacterState.willpowerPointLimit) {
+      toast({ title: "Willpower Limit Exceeded", description: `This change would make Willpower cost ${potentialWillpowerCost}pts, exceeding the limit of ${currentCharacterState.willpowerPointLimit}.`, variant: "destructive" });
       return; 
     }
     
@@ -734,14 +734,14 @@ export default function HomePage() {
   };
 
   const handleAddSkill = (skillDef: PredefinedSkillDef) => {
-    const prev = characterData; 
+    const currentCharacterState = characterData; 
     const newSkillCost = calculateSingleSkillPoints({
       id: '', definitionId: '', name: '', baseName: '', linkedAttribute: skillDef.linkedAttribute, description: '',
       dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: false
     });
-    const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
-    if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
-      toast({ title: "Skill Limit Exceeded", description: `Adding this skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+    const currentTotalSkillCost = calculateTotalSkillPoints(currentCharacterState.skills);
+    if (currentCharacterState.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > currentCharacterState.skillPointLimit) {
+      toast({ title: "Skill Limit Exceeded", description: `Adding this skill would exceed the Skill Point Limit of ${currentCharacterState.skillPointLimit}.`, variant: "destructive" });
       return; 
     }
 
@@ -767,14 +767,14 @@ export default function HomePage() {
   };
 
   const handleAddCustomSkill = () => {
-    const prev = characterData; 
+    const currentCharacterState = characterData; 
     const newSkillCost = calculateSingleSkillPoints({
       id: '', definitionId: '', name: '', baseName: '', linkedAttribute: 'body', description: '',
       dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: true
     });
-    const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
-    if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
-      toast({ title: "Skill Limit Exceeded", description: `Adding a custom skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+    const currentTotalSkillCost = calculateTotalSkillPoints(currentCharacterState.skills);
+    if (currentCharacterState.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > currentCharacterState.skillPointLimit) {
+      toast({ title: "Skill Limit Exceeded", description: `Adding a custom skill would exceed the Skill Point Limit of ${currentCharacterState.skillPointLimit}.`, variant: "destructive" });
       return; 
     }
     setCharacterData(current => { 
@@ -807,9 +807,9 @@ export default function HomePage() {
     field: keyof SkillInstance,
     value: string | AttributeName
   ) => {
-    const prev = characterData; 
-    const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
-    const skillBeingChanged = prev.skills.find(s => s.id === skillId);
+    const currentCharacterState = characterData; 
+    const currentTotalSkillCost = calculateTotalSkillPoints(currentCharacterState.skills);
+    const skillBeingChanged = currentCharacterState.skills.find(s => s.id === skillId);
     if (!skillBeingChanged) return;
 
     const costOfSkillBeingChanged = calculateSingleSkillPoints(skillBeingChanged);
@@ -824,8 +824,8 @@ export default function HomePage() {
     const costOfPotentialNewSkill = calculateSingleSkillPoints(tempSkillForCheck);
     const potentialNewTotalSkillCost = currentTotalSkillCost - costOfSkillBeingChanged + costOfPotentialNewSkill;
 
-    if (prev.skillPointLimit !== undefined && potentialNewTotalSkillCost > prev.skillPointLimit) {
-      toast({ title: "Skill Limit Exceeded", description: `This skill change would make total skill cost ${potentialNewTotalSkillCost}pts, exceeding the limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+    if (currentCharacterState.skillPointLimit !== undefined && potentialNewTotalSkillCost > currentCharacterState.skillPointLimit) {
+      toast({ title: "Skill Limit Exceeded", description: `This skill change would make total skill cost ${potentialNewTotalSkillCost}pts, exceeding the limit of ${currentCharacterState.skillPointLimit}.`, variant: "destructive" });
       return; 
     }
     
@@ -854,12 +854,12 @@ export default function HomePage() {
       toastTitle: string,
       toastDescriptionFn: (cost: number, limit:number) => string
     ) => {
-    const prev = characterData;
-    const newMiracles = updater(prev.miracles, prev.skills);
-    const potentialMiracleCost = calculateTotalMiraclePoints(newMiracles, prev.skills);
+    const currentCharacterState = characterData;
+    const newMiracles = updater(currentCharacterState.miracles, currentCharacterState.skills);
+    const potentialMiracleCost = calculateTotalMiraclePoints(newMiracles, currentCharacterState.skills);
 
-    if (prev.miraclePointLimit !== undefined && potentialMiracleCost > prev.miraclePointLimit) {
-        toast({ title: toastTitle, description: toastDescriptionFn(potentialMiracleCost, prev.miraclePointLimit), variant: "destructive"});
+    if (currentCharacterState.miraclePointLimit !== undefined && potentialMiracleCost > currentCharacterState.miraclePointLimit) {
+        toast({ title: toastTitle, description: toastDescriptionFn(potentialMiracleCost, currentCharacterState.miraclePointLimit), variant: "destructive"});
         return;
     }
     setCharacterData(current => ({...current, miracles: newMiracles}));
@@ -1101,6 +1101,7 @@ export default function HomePage() {
     limitType: 'archetype' | 'stat' | 'skill' | 'willpower' | 'miracle',
     value: string
   ) => {
+    const currentCharacterState = characterData;
     const rawNumericValue = parseInt(value, 10);
     const intendedNewSubLimitValue = isNaN(rawNumericValue) || rawNumericValue < 0 ? undefined : rawNumericValue;
   
@@ -1111,7 +1112,7 @@ export default function HomePage() {
         skillPointLimit: currentSkillLimitFromState, 
         willpowerPointLimit: currentWillpowerLimitFromState, 
         miraclePointLimit: currentMiracleLimitFromState 
-      } = characterData; 
+      } = currentCharacterState; 
   
       let sumOfOtherSubLimits = 0;
       if (limitType !== 'archetype') sumOfOtherSubLimits += (currentArchetypeLimitFromState || 0);
@@ -1564,6 +1565,7 @@ export default function HomePage() {
               <TabsContent value="character" className="mt-0">
                 <CharacterTabContent
                   characterData={characterData}
+                  gmSettings={gmSettings}
                   onBasicInfoChange={handleBasicInfoChange}
                   onAddMotivation={handleAddMotivation}
                   onRemoveMotivation={handleRemoveMotivation}
@@ -1646,4 +1648,5 @@ export default function HomePage() {
 
 
     
+
 

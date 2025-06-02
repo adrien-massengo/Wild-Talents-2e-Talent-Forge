@@ -2,7 +2,7 @@
 // src/components/tabs/character-tab-content.tsx
 "use client";
 
-import type { CharacterData, StatDetail, SkillInstance, BasicInfo, MotivationObject } from "@/app/page";
+import type { CharacterData, StatDetail, SkillInstance, BasicInfo, MotivationObject, GmSettings } from "@/app/page";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType, PredefinedExtraOrFlaw } from "@/lib/miracles-definitions";
@@ -33,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
+  gmSettings: GmSettings; // Added gmSettings
   onBasicInfoChange: (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => void;
   onAddMotivation: () => void;
   onRemoveMotivation: (motivationId: string) => void;
@@ -130,12 +131,23 @@ interface MQCollapsibleProps {
   basicInfo: BasicInfo;
   onMetaQualityConfigChange: CharacterTabContentProps['onMetaQualityConfigChange'];
   mqType: 'source' | 'permission' | 'intrinsic';
+  gmSettings: GmSettings; // Added gmSettings
 }
 
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
-  title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onMetaQualityConfigChange, mqType
+  title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onMetaQualityConfigChange, mqType, gmSettings
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
+
+  const filteredMqList = React.useMemo(() => {
+    return mqList.filter(mq => {
+      if (mqType === 'source') return (gmSettings.metaQualitiesSource[mq.id] === undefined || gmSettings.metaQualitiesSource[mq.id]);
+      if (mqType === 'permission') return (gmSettings.metaQualitiesPermission[mq.id] === undefined || gmSettings.metaQualitiesPermission[mq.id]);
+      if (mqType === 'intrinsic') return (gmSettings.metaQualitiesIntrinsic[mq.id] === undefined || gmSettings.metaQualitiesIntrinsic[mq.id]);
+      return true;
+    });
+  }, [mqList, mqType, gmSettings]);
+
 
   return (
     <Card className="bg-card/50 shadow-sm">
@@ -148,7 +160,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
       </CardHeader>
       {isOpen && (
         <CardContent className="p-3 space-y-3">
-          {mqList.map(mq => {
+          {filteredMqList.map(mq => {
             const configKey = mq.configKey as keyof BasicInfo | undefined;
             return (
             <div key={mq.id} className="p-2 border rounded-md bg-background/70">
@@ -311,6 +323,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
 
 export function CharacterTabContent({
   characterData,
+  gmSettings,
   onBasicInfoChange,
   onAddMotivation,
   onRemoveMotivation,
@@ -376,26 +389,8 @@ export function CharacterTabContent({
     };
   }, [basicInfo.selectedPermissionMQIds]);
   
-  const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
-  const onePowerLimitReached = basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
   
-  const filteredDynamicPqDefs = React.useMemo(() => {
-      const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
-      return allDynamicDefs.filter(def => {
-          if (def.key.startsWith('hyperskill_')) {
-              return canAddHyperskillQuality;
-          }
-          if (def.key.startsWith('hyperstat_')) {
-              return canAddHyperstatQuality;
-          }
-          if (['attacks', 'defends', 'useful'].includes(def.key)) {
-              return canAddStandardMiracleQuality;
-          }
-          return false; 
-      });
-  }, [characterData.skills, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
-
-  const filteredMiracleTemplates = React.useMemo(() => {
+  const initialFilteredMiracleTemplates = React.useMemo(() => {
     return PREDEFINED_MIRACLES_TEMPLATES.filter(template => {
         if (!template.qualities || template.qualities.length === 0) { 
              return canAddStandardMiracleQuality || canAddHyperstatQuality || canAddHyperskillQuality; 
@@ -414,6 +409,39 @@ export function CharacterTabContent({
     });
   }, [canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
 
+  const finalFilteredMiracleTemplates = React.useMemo(() => {
+    return initialFilteredMiracleTemplates.filter(template =>
+        template.definitionId && (gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId] === undefined || gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId])
+    );
+  }, [initialFilteredMiracleTemplates, gmSettings.miracleRestrictions.allowedSampleMiracles]);
+
+
+  const initialFilteredDynamicPqDefs = React.useMemo(() => {
+      const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
+      return allDynamicDefs.filter(def => {
+          if (def.key.startsWith('hyperskill_')) {
+              return canAddHyperskillQuality;
+          }
+          if (def.key.startsWith('hyperstat_')) {
+              return canAddHyperstatQuality;
+          }
+          if (['attacks', 'defends', 'useful'].includes(def.key)) {
+              return canAddStandardMiracleQuality;
+          }
+          return false; 
+      });
+  }, [characterData.skills, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
+
+  const finalFilteredDynamicPqDefs = React.useMemo(() => {
+    return initialFilteredDynamicPqDefs.filter(def =>
+        gmSettings.miracleRestrictions.allowedQualities[def.key] === undefined || gmSettings.miracleRestrictions.allowedQualities[def.key]
+    );
+  }, [initialFilteredDynamicPqDefs, gmSettings.miracleRestrictions.allowedQualities]);
+
+
+  const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
+  const onePowerLimitReached = basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
+
   const isAddMiracleOverallDisabled = onePowerLimitReached || !canCharacterAddAnyMiracle;
 
   let addMiracleTooltipContent = "";
@@ -421,9 +449,10 @@ export function CharacterTabContent({
       addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1 regular miracle).";
   } else if (!canCharacterAddAnyMiracle) {
       addMiracleTooltipContent = "No permissions selected that allow adding new miracles or specific miracle qualities.";
-  } else if (filteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0) {
-      addMiracleTooltipContent = "No predefined miracle templates match your current permissions. You can still add a custom miracle.";
+  } else if (finalFilteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0) {
+      addMiracleTooltipContent = "No predefined miracle templates match your current permissions/GM settings. You can still add a custom miracle.";
   }
+
 
   const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD') => {
       const options = [];
@@ -608,12 +637,12 @@ export function CharacterTabContent({
           <div className="space-y-3 mt-3">
             <div className="flex justify-between items-center">
               <h5 className="text-md font-semibold text-accent">Power Qualities</h5>
-              <Button size="sm" variant="outline" onClick={() => onAddMiracleQuality(miracle.id)} disabled={filteredDynamicPqDefs.length === 0}>
+              <Button size="sm" variant="outline" onClick={() => onAddMiracleQuality(miracle.id)} disabled={finalFilteredDynamicPqDefs.length === 0}>
                 <PlusCircle className="mr-2 h-4 w-4"/> Add Quality
               </Button>
             </div>
-            {filteredDynamicPqDefs.length === 0 && <p className="text-xs text-muted-foreground">No quality types available based on current permissions.</p>}
-            {miracle.qualities.length === 0 && filteredDynamicPqDefs.length > 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
+            {finalFilteredDynamicPqDefs.length === 0 && <p className="text-xs text-muted-foreground">No quality types available based on current permissions/GM settings.</p>}
+            {miracle.qualities.length === 0 && finalFilteredDynamicPqDefs.length > 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
             
             {miracle.qualities.map((quality) => (
               <Card key={quality.id} className="p-3 bg-background/50 border-border shadow-inner">
@@ -629,7 +658,7 @@ export function CharacterTabContent({
                     <Select value={quality.type} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'type', v)}>
                       <SelectTrigger id={`${quality.id}-type`}><SelectValue/></SelectTrigger>
                       <SelectContent>
-                        {filteredDynamicPqDefs.map(def => <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>)}
+                        {finalFilteredDynamicPqDefs.map(def => <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -638,7 +667,9 @@ export function CharacterTabContent({
                     <Select value={quality.capacity} onValueChange={(v) => onMiracleQualityChange(miracle.id, quality.id, 'capacity', v as MiracleCapacityType)}>
                       <SelectTrigger id={`${quality.id}-capacity`}><SelectValue/></SelectTrigger>
                       <SelectContent>
-                        {POWER_CAPACITY_OPTIONS.map(cap => <SelectItem key={cap.value} value={cap.value}>{cap.label}</SelectItem>)}
+                        {POWER_CAPACITY_OPTIONS
+                           .filter(cap => gmSettings.miracleRestrictions.allowedCapacities[cap.value] === undefined || gmSettings.miracleRestrictions.allowedCapacities[cap.value])
+                           .map(cap => <SelectItem key={cap.value} value={cap.value}>{cap.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -705,7 +736,9 @@ export function CharacterTabContent({
                           <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Extra..."/></SelectTrigger>
                           <SelectContent>
                               <SelectItem value="custom_extra">Custom Extra</SelectItem>
-                              {PREDEFINED_EXTRAS.map(ex => <SelectItem key={ex.id} value={ex.id}>{ex.name} ({ex.costModifier > 0 ? '+' : ''}{ex.costModifier})</SelectItem>)}
+                              {PREDEFINED_EXTRAS
+                                .filter(ex => gmSettings.miracleRestrictions.allowedExtras[ex.id] === undefined || gmSettings.miracleRestrictions.allowedExtras[ex.id])
+                                .map(ex => <SelectItem key={ex.id} value={ex.id}>{ex.name} ({ex.costModifier > 0 ? '+' : ''}{ex.costModifier})</SelectItem>)}
                           </SelectContent>
                       </Select>
                       <Button size="sm" className="h-8 text-xs" onClick={() => {
@@ -752,7 +785,9 @@ export function CharacterTabContent({
                           <SelectTrigger className="h-8 text-xs flex-grow" ><SelectValue placeholder="Add Flaw..." /></SelectTrigger>
                           <SelectContent>
                               <SelectItem value="custom_flaw">Custom Flaw</SelectItem>
-                              {PREDEFINED_FLAWS.map(fl => <SelectItem key={fl.id} value={fl.id}>{fl.name} ({fl.costModifier})</SelectItem>)}
+                              {PREDEFINED_FLAWS
+                                .filter(fl => gmSettings.miracleRestrictions.allowedFlaws[fl.id] === undefined || gmSettings.miracleRestrictions.allowedFlaws[fl.id])
+                                .map(fl => <SelectItem key={fl.id} value={fl.id}>{fl.name} ({fl.costModifier})</SelectItem>)}
                           </SelectContent>
                       </Select>
                        <Button size="sm" className="h-8 text-xs" onClick={() => {
@@ -788,7 +823,9 @@ export function CharacterTabContent({
             <Select value={characterData.basicInfo.selectedArchetypeId} onValueChange={(value) => onBasicInfoChange('selectedArchetypeId', value)}>
               <SelectTrigger id="archetype"><SelectValue placeholder="Select Archetype..." /></SelectTrigger>
               <SelectContent>
-                {ARCHETYPES.map(arch => <SelectItem key={arch.id} value={arch.id}>{arch.name}</SelectItem>)}
+                {ARCHETYPES
+                  .filter(arch => arch.id === 'custom' || (gmSettings.sampleArchetypes[arch.id] === undefined || gmSettings.sampleArchetypes[arch.id]))
+                  .map(arch => <SelectItem key={arch.id} value={arch.id}>{arch.name}</SelectItem>)}
               </SelectContent>
             </Select>
             {selectedArchetype && selectedArchetype.id !== 'custom' && (
@@ -816,6 +853,7 @@ export function CharacterTabContent({
             basicInfo={characterData.basicInfo}
             onMetaQualityConfigChange={onMetaQualityConfigChange}
             mqType="source"
+            gmSettings={gmSettings}
           />
 
           <MetaQualityCollapsible
@@ -826,6 +864,7 @@ export function CharacterTabContent({
             basicInfo={characterData.basicInfo}
             onMetaQualityConfigChange={onMetaQualityConfigChange}
             mqType="permission"
+            gmSettings={gmSettings}
           />
 
           <MetaQualityCollapsible
@@ -836,6 +875,7 @@ export function CharacterTabContent({
             basicInfo={characterData.basicInfo}
             onMetaQualityConfigChange={onMetaQualityConfigChange}
             mqType="intrinsic"
+            gmSettings={gmSettings}
           />
         </div>
       </CollapsibleSectionItem>
@@ -1009,7 +1049,9 @@ export function CharacterTabContent({
                   <SelectValue placeholder="Choose a skill..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {SKILL_DEFINITIONS.map(def => (
+                  {SKILL_DEFINITIONS
+                    .filter(def => gmSettings.sampleSkills[def.id] === undefined || gmSettings.sampleSkills[def.id])
+                    .map(def => (
                     <SelectItem key={def.id} value={def.id}>{def.name} ({def.linkedAttribute})</SelectItem>
                   ))}
                 </SelectContent>
@@ -1218,11 +1260,11 @@ export function CharacterTabContent({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="custom">Add Custom Miracle</SelectItem>
-                  {filteredMiracleTemplates.map(def => (
+                  {finalFilteredMiracleTemplates.map(def => (
                     <SelectItem key={def.definitionId} value={def.definitionId!}>{def.name}</SelectItem>
                   ))}
-                   {filteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0 && !isAddMiracleOverallDisabled && (
-                      <div className="p-2 text-xs text-muted-foreground">No predefined templates match current permissions.</div>
+                   {finalFilteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0 && !isAddMiracleOverallDisabled && (
+                      <div className="p-2 text-xs text-muted-foreground">No predefined templates match current permissions/GM settings.</div>
                     )}
                 </SelectContent>
               </Select>
@@ -1271,3 +1313,4 @@ export function CharacterTabContent({
     
 
     
+
