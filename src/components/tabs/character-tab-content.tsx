@@ -339,8 +339,8 @@ export function CharacterTabContent({
 
   const filteredMiracleTemplates = React.useMemo(() => {
     return PREDEFINED_MIRACLES_TEMPLATES.filter(template => {
-        if (!template.qualities || template.qualities.length === 0) {
-            return canAddStandardMiracleQuality || canAddHyperstatQuality || canAddHyperskillQuality; 
+        if (!template.qualities || template.qualities.length === 0) { // Templates without qualities are generally "customizable"
+             return canAddStandardMiracleQuality || canAddHyperstatQuality || canAddHyperskillQuality; // Allow if any permission is present
         }
         return template.qualities.every(quality => {
             const type = quality.type;
@@ -351,7 +351,7 @@ export function CharacterTabContent({
             } else if (type.startsWith('hyperskill_')) {
                 return canAddHyperskillQuality;
             }
-            return false; 
+            return false; // Unknown quality type in template
         });
     });
   }, [characterData.basicInfo.selectedPermissionMQIds, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
@@ -419,13 +419,13 @@ export function CharacterTabContent({
   const renderMiracleCardContent = (miracle: MiracleDefinition) => {
     const isIntrinsicMandatedUnremovable = miracle.isMandatory && 
         (miracle.definitionId?.startsWith('archetype-mandatory-') || 
-        (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
+         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
     
     return (
       <>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
-            {(miracle.isCustom || !miracle.definitionId || miracle.definitionId?.startsWith('archetype-mandatory-') || miracle.definitionId === 'perceive_godlike_talents') ? (
+            {(miracle.isCustom || !miracle.definitionId || miracle.definitionId?.startsWith('archetype-mandatory-') || (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents')) ? (
               <Input
                 value={miracle.name}
                 onChange={(e) => onMiracleChange(miracle.id, 'name', e.target.value)}
@@ -643,7 +643,7 @@ export function CharacterTabContent({
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6" collapsible>
+    <Accordion type="multiple" className="w-full space-y-6">
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>
@@ -1125,6 +1125,7 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
 
 
 
