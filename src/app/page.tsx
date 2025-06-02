@@ -1143,7 +1143,10 @@ export default function HomePage() {
   const charmValue = calculateStatValue('charm', characterData.stats.charm);
   const commandValue = calculateStatValue('command', characterData.stats.command);
   
-  const rawCalculatedBaseWillFromStats = charmValue + commandValue;
+  let rawCalculatedBaseWillFromStats = charmValue + commandValue;
+  if (discardedAttribute === 'charm') rawCalculatedBaseWillFromStats -= charmValue; // Should be 0 already
+  if (discardedAttribute === 'command') rawCalculatedBaseWillFromStats -= commandValue; // Should be 0 already
+
   
   const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
   const displayCalculatedBaseWillFromStats = hasNoBaseWillIntrinsic ? 0 : rawCalculatedBaseWillFromStats;
@@ -1156,7 +1159,7 @@ export default function HomePage() {
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
   
   let displayTotalWill = displayTotalBaseWill + currentPurchasedWill;
-  if (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) { // If "No Base Will" OR "No Willpower" is selected, Total Will is 0.
+  if (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) { 
     displayTotalWill = 0;
   }
   
@@ -1238,7 +1241,7 @@ export default function HomePage() {
         </Tabs>
       </main>
       <footer className="text-center p-4 text-sm text-muted-foreground">
-        Wild Talents 2e: Talent Forge - Alpha
+        Wild Talents 2e: Talent Forge
       </footer>
     </div>
   );
