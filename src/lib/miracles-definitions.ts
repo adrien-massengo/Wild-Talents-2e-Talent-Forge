@@ -1236,7 +1236,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
         {
             id: 'pgt_q1_use',
             type: 'useful',
-            capacity: 'touch',
+            capacity: 'range',
             levels: 0,
             extras: [],
             flaws: [
@@ -1904,3 +1904,4 @@ export const getDynamicPowerQualityDefinitions = (skills: SkillInstance[]): Powe
 };
 
     
+
