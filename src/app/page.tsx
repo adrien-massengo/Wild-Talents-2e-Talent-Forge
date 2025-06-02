@@ -19,6 +19,16 @@ import type {
     InhumanStatsSettings, InhumanStatSetting, AttributeCondition
 } from "@/lib/character-definitions";
 import { ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES } from "@/lib/character-definitions";
+import {
+  calculateTotalStatPoints,
+  calculateTotalWillpowerPoints,
+  calculateTotalSkillPoints,
+  calculateTotalMiraclePoints,
+  calculateCurrentArchetypeCost,
+  calculateSingleStatPoints,
+  calculateSingleSkillPoints,
+  calculateSingleMiracleTotalCost,
+} from "@/lib/cost-calculations";
 
 
 export interface StatDetail {
@@ -164,7 +174,7 @@ export default function HomePage() {
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
     setCharacterData(prev => {
       const previousArchetypeId = prev.basicInfo.selectedArchetypeId;
-      const newBasicInfo = { ...prev.basicInfo, [field]: value };
+      let newBasicInfo = { ...prev.basicInfo, [field]: value };
       let newWillpower = { ...prev.willpower };
       let updatedMiracles = [...prev.miracles];
       let newInhumanStatsSettings = prev.basicInfo.inhumanStatsSettings || 
@@ -173,33 +183,47 @@ export default function HomePage() {
             return acc;
         }, {} as InhumanStatsSettings);
 
-
       if (field === 'selectedArchetypeId') {
-        const newArchetype = ARCHETYPES.find(arch => arch.id === value);
+        const newArchetypeDef = ARCHETYPES.find(arch => arch.id === value);
+        
+        // Check Archetype Point Limit
+        if (newArchetypeDef && newArchetypeDef.id !== 'custom' && prev.archetypePointLimit !== undefined && newArchetypeDef.points > prev.archetypePointLimit) {
+            toast({ title: "Archetype Limit Exceeded", description: `Cannot select ${newArchetypeDef.name}. Its cost (${newArchetypeDef.points}) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+            return prev; // Revert change
+        }
+        // Also, if changing to 'custom', the cost will be calculated from MQs, so check that below.
+         if (newArchetypeDef && value === 'custom') {
+            // For custom, the cost is MQs. We need to ensure current MQs don't exceed limit.
+            const currentCustomCost = calculateCurrentArchetypeCost(newBasicInfo); // basicInfo with new 'custom' archetypeId
+            if (prev.archetypePointLimit !== undefined && currentCustomCost > prev.archetypePointLimit) {
+                 toast({ title: "Archetype Limit Exceeded", description: `Changing to Custom Archetype with current Meta-Qualities (${currentCustomCost}pts) exceeds the Archetype Point Limit of ${prev.archetypePointLimit}. Adjust Meta-Qualities first.`, variant: "destructive" });
+                 return prev;
+            }
+        }
+
 
         if (previousArchetypeId === 'godlike_talent' && value !== 'godlike_talent') {
           updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
         }
         
-        if (newArchetype && newArchetype.id !== previousArchetypeId) {
+        if (newArchetypeDef && newArchetypeDef.id !== previousArchetypeId) {
              updatedMiracles = updatedMiracles.filter(m => {
                 const isGenericMandatory = m.definitionId?.startsWith('archetype-mandatory-');
-                if (m.definitionId === 'perceive_godlike_talents' && value !== 'godlike_talent') return false; // Remove if not godlike anymore
-                if (m.definitionId === 'perceive_godlike_talents' && value === 'godlike_talent') return true; // Keep if becoming godlike
+                if (m.definitionId === 'perceive_godlike_talents' && value !== 'godlike_talent') return false;
+                if (m.definitionId === 'perceive_godlike_talents' && value === 'godlike_talent') return true; 
                 if (isGenericMandatory) {
                     if (value === 'custom') return false; 
-                    const newArchHasMandatoryPowerIntrinsic = newArchetype?.intrinsicMQIds.includes('mandatory_power');
+                    const newArchHasMandatoryPowerIntrinsic = newArchetypeDef?.intrinsicMQIds.includes('mandatory_power');
                     if (!newArchHasMandatoryPowerIntrinsic) return false; 
                 }
                 return true;
             });
         }
 
-
-        if (newArchetype && newArchetype.id !== 'custom') {
-          newBasicInfo.selectedSourceMQIds = newArchetype.sourceMQIds || [];
-          newBasicInfo.selectedPermissionMQIds = newArchetype.permissionMQIds || [];
-          newBasicInfo.selectedIntrinsicMQIds = newArchetype.intrinsicMQIds || [];
+        if (newArchetypeDef && newArchetypeDef.id !== 'custom') {
+          newBasicInfo.selectedSourceMQIds = newArchetypeDef.sourceMQIds || [];
+          newBasicInfo.selectedPermissionMQIds = newArchetypeDef.permissionMQIds || [];
+          newBasicInfo.selectedIntrinsicMQIds = newArchetypeDef.intrinsicMQIds || [];
           
           const currentIntrinsicConfigs = {
             intrinsicAllergyConfig: { ...prev.basicInfo.intrinsicAllergyConfig },
@@ -215,31 +239,29 @@ export default function HomePage() {
           newBasicInfo.intrinsicMandatoryPowerConfig = {};
           newBasicInfo.intrinsicVulnerableConfig = {};
 
-          (newArchetype.intrinsicMQIds || []).forEach(mqId => {
+          (newArchetypeDef.intrinsicMQIds || []).forEach(mqId => {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
             if (intrinsicDef?.configKey) {
                 // @ts-ignore
                 newBasicInfo[intrinsicDef.configKey][mqId] = currentIntrinsicConfigs[intrinsicDef.configKey]?.[mqId] || 
                   (intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig' 
-                    ? { count: (newArchetype.mandatoryPowerText ? 1 : 0) } 
+                    ? { count: (newArchetypeDef.mandatoryPowerText ? 1 : 0) } 
                     : (intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {extraBoxes:0} : {})
                   );
 
                  if (intrinsicDef.id === 'mandatory_power') {
-                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (newArchetype.mandatoryPowerText ? 1 : 0);
+                    const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (newArchetypeDef.mandatoryPowerText ? 1 : 0);
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
                     updatedMiracles = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value) as MiracleDefinition[];
                 }
             }
           });
-           // Reset inhumanStatsSettings if new archetype doesn't include 'inhuman_stats' permission
            if (!newBasicInfo.selectedPermissionMQIds.includes('inhuman_stats')) {
                 newInhumanStatsSettings = ALL_STATS.reduce((acc, statName) => {
                     acc[statName] = { condition: 'normal' };
                     return acc;
                 }, {} as InhumanStatsSettings);
             } else if (!prev.basicInfo.selectedPermissionMQIds.includes('inhuman_stats') && newBasicInfo.selectedPermissionMQIds.includes('inhuman_stats')) {
-                // If inhuman_stats is newly added by archetype, ensure it's initialized
                  newInhumanStatsSettings = prev.basicInfo.inhumanStatsSettings && Object.keys(prev.basicInfo.inhumanStatsSettings).length > 0
                     ? prev.basicInfo.inhumanStatsSettings
                     : ALL_STATS.reduce((acc, statName) => {
@@ -255,8 +277,6 @@ export default function HomePage() {
           } else if (newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
             newWillpower.purchasedWill = 0;
           }
-
-          return { ...prev, basicInfo: {...newBasicInfo, inhumanStatsSettings: newInhumanStatsSettings }, willpower: newWillpower, miracles: updatedMiracles };
         } 
       }
       return { ...prev, basicInfo: {...newBasicInfo, inhumanStatsSettings: newInhumanStatsSettings }, willpower: newWillpower, miracles: updatedMiracles };
@@ -305,8 +325,33 @@ export default function HomePage() {
     isSelected: boolean
   ) => {
     setCharacterData(prev => {
-      const newBasicInfo = { ...prev.basicInfo };
+      const tempBasicInfo = { ...prev.basicInfo };
       let currentSelection: string[] = [];
+
+      if (mqType === 'source') currentSelection = [...tempBasicInfo.selectedSourceMQIds];
+      else if (mqType === 'permission') currentSelection = [...tempBasicInfo.selectedPermissionMQIds];
+      else if (mqType === 'intrinsic') currentSelection = [...tempBasicInfo.selectedIntrinsicMQIds];
+
+      if (isSelected) {
+        if (!currentSelection.includes(mqId)) currentSelection.push(mqId);
+      } else {
+        currentSelection = currentSelection.filter(id => id !== mqId);
+      }
+      
+      if (mqType === 'source') tempBasicInfo.selectedSourceMQIds = currentSelection;
+      else if (mqType === 'permission') tempBasicInfo.selectedPermissionMQIds = currentSelection;
+      else if (mqType === 'intrinsic') tempBasicInfo.selectedIntrinsicMQIds = currentSelection;
+      tempBasicInfo.selectedArchetypeId = 'custom'; // Changing MQs always results in a custom archetype
+
+      const potentialArchetypeCost = calculateCurrentArchetypeCost(tempBasicInfo);
+      if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
+        toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality change would make the custom archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+        return prev; // Revert
+      }
+
+      // If cost is fine, proceed with actual update
+      const newBasicInfo = { ...prev.basicInfo };
+      let currentActualSelection: string[] = [];
       let newWillpower = { ...prev.willpower };
       let newInhumanStatsSettings = prev.basicInfo.inhumanStatsSettings || 
         ALL_STATS.reduce((acc, statName) => {
@@ -314,16 +359,15 @@ export default function HomePage() {
             return acc;
         }, {} as InhumanStatsSettings);
 
-
-      if (mqType === 'source') currentSelection = [...newBasicInfo.selectedSourceMQIds];
-      else if (mqType === 'permission') currentSelection = [...newBasicInfo.selectedPermissionMQIds];
-      else if (mqType === 'intrinsic') currentSelection = [...newBasicInfo.selectedIntrinsicMQIds];
+      if (mqType === 'source') currentActualSelection = [...newBasicInfo.selectedSourceMQIds];
+      else if (mqType === 'permission') currentActualSelection = [...newBasicInfo.selectedPermissionMQIds];
+      else if (mqType === 'intrinsic') currentActualSelection = [...newBasicInfo.selectedIntrinsicMQIds];
 
       let updatedMiracles = [...prev.miracles];
 
       if (isSelected) {
-        if (!currentSelection.includes(mqId)) {
-          currentSelection.push(mqId);
+        if (!currentActualSelection.includes(mqId)) {
+          currentActualSelection.push(mqId);
            if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
                 updatedMiracles = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId) as MiracleDefinition[];
@@ -335,7 +379,6 @@ export default function HomePage() {
              newWillpower.purchasedWill = 0;
            }
            if (mqType === 'permission' && mqId === 'inhuman_stats') {
-                // Ensure inhumanStatsSettings is initialized if not already
                 if (!newInhumanStatsSettings || Object.keys(newInhumanStatsSettings).length === 0) {
                      newInhumanStatsSettings = ALL_STATS.reduce((acc, statName) => {
                         acc[statName] = { condition: 'normal' };
@@ -345,7 +388,7 @@ export default function HomePage() {
             }
         }
       } else {
-        currentSelection = currentSelection.filter(id => id !== mqId);
+        currentActualSelection = currentActualSelection.filter(id => id !== mqId);
         if (mqType === 'intrinsic') {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
             if (intrinsicDef?.configKey) {
@@ -356,16 +399,15 @@ export default function HomePage() {
                 }
             }
             if (mqId === 'no_base_will' && newBasicInfo.selectedIntrinsicMQIds.includes('no_willpower')) {
-                // No change needed here, no_willpower already dictates purchasedWill = 0
+                // No change needed here
             } else if (mqId === 'no_willpower' && newBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')){
                  newWillpower.purchasedWill = 0; 
             }
-            if (newBasicInfo.selectedArchetypeId === 'godlike_talent' && mqId === 'mandatory_power') {
+            if (newBasicInfo.selectedArchetypeId === 'godlike_talent' && mqId === 'mandatory_power') { // This check seems redundant as archetype becomes custom
                 updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
             }
         }
         if (mqType === 'permission' && mqId === 'inhuman_stats') {
-            // Reset inhumanStatsSettings to normal for all stats
             newInhumanStatsSettings = ALL_STATS.reduce((acc, statName) => {
                 acc[statName] = { condition: 'normal' };
                 return acc;
@@ -373,9 +415,9 @@ export default function HomePage() {
         }
       }
 
-      if (mqType === 'source') newBasicInfo.selectedSourceMQIds = currentSelection;
-      else if (mqType === 'permission') newBasicInfo.selectedPermissionMQIds = currentSelection;
-      else if (mqType === 'intrinsic') newBasicInfo.selectedIntrinsicMQIds = currentSelection;
+      if (mqType === 'source') newBasicInfo.selectedSourceMQIds = currentActualSelection;
+      else if (mqType === 'permission') newBasicInfo.selectedPermissionMQIds = currentActualSelection;
+      else if (mqType === 'intrinsic') newBasicInfo.selectedIntrinsicMQIds = currentActualSelection;
       
       newBasicInfo.selectedArchetypeId = 'custom';
 
@@ -384,10 +426,10 @@ export default function HomePage() {
   };
   
  const handleMetaQualityConfigChange = (
-    metaQualityId: string, // e.g., 'allergy', 'mandatory_power', 'inhuman_stats'
+    metaQualityId: string, 
     configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>,
-    fieldOrStatName: string, // For intrinsics: 'substance', 'effect', 'type', 'count', 'extraBoxes', 'discardedAttribute'. For inhuman_stats: 'body', 'coordination', etc.
-    valueOrSubField: any, // For intrinsics: the value. For inhuman_stats: an object like { field: 'condition'/'inferiorMaxDice', value: ... } or just the value if it's a direct field update
+    fieldOrStatName: string, 
+    valueOrSubField: any, 
     currentMiraclesParam?: MiracleDefinition[],
     calledFromArchetypeChange?: boolean,
     archetypeIdForContext?: string
@@ -395,6 +437,51 @@ export default function HomePage() {
     let finalMiracles: MiracleDefinition[] | undefined = undefined;
 
     setCharacterData(prev => {
+        // Create a temporary newBasicInfo to calculate potential cost for intrinsics
+        const tempNewBasicInfo = JSON.parse(JSON.stringify(prev.basicInfo)); // Deep clone
+        if (configKey !== 'inhumanStatsSettings') {
+            // @ts-ignore
+            tempNewBasicInfo[configKey] = {
+                // @ts-ignore
+                ...(prev.basicInfo[configKey] || {}),
+                [metaQualityId]: {
+                    // @ts-ignore
+                    ...(prev.basicInfo[configKey]?.[metaQualityId] || {}),
+                    [fieldOrStatName]: valueOrSubField,
+                }
+            };
+        } else { // For inhumanStatsSettings
+            const statName = fieldOrStatName as keyof CharacterData['stats'];
+            const { field: subField, value: subValue } = valueOrSubField as { field: keyof InhumanStatSetting, value: any };
+            tempNewBasicInfo.inhumanStatsSettings = {
+                ...(tempNewBasicInfo.inhumanStatsSettings || {}),
+                [statName]: {
+                    ...(tempNewBasicInfo.inhumanStatsSettings?.[statName] || { condition: 'normal' }),
+                    [subField]: subValue,
+                }
+            };
+            if (subField === 'condition' && subValue !== 'inferior') { // @ts-ignore
+                delete tempNewBasicInfo.inhumanStatsSettings[statName].inferiorMaxDice;
+            }
+            if (subField === 'condition' && subValue === 'inferior' && !tempNewBasicInfo.inhumanStatsSettings?.[statName]?.inferiorMaxDice) { // @ts-ignore
+                tempNewBasicInfo.inhumanStatsSettings[statName].inferiorMaxDice = 4;
+            }
+        }
+        
+        // If this MQ change makes the archetype custom, check its cost
+        const archetypeIdForCostCheck = calledFromArchetypeChange ? archetypeIdForContext : 'custom';
+        const basicInfoForCostCheck = { ...tempNewBasicInfo, selectedArchetypeId: archetypeIdForCostCheck };
+        
+        const potentialArchetypeCost = calculateCurrentArchetypeCost(basicInfoForCostCheck);
+
+        if (prev.archetypePointLimit !== undefined && potentialArchetypeCost > prev.archetypePointLimit) {
+            toast({ title: "Archetype Limit Exceeded", description: `This Meta-Quality configuration change would make the archetype cost ${potentialArchetypeCost}pts, exceeding the limit of ${prev.archetypePointLimit}.`, variant: "destructive" });
+            if (calledFromArchetypeChange && finalMiracles) return finalMiracles; // Special handling for archetype change
+            return prev; // Revert
+        }
+
+
+        // If cost is fine, proceed with actual update
         const miraclesToUpdate = currentMiraclesParam || prev.miracles;
         const newBasicInfo = { ...prev.basicInfo };
         let inhumanStatsUpdate = false;
@@ -406,18 +493,14 @@ export default function HomePage() {
             newBasicInfo.inhumanStatsSettings = {
                 ...(newBasicInfo.inhumanStatsSettings || {}),
                 [statName]: {
-                    ...(newBasicInfo.inhumanStatsSettings?.[statName] || { condition: 'normal' }), // Ensure existing settings or default
+                    ...(newBasicInfo.inhumanStatsSettings?.[statName] || { condition: 'normal' }), 
                     [subField]: subValue,
                 }
             };
-            // If condition is changed away from 'inferior', clear inferiorMaxDice
-            if (subField === 'condition' && subValue !== 'inferior') {
-                // @ts-ignore
+            if (subField === 'condition' && subValue !== 'inferior') { // @ts-ignore
                 delete newBasicInfo.inhumanStatsSettings[statName].inferiorMaxDice;
             }
-             // If condition becomes 'inferior' and inferiorMaxDice is not set, default it to 4
-            if (subField === 'condition' && subValue === 'inferior' && !newBasicInfo.inhumanStatsSettings?.[statName]?.inferiorMaxDice) {
-                 // @ts-ignore
+            if (subField === 'condition' && subValue === 'inferior' && !newBasicInfo.inhumanStatsSettings?.[statName]?.inferiorMaxDice) { // @ts-ignore
                 newBasicInfo.inhumanStatsSettings[statName].inferiorMaxDice = 4;
             }
             inhumanStatsUpdate = true;
@@ -461,12 +544,12 @@ export default function HomePage() {
                         const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'perceive_godlike_talents');
                         if (template) {
                             newMandatoryMiracle = {
-                                ...template, // Spread the template
+                                ...template, 
                                 id: `miracle-arch-mandatory-pgt-${Date.now()}-${i}`,
                                 dice: '0D', 
                                 hardDice: '2HD', 
                                 wiggleDice: '0WD',
-                                qualities: template.qualities.map(tq => ({ // Deep copy qualities, extras, flaws with new IDs
+                                qualities: template.qualities.map(tq => ({ 
                                   ...tq,
                                   id: `quality-instance-pgt-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
                                   extras: tq.extras.map(tex => ({
@@ -521,7 +604,7 @@ export default function HomePage() {
           if (calledFromArchetypeChange) return prev; 
           return { ...prev, basicInfo: newBasicInfo, miracles: updatedMiracles };
       }
-      finalMiracles = updatedMiracles; // ensure finalMiracles is assigned even if not mandatory_power
+      finalMiracles = updatedMiracles; 
       if (calledFromArchetypeChange) return prev;
       return { ...prev, basicInfo: newBasicInfo, miracles: inhumanStatsUpdate ? prev.miracles : updatedMiracles };
     });
@@ -535,75 +618,118 @@ export default function HomePage() {
     dieType: keyof StatDetail,
     value: string
   ) => {
-    setCharacterData(prev => ({
-      ...prev,
-      stats: {
-        ...prev.stats,
-        [statName]: {
-          ...prev.stats[statName],
-          [dieType]: value,
+    setCharacterData(prev => {
+      const discardedAttr = getDiscardedAttributeFromBasicInfo(prev.basicInfo);
+      const currentTotalStatCost = calculateTotalStatPoints(prev.stats, discardedAttr);
+      const costOfStatBeingChanged = calculateSingleStatPoints(prev.stats[statName], statName, discardedAttr);
+      
+      const potentialNewStatDetail = { ...prev.stats[statName], [dieType]: value };
+      const costOfPotentialNewStat = calculateSingleStatPoints(potentialNewStatDetail, statName, discardedAttr);
+      
+      const potentialNewTotalStatCost = currentTotalStatCost - costOfStatBeingChanged + costOfPotentialNewStat;
+
+      if (prev.statPointLimit !== undefined && potentialNewTotalStatCost > prev.statPointLimit) {
+        toast({ title: "Stat Limit Exceeded", description: `Changing ${statName} would make total stat cost ${potentialNewTotalStatCost}pts, exceeding the limit of ${prev.statPointLimit}.`, variant: "destructive" });
+        return prev;
+      }
+
+      return {
+        ...prev,
+        stats: {
+          ...prev.stats,
+          [statName]: potentialNewStatDetail,
         },
-      },
-    }));
+      };
+    });
   };
 
   const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
-    const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
-    const hasNoWillpowerIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
+    setCharacterData(prev => {
+      const hasNoBaseWillIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
+      const hasNoWillpowerIntrinsic = prev.basicInfo.selectedIntrinsicMQIds.includes('no_willpower');
+      let processedValue = isNaN(value) ? 0 : Math.max(0, value);
 
-    let processedValue = isNaN(value) ? 0 : Math.max(0, value);
+      if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) processedValue = 0;
+      if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) processedValue = 0;
 
-    if (field === 'purchasedBaseWill' && hasNoBaseWillIntrinsic) {
-      processedValue = 0; 
-    }
-    if (field === 'purchasedWill' && (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic)) {
-      processedValue = 0; 
-    }
-    
-    setCharacterData(prev => ({
-      ...prev,
-      willpower: {
-        ...prev.willpower,
-        [field]: processedValue,
+      const tempWillpower = { ...prev.willpower, [field]: processedValue };
+      const potentialWillpowerCost = calculateTotalWillpowerPoints(
+        tempWillpower.purchasedBaseWill,
+        tempWillpower.purchasedWill,
+        hasNoBaseWillIntrinsic,
+        hasNoWillpowerIntrinsic
+      );
+
+      if (prev.willpowerPointLimit !== undefined && potentialWillpowerCost > prev.willpowerPointLimit) {
+        toast({ title: "Willpower Limit Exceeded", description: `This change would make Willpower cost ${potentialWillpowerCost}pts, exceeding the limit of ${prev.willpowerPointLimit}.`, variant: "destructive" });
+        return prev;
       }
-    }));
+      
+      return {
+        ...prev,
+        willpower: tempWillpower,
+      };
+    });
   };
 
   const handleAddSkill = (skillDef: PredefinedSkillDef) => {
-    const newSkillInstance: SkillInstance = {
-      id: Date.now().toString(),
-      definitionId: skillDef.id,
-      name: skillDef.hasType ? `${skillDef.name} (Unspecified)` : skillDef.name,
-      baseName: skillDef.name,
-      linkedAttribute: skillDef.linkedAttribute,
-      description: skillDef.description,
-      dice: '1D',
-      hardDice: '0HD',
-      wiggleDice: '0WD',
-      isCustom: false,
-      typeSpecification: '',
-      notes: skillDef.notes,
-      sampleTypes: skillDef.sampleTypes,
-      hasType: skillDef.hasType,
-    };
-    setCharacterData(prev => ({ ...prev, skills: [...prev.skills, newSkillInstance] }));
+    setCharacterData(prev => {
+      const newSkillCost = calculateSingleSkillPoints({
+        id: '', definitionId: '', name: '', baseName: '', linkedAttribute: skillDef.linkedAttribute, description: '',
+        dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: false
+      });
+      const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
+      if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
+        toast({ title: "Skill Limit Exceeded", description: `Adding this skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+        return prev;
+      }
+
+      const newSkillInstance: SkillInstance = {
+        id: Date.now().toString(),
+        definitionId: skillDef.id,
+        name: skillDef.hasType ? `${skillDef.name} (Unspecified)` : skillDef.name,
+        baseName: skillDef.name,
+        linkedAttribute: skillDef.linkedAttribute,
+        description: skillDef.description,
+        dice: '1D',
+        hardDice: '0HD',
+        wiggleDice: '0WD',
+        isCustom: false,
+        typeSpecification: '',
+        notes: skillDef.notes,
+        sampleTypes: skillDef.sampleTypes,
+        hasType: skillDef.hasType,
+      };
+      return { ...prev, skills: [...prev.skills, newSkillInstance] };
+    });
   };
 
   const handleAddCustomSkill = () => {
-    const newCustomSkill: SkillInstance = {
-      id: Date.now().toString(),
-      definitionId: `custom-${Date.now().toString()}`,
-      name: 'Custom Skill',
-      baseName: 'Custom Skill',
-      linkedAttribute: 'body',
-      description: 'Custom skill description.',
-      dice: '1D',
-      hardDice: '0HD',
-      wiggleDice: '0WD',
-      isCustom: true,
-      typeSpecification: '',
-    };
-    setCharacterData(prev => ({ ...prev, skills: [...prev.skills, newCustomSkill] }));
+    setCharacterData(prev => {
+      const newSkillCost = calculateSingleSkillPoints({
+        id: '', definitionId: '', name: '', baseName: '', linkedAttribute: 'body', description: '',
+        dice: '1D', hardDice: '0HD', wiggleDice: '0WD', isCustom: true
+      });
+      const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
+      if (prev.skillPointLimit !== undefined && (currentTotalSkillCost + newSkillCost) > prev.skillPointLimit) {
+        toast({ title: "Skill Limit Exceeded", description: `Adding a custom skill would exceed the Skill Point Limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+        return prev;
+      }
+      const newCustomSkill: SkillInstance = {
+        id: Date.now().toString(),
+        definitionId: `custom-${Date.now().toString()}`,
+        name: 'Custom Skill',
+        baseName: 'Custom Skill',
+        linkedAttribute: 'body',
+        description: 'Custom skill description.',
+        dice: '1D',
+        hardDice: '0HD',
+        wiggleDice: '0WD',
+        isCustom: true,
+        typeSpecification: '',
+      };
+      return { ...prev, skills: [...prev.skills, newCustomSkill] };
+    });
   };
 
   const handleRemoveSkill = (skillIdToRemove: string) => {
@@ -618,58 +744,77 @@ export default function HomePage() {
     field: keyof SkillInstance,
     value: string | AttributeName
   ) => {
-    setCharacterData(prev => ({
-      ...prev,
-      skills: prev.skills.map(skill => {
-        if (skill.id === skillId) {
-          const updatedSkill = { ...skill, [field]: value };
-          if (field === 'typeSpecification' && skill.hasType) {
-            updatedSkill.name = `${skill.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
-          }
-          if (field === 'name' && skill.isCustom) {
-             updatedSkill.baseName = value as string;
-          }
-          return updatedSkill;
-        }
-        return skill;
-      }),
-    }));
+    setCharacterData(prev => {
+      const currentTotalSkillCost = calculateTotalSkillPoints(prev.skills);
+      const skillBeingChanged = prev.skills.find(s => s.id === skillId);
+      if (!skillBeingChanged) return prev;
+
+      const costOfSkillBeingChanged = calculateSingleSkillPoints(skillBeingChanged);
+      const tempSkill = { ...skillBeingChanged, [field]: value };
+      // If name changed for custom skill, update baseName. If typeSpec changed, update name.
+      if (field === 'typeSpecification' && tempSkill.hasType) {
+        tempSkill.name = `${tempSkill.baseName}${value ? ` (${value})` : ' (Unspecified)'}`;
+      }
+      if (field === 'name' && tempSkill.isCustom) {
+         tempSkill.baseName = value as string;
+      }
+
+      const costOfPotentialNewSkill = calculateSingleSkillPoints(tempSkill);
+      const potentialNewTotalSkillCost = currentTotalSkillCost - costOfSkillBeingChanged + costOfPotentialNewSkill;
+
+      if (prev.skillPointLimit !== undefined && potentialNewTotalSkillCost > prev.skillPointLimit) {
+        toast({ title: "Skill Limit Exceeded", description: `This skill change would make total skill cost ${potentialNewTotalSkillCost}pts, exceeding the limit of ${prev.skillPointLimit}.`, variant: "destructive" });
+        return prev;
+      }
+      
+      return {
+        ...prev,
+        skills: prev.skills.map(skill => skill.id === skillId ? tempSkill : skill),
+      };
+    });
+  };
+
+  const withMiracleCostCheck = (
+    miracleUpdater: (prev: CharacterData) => CharacterData 
+  ): ((prev: CharacterData) => CharacterData) => {
+    return (prev: CharacterData) => {
+      const potentialNextState = miracleUpdater(prev);
+      const potentialMiracleCost = calculateTotalMiraclePoints(potentialNextState.miracles, potentialNextState.skills);
+      
+      if (prev.miraclePointLimit !== undefined && potentialMiracleCost > prev.miraclePointLimit) {
+        toast({ title: "Miracle Limit Exceeded", description: `This change would make total miracle cost ${potentialMiracleCost}pts, exceeding the limit of ${prev.miraclePointLimit}.`, variant: "destructive"});
+        return prev; // Revert
+      }
+      return potentialNextState;
+    };
   };
 
   const handleAddMiracle = (type: 'custom' | string) => {
-    let newMiracle: MiracleDefinition;
-    if (type === 'custom') {
-      newMiracle = {
-        id: `miracle-${Date.now()}`,
-        name: 'New Custom Miracle',
-        dice: '1D',
-        hardDice: '0HD',
-        wiggleDice: '0WD',
-        qualities: [],
-        description: 'Custom miracle description.',
-        isCustom: true,
-        isMandatory: false,
-      };
-    } else {
-      const template = PREDEFINED_MIRACLES_TEMPLATES.find(m => m.definitionId === type);
-      if (!template) return;
-      newMiracle = {
-        ...template,
-        id: `miracle-${template.definitionId}-${Date.now()}`,
-        dice: '1D', 
-        hardDice: '0HD',
-        wiggleDice: '0WD',
-        qualities: template.qualities.map(q => ({
-            ...q, 
-            id: `quality-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`,
-            extras: q.extras.map(ex => ({...ex, id: `extra-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
-            flaws: q.flaws.map(fl => ({...fl, id: `flaw-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
-        })), 
-        isCustom: false,
-        isMandatory: false, 
-      };
-    }
-    setCharacterData(prev => ({ ...prev, miracles: [...prev.miracles, newMiracle] }));
+    setCharacterData(withMiracleCostCheck(prev => {
+      let newMiracle: MiracleDefinition;
+      if (type === 'custom') {
+        newMiracle = {
+          id: `miracle-${Date.now()}`,
+          name: 'New Custom Miracle',
+          dice: '1D', hardDice: '0HD', wiggleDice: '0WD', qualities: [],
+          description: 'Custom miracle description.', isCustom: true, isMandatory: false,
+        };
+      } else {
+        const template = PREDEFINED_MIRACLES_TEMPLATES.find(m => m.definitionId === type);
+        if (!template) return prev;
+        newMiracle = {
+          ...template, id: `miracle-${template.definitionId}-${Date.now()}`,
+          dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
+          qualities: template.qualities.map(q => ({
+              ...q, id: `quality-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+              extras: q.extras.map(ex => ({...ex, id: `extra-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
+              flaws: q.flaws.map(fl => ({...fl, id: `flaw-instance-${Date.now()}-${Math.random().toString(36).substring(2)}`})),
+          })), 
+          isCustom: false, isMandatory: false, 
+        };
+      }
+      return { ...prev, miracles: [...prev.miracles, newMiracle] };
+    }));
   };
 
   const handleRemoveMiracle = (miracleId: string) => {
@@ -682,11 +827,11 @@ export default function HomePage() {
         toast({ title: "Cannot remove intrinsic-mandated miracle", description: "This miracle's existence is tied to an archetype or intrinsic setting.", variant: "destructive"});
         return;
     }
-
-    setCharacterData(prev => ({
+    // Cost check not strictly needed for removal, but good practice for consistency if logic changes
+    setCharacterData(withMiracleCostCheck(prev => ({
       ...prev,
       miracles: prev.miracles.filter(m => m.id !== miracleId),
-    }));
+    })));
   };
 
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
@@ -695,42 +840,38 @@ export default function HomePage() {
         (miracle.definitionId?.startsWith('archetype-mandatory-') || 
          (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
 
-
      if (isIntrinsicMandatedUnremovable && field === 'isMandatory' && !value) {
        toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic or specific archetype rule.", variant: "destructive"});
        return;
      }
 
-    setCharacterData(prev => ({
+    setCharacterData(withMiracleCostCheck(prev => ({
       ...prev,
       miracles: prev.miracles.map(m => m.id === miracleId ? { ...m, [field]: value } : m),
-    }));
+    })));
   };
 
   const handleAddMiracleQuality = (miracleId: string) => {
-    const newQuality: MiracleQuality = {
-      id: `quality-${Date.now()}`,
-      type: 'useful', 
-      capacity: 'touch', 
-      levels: 0,
-      extras: [],
-      flaws: [],
-    };
-    setCharacterData(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m =>
-        m.id === miracleId ? { ...m, qualities: [...m.qualities, newQuality] } : m
-      ),
+    setCharacterData(withMiracleCostCheck(prev => {
+      const newQuality: MiracleQuality = {
+        id: `quality-${Date.now()}`, type: 'useful', capacity: 'touch', levels: 0, extras: [], flaws: [],
+      };
+      return {
+        ...prev,
+        miracles: prev.miracles.map(m =>
+          m.id === miracleId ? { ...m, qualities: [...m.qualities, newQuality] } : m
+        ),
+      };
     }));
   };
 
   const handleRemoveMiracleQuality = (miracleId: string, qualityId: string) => {
-    setCharacterData(prev => ({
+    setCharacterData(withMiracleCostCheck(prev => ({
       ...prev,
       miracles: prev.miracles.map(m =>
         m.id === miracleId ? { ...m, qualities: m.qualities.filter(q => q.id !== qualityId) } : m
       ),
-    }));
+    })));
   };
 
   const handleMiracleQualityChange = (
@@ -739,7 +880,7 @@ export default function HomePage() {
     field: keyof MiracleQuality,
     value: any
   ) => {
-    setCharacterData(prev => ({
+    setCharacterData(withMiracleCostCheck(prev => ({
       ...prev,
       miracles: prev.miracles.map(m =>
         m.id === miracleId ? {
@@ -757,7 +898,7 @@ export default function HomePage() {
           })
         } : m
       ),
-    }));
+    })));
   };
 
   const handleAddExtraOrFlawToQuality = (
@@ -766,42 +907,38 @@ export default function HomePage() {
     itemType: 'extra' | 'flaw',
     definitionId?: string
   ) => {
-    let newItem: AppliedExtraOrFlaw;
-    if (definitionId) {
-      const collection = itemType === 'extra' ? PREDEFINED_EXTRAS : PREDEFINED_FLAWS;
-      const definition = collection.find(item => item.id === definitionId);
-      if (!definition) return;
-      newItem = {
-        id: `${itemType}-def-${definition.id}-${Date.now()}`,
-        definitionId: definition.id,
-        name: definition.name,
-        costModifier: definition.costModifier,
-        isCustom: false,
+    setCharacterData(withMiracleCostCheck(prev => {
+      let newItem: AppliedExtraOrFlaw;
+      if (definitionId) {
+        const collection = itemType === 'extra' ? PREDEFINED_EXTRAS : PREDEFINED_FLAWS;
+        const definition = collection.find(item => item.id === definitionId);
+        if (!definition) return prev;
+        newItem = {
+          id: `${itemType}-def-${definition.id}-${Date.now()}`, definitionId: definition.id,
+          name: definition.name, costModifier: definition.costModifier, isCustom: false,
+        };
+      } else { 
+        newItem = {
+          id: `custom-${itemType}-${Date.now()}`, name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
+          costModifier: itemType === 'extra' ? 1 : -1, isCustom: true,
+        };
+      }
+      return {
+        ...prev,
+        miracles: prev.miracles.map(m =>
+          m.id === miracleId ? {
+            ...m,
+            qualities: m.qualities.map(q => {
+              if (q.id === qualityId) {
+                return itemType === 'extra'
+                  ? { ...q, extras: [...q.extras, newItem] }
+                  : { ...q, flaws: [...q.flaws, newItem] };
+              }
+              return q;
+            })
+          } : m
+        ),
       };
-    } else { 
-      newItem = {
-        id: `custom-${itemType}-${Date.now()}`,
-        name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
-        costModifier: itemType === 'extra' ? 1 : -1, 
-        isCustom: true,
-      };
-    }
-
-    setCharacterData(prev => ({
-      ...prev,
-      miracles: prev.miracles.map(m =>
-        m.id === miracleId ? {
-          ...m,
-          qualities: m.qualities.map(q => {
-            if (q.id === qualityId) {
-              return itemType === 'extra'
-                ? { ...q, extras: [...q.extras, newItem] }
-                : { ...q, flaws: [...q.flaws, newItem] };
-            }
-            return q;
-          })
-        } : m
-      ),
     }));
   };
 
@@ -811,7 +948,7 @@ export default function HomePage() {
     itemType: 'extra' | 'flaw',
     itemId: string
   ) => {
-    setCharacterData(prev => ({
+    setCharacterData(withMiracleCostCheck(prev => ({
       ...prev,
       miracles: prev.miracles.map(m =>
         m.id === miracleId ? {
@@ -826,7 +963,7 @@ export default function HomePage() {
           })
         } : m
       ),
-    }));
+    })));
   };
 
   const handleExtraOrFlawChange = (
@@ -837,7 +974,7 @@ export default function HomePage() {
     field: keyof AppliedExtraOrFlaw,
     value: string | number
   ) => {
-     setCharacterData(prev => ({
+     setCharacterData(withMiracleCostCheck(prev => ({
       ...prev,
       miracles: prev.miracles.map(m =>
         m.id === miracleId ? {
@@ -864,7 +1001,7 @@ export default function HomePage() {
           })
         } : m
       ),
-    }));
+    })));
   };
   
   const handlePointLimitChange = (value: number) => {
@@ -883,12 +1020,8 @@ export default function HomePage() {
   
     setCharacterData(prev => {
       const { 
-        pointLimit, 
-        archetypePointLimit, 
-        statPointLimit, 
-        skillPointLimit, 
-        willpowerPointLimit, 
-        miraclePointLimit 
+        pointLimit, archetypePointLimit, statPointLimit, 
+        skillPointLimit, willpowerPointLimit, miraclePointLimit 
       } = prev;
   
       let sumOfOtherSubLimits = 0;
@@ -899,7 +1032,6 @@ export default function HomePage() {
       if (limitType !== 'miracle') sumOfOtherSubLimits += (miraclePointLimit || 0);
   
       const overallLimit = pointLimit || 0; 
-      
       let finalNewSubLimitValue = intendedNewSubLimitValue;
   
       if (intendedNewSubLimitValue !== undefined) {
@@ -973,26 +1105,19 @@ export default function HomePage() {
               : initialCharacterData.basicInfo.inhumanStatsSettings,
         };
         
-        Object.keys(loadedBasicInfo.intrinsicMandatoryPowerConfig).forEach(key => {
-            // @ts-ignore
-            if (typeof loadedBasicInfo.intrinsicMandatoryPowerConfig[key]?.count !== 'number') {
-                // @ts-ignore
+        Object.keys(loadedBasicInfo.intrinsicMandatoryPowerConfig).forEach(key => { // @ts-ignore
+            if (typeof loadedBasicInfo.intrinsicMandatoryPowerConfig[key]?.count !== 'number') { // @ts-ignore
                 loadedBasicInfo.intrinsicMandatoryPowerConfig[key] = { ...(loadedBasicInfo.intrinsicMandatoryPowerConfig[key] || {}), count: 0};
             }
         });
-        Object.keys(loadedBasicInfo.intrinsicVulnerableConfig).forEach(key => {
-            // @ts-ignore
-             if (typeof loadedBasicInfo.intrinsicVulnerableConfig[key]?.extraBoxes !== 'number') {
-                // @ts-ignore
+        Object.keys(loadedBasicInfo.intrinsicVulnerableConfig).forEach(key => { // @ts-ignore
+             if (typeof loadedBasicInfo.intrinsicVulnerableConfig[key]?.extraBoxes !== 'number') { // @ts-ignore
                  loadedBasicInfo.intrinsicVulnerableConfig[key] = { ...(loadedBasicInfo.intrinsicVulnerableConfig[key] || {}), extraBoxes: 0};
             }
         });
 
-
         const validatedData: CharacterData = {
-          ...initialCharacterData,
-          ...parsedData,
-          basicInfo: loadedBasicInfo,
+          ...initialCharacterData, ...parsedData, basicInfo: loadedBasicInfo,
           stats: { ...initialCharacterData.stats }, 
           willpower: { ...initialCharacterData.willpower, ...(parsedData.willpower || {}) },
           skills: parsedData.skills ? parsedData.skills.map(skill => ({
@@ -1010,24 +1135,15 @@ export default function HomePage() {
             notes: typeof skill.notes === 'string' ? skill.notes : undefined,
             sampleTypes: typeof skill.sampleTypes === 'string' ? skill.sampleTypes : undefined,
             hasType: typeof skill.hasType === 'boolean' ? skill.hasType : false,
-            ...skill, 
-            id: `loaded-skill-${Date.now()}-${Math.random().toString(36).substring(7)}`, 
+            ...skill, id: `loaded-skill-${Date.now()}-${Math.random().toString(36).substring(7)}`, 
           })) : [],
           miracles: parsedData.miracles ? parsedData.miracles.map(miracle => {
             const defaultMiracle: MiracleDefinition = {
-              id: `loaded-miracle-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-              name: 'Unnamed Miracle',
-              dice: '1D',
-              hardDice: '0HD',
-              wiggleDice: '0WD',
-              qualities: [],
-              description: '',
-              isCustom: true,
-              isMandatory: false,
+              id: `loaded-miracle-${Date.now()}-${Math.random().toString(36).substring(7)}`, name: 'Unnamed Miracle',
+              dice: '1D', hardDice: '0HD', wiggleDice: '0WD', qualities: [], description: '', isCustom: true, isMandatory: false,
             };
             return {
-              ...defaultMiracle,
-              ...miracle,
+              ...defaultMiracle, ...miracle,
               name: typeof miracle.name === 'string' ? miracle.name : defaultMiracle.name,
               dice: typeof miracle.dice === 'string' ? miracle.dice : defaultMiracle.dice,
               hardDice: typeof miracle.hardDice === 'string' ? miracle.hardDice : defaultMiracle.hardDice,
@@ -1039,66 +1155,36 @@ export default function HomePage() {
               qualities: miracle.qualities ? miracle.qualities.map(quality => {
                 const defaultQuality: MiracleQuality = {
                   id: `loaded-quality-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                  type: 'useful' as MiracleQualityType,
-                  capacity: 'touch' as MiracleCapacityType,
-                  levels: 0,
-                  extras: [],
-                  flaws: [],
+                  type: 'useful' as MiracleQualityType, capacity: 'touch' as MiracleCapacityType, levels: 0, extras: [], flaws: [],
                 };
-                return {
-                  ...defaultQuality,
-                  ...quality,
+                return { ...defaultQuality, ...quality,
                   type: typeof quality.type === 'string' ? quality.type as MiracleQualityType : defaultQuality.type,
                   capacity: typeof quality.capacity === 'string' ? quality.capacity as MiracleCapacityType : defaultQuality.capacity,
                   levels: (typeof quality.levels === 'number' && !isNaN(quality.levels)) ? quality.levels : defaultQuality.levels,
                   id: defaultQuality.id, 
                   extras: quality.extras ? quality.extras.map(ex => {
                     const defaultExtra: AppliedExtraOrFlaw = {
-                        id: `loaded-extra-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                        name: 'Custom Extra',
-                        costModifier: 1, 
-                        isCustom: true,
+                        id: `loaded-extra-${Date.now()}-${Math.random().toString(36).substring(7)}`, name: 'Custom Extra', costModifier: 1, isCustom: true,
                     };
                     let loadedCostModifier = ex.costModifier;
                     if (typeof loadedCostModifier !== 'number' || isNaN(loadedCostModifier)) {
                         const predefinedEx = PREDEFINED_EXTRAS.find(pEx => pEx.id === ex.definitionId);
                         loadedCostModifier = ex.isCustom ? 1 : (predefinedEx?.costModifier ?? 0);
                     }
-                    if (isNaN(loadedCostModifier)) { 
-                        loadedCostModifier = ex.isCustom ? 1 : 0;
-                    }
-                    return {
-                        ...defaultExtra,
-                        ...ex,
-                        name: typeof ex.name === 'string' ? ex.name : defaultExtra.name,
-                        costModifier: loadedCostModifier,
-                        isCustom: typeof ex.isCustom === 'boolean' ? ex.isCustom : defaultExtra.isCustom,
-                        id: defaultExtra.id,
-                    };
+                    if (isNaN(loadedCostModifier)) loadedCostModifier = ex.isCustom ? 1 : 0;
+                    return { ...defaultExtra, ...ex, name: typeof ex.name === 'string' ? ex.name : defaultExtra.name, costModifier: loadedCostModifier, isCustom: typeof ex.isCustom === 'boolean' ? ex.isCustom : defaultExtra.isCustom, id: defaultExtra.id, };
                   }) : [],
                   flaws: quality.flaws ? quality.flaws.map(fl => {
                     const defaultFlaw: AppliedExtraOrFlaw = {
-                        id: `loaded-flaw-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                        name: 'Custom Flaw',
-                        costModifier: -1, 
-                        isCustom: true,
+                        id: `loaded-flaw-${Date.now()}-${Math.random().toString(36).substring(7)}`, name: 'Custom Flaw', costModifier: -1, isCustom: true,
                     };
                     let loadedCostModifier = fl.costModifier;
                     if (typeof loadedCostModifier !== 'number' || isNaN(loadedCostModifier)) {
                         const predefinedFl = PREDEFINED_FLAWS.find(pFL => pFL.id === fl.definitionId);
                         loadedCostModifier = fl.isCustom ? -1 : (predefinedFl?.costModifier ?? 0);
                     }
-                    if (isNaN(loadedCostModifier)) { 
-                        loadedCostModifier = fl.isCustom ? -1 : 0;
-                    }
-                     return {
-                        ...defaultFlaw,
-                        ...fl,
-                        name: typeof fl.name === 'string' ? fl.name : defaultFlaw.name,
-                        costModifier: loadedCostModifier,
-                        isCustom: typeof fl.isCustom === 'boolean' ? fl.isCustom : defaultFlaw.isCustom,
-                        id: defaultFlaw.id,
-                    };
+                    if (isNaN(loadedCostModifier)) loadedCostModifier = fl.isCustom ? -1 : 0;
+                     return { ...defaultFlaw, ...fl, name: typeof fl.name === 'string' ? fl.name : defaultFlaw.name, costModifier: loadedCostModifier, isCustom: typeof fl.isCustom === 'boolean' ? fl.isCustom : defaultFlaw.isCustom, id: defaultFlaw.id, };
                   }) : [],
                 };
               }) : [],
@@ -1115,8 +1201,7 @@ export default function HomePage() {
         for (const statKey in initialCharacterData.stats) {
           if (parsedData.stats && parsedData.stats[statKey as keyof CharacterData['stats']]) {
             validatedData.stats[statKey as keyof CharacterData['stats']] = {
-              ...initialStatDetail,
-              ...parsedData.stats[statKey as keyof CharacterData['stats']],
+              ...initialStatDetail, ...parsedData.stats[statKey as keyof CharacterData['stats']],
             };
           }
         }
@@ -1132,26 +1217,14 @@ export default function HomePage() {
         }
 
         setCharacterData(validatedData);
-        toast({
-          title: "Character Loaded",
-          description: "Character data has been loaded from local storage.",
-        });
-
+        toast({ title: "Character Loaded", description: "Character data has been loaded from local storage." });
       } else {
-        toast({
-          title: "No Saved Data",
-          description: "No character data found in local storage.",
-          variant: "destructive",
-        });
+        toast({ title: "No Saved Data", description: "No character data found in local storage.", variant: "destructive" });
         setCharacterData(initialCharacterData);
       }
     } catch (error) {
       console.error("Failed to load character:", error);
-      toast({
-        title: "Load Error",
-        description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`,
-        variant: "destructive",
-      });
+      toast({ title: "Load Error", description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`, variant: "destructive" });
        setCharacterData(initialCharacterData);
     }
   };
@@ -1169,34 +1242,27 @@ export default function HomePage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast({
-        title: "Character Exported",
-        description: `Character data downloaded as ${fileName}.`,
-      });
+      toast({ title: "Character Exported", description: `Character data downloaded as ${fileName}.` });
     } catch (error) {
        console.error("Failed to export character:", error);
-       toast({
-        title: "Export Error",
-        description: "Could not export character data.",
-        variant: "destructive",
-      });
+       toast({ title: "Export Error", description: "Could not export character data.", variant: "destructive" });
     }
   };
 
-  const getDiscardedAttribute = (): DiscardedAttributeType => {
-    if (characterData.basicInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
-        for (const id of Object.keys(characterData.basicInfo.intrinsicCustomStatsConfig)) {
+  const getDiscardedAttributeFromBasicInfo = (bInfo: BasicInfo): DiscardedAttributeType => {
+    if (bInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
+        for (const id of Object.keys(bInfo.intrinsicCustomStatsConfig)) {
             const intrinsicDef = INTRINSIC_META_QUALITIES.find(mq => mq.id === id);
-            if (characterData.basicInfo.selectedIntrinsicMQIds.includes(id) && intrinsicDef?.id === 'custom_stats' && intrinsicDef?.configKey === 'intrinsicCustomStatsConfig') {
+            if (bInfo.selectedIntrinsicMQIds.includes(id) && intrinsicDef?.id === 'custom_stats' && intrinsicDef?.configKey === 'intrinsicCustomStatsConfig') {
                  // @ts-ignore
-                const discarded = characterData.basicInfo.intrinsicCustomStatsConfig[id]?.discardedAttribute;
+                const discarded = bInfo.intrinsicCustomStatsConfig[id]?.discardedAttribute;
                 if (discarded) return discarded;
             }
         }
     }
     return undefined;
   };
-  const discardedAttribute = getDiscardedAttribute();
+  const discardedAttribute = getDiscardedAttributeFromBasicInfo(characterData.basicInfo);
 
   const calculateStatValue = (statName: keyof CharacterData['stats'], stat: StatDetail | undefined): number => {
     if (!stat || discardedAttribute === statName) return 0;
@@ -1209,9 +1275,8 @@ export default function HomePage() {
   const commandValue = calculateStatValue('command', characterData.stats.command);
   
   let rawCalculatedBaseWillFromStats = charmValue + commandValue;
-  if (discardedAttribute === 'charm') rawCalculatedBaseWillFromStats -= charmValue; // Should be 0 already
-  if (discardedAttribute === 'command') rawCalculatedBaseWillFromStats -= commandValue; // Should be 0 already
-
+  if (discardedAttribute === 'charm') rawCalculatedBaseWillFromStats -= charmValue; 
+  if (discardedAttribute === 'command') rawCalculatedBaseWillFromStats -= commandValue; 
   
   const hasNoBaseWillIntrinsic = characterData.basicInfo.selectedIntrinsicMQIds.includes('no_base_will');
   const displayCalculatedBaseWillFromStats = hasNoBaseWillIntrinsic ? 0 : rawCalculatedBaseWillFromStats;
@@ -1224,9 +1289,7 @@ export default function HomePage() {
   const displayTotalBaseWill = displayCalculatedBaseWillFromStats + currentPurchasedBaseWill;
   
   let displayTotalWill = displayTotalBaseWill + currentPurchasedWill;
-  if (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) { 
-    displayTotalWill = 0;
-  }
+  if (hasNoBaseWillIntrinsic || hasNoWillpowerIntrinsic) displayTotalWill = 0;
   
   const totalInvestedInMotivations = characterData.basicInfo.motivations.reduce((sum, m) => sum + (m.investedBaseWill || 0), 0);
   const uninvestedBaseWill = displayTotalBaseWill - totalInvestedInMotivations;
@@ -1322,5 +1385,6 @@ export default function HomePage() {
 
 
     
+
 
 
