@@ -428,7 +428,6 @@ export function CharacterTabContent({
 
   const finalFilteredMiracleTemplates = React.useMemo(() => {
     return initialFilteredMiracleTemplates.filter(template => {
-      // 1. Check if the template itself is directly allowed by GM settings (direct toggle)
       const isTemplateDirectlyAllowed = template.definitionId &&
         (gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId] === undefined ||
          gmSettings.miracleRestrictions.allowedSampleMiracles[template.definitionId]);
@@ -437,8 +436,6 @@ export function CharacterTabContent({
         return false;
       }
   
-      // 2. Check if all constituent qualities of this template are currently allowed by GM quality restrictions
-      //    finalFilteredDynamicPqDefs already respects gmSettings.miracleRestrictions.allowedQualities
       const allConstituentQualitiesAllowed = template.qualities.every(templateQuality => {
         return finalFilteredDynamicPqDefs.some(allowedDef => allowedDef.key === templateQuality.type);
       });
@@ -463,10 +460,14 @@ export function CharacterTabContent({
   }
 
 
-  const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD') => {
+  const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD', gmMaxDicePerType?: number) => {
+      let finalCap = cap;
+      if (gmMaxDicePerType !== undefined) {
+          finalCap = Math.min(cap, gmMaxDicePerType);
+      }
       const options = [];
       if (suffix === 'D') options.push('0D'); 
-      for (let i = (suffix === 'D' ? 1 : 0); i <= cap; i++) {
+      for (let i = (suffix === 'D' ? 1 : 0); i <= finalCap; i++) {
           options.push(`${i}${suffix}`);
       }
       return options;
@@ -551,25 +552,21 @@ export function CharacterTabContent({
 
   const filteredArchetypes = React.useMemo(() => {
     return ARCHETYPES.filter(arch => {
-      if (arch.id === 'custom') return true; // Custom is always available
+      if (arch.id === 'custom') return true; 
 
-      // Check if archetype itself is allowed
       const isArchAllowed = gmSettings.sampleArchetypes[arch.id] === undefined || gmSettings.sampleArchetypes[arch.id];
       if (!isArchAllowed) return false;
 
-      // Check if all its required Source MQs are allowed
       const sourceMQsAllowed = arch.sourceMQIds.every(mqId => 
         gmSettings.metaQualitiesSource[mqId] === undefined || gmSettings.metaQualitiesSource[mqId]
       );
       if (!sourceMQsAllowed) return false;
 
-      // Check if all its required Permission MQs are allowed
       const permissionMQsAllowed = arch.permissionMQIds.every(mqId =>
         gmSettings.metaQualitiesPermission[mqId] === undefined || gmSettings.metaQualitiesPermission[mqId]
       );
       if (!permissionMQsAllowed) return false;
       
-      // Check if all its required Intrinsic MQs are allowed
       const intrinsicMQsAllowed = arch.intrinsicMQIds.every(mqId =>
         gmSettings.metaQualitiesIntrinsic[mqId] === undefined || gmSettings.metaQualitiesIntrinsic[mqId]
       );
@@ -605,6 +602,9 @@ export function CharacterTabContent({
         (miracle.definitionId?.startsWith('archetype-mandatory-') || 
          (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
     
+    const gmMaxDice = gmSettings.miracleRestrictions.numericRestrictions.maxDicePerType;
+    const gmMaxQualityLevels = gmSettings.miracleRestrictions.numericRestrictions.maxPowerQualityLevels;
+
     return (
       <>
         <CardHeader className="pb-3">
@@ -642,15 +642,15 @@ export function CharacterTabContent({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
               <Select value={miracle.dice} onValueChange={(v) => onMiracleChange(miracle.id, 'dice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>{generateDiceOptions(10, 'D').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>{generateDiceOptions(10, 'D', gmMaxDice).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>{generateDiceOptions(10, 'HD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>{generateDiceOptions(10, 'HD', gmMaxDice).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={miracle.wiggleDice} onValueChange={(v) => onMiracleChange(miracle.id, 'wiggleDice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>{generateDiceOptions(10, 'WD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>{generateDiceOptions(10, 'WD', gmMaxDice).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
@@ -716,10 +716,14 @@ export function CharacterTabContent({
                       id={`${quality.id}-levels`}
                       type="number"
                       min="0"
+                      max={gmMaxQualityLevels !== undefined ? gmMaxQualityLevels : undefined}
                       value={String(Math.max(0, quality.levels || 0))}
                       onChange={(e) => {
                           let val = parseInt(e.target.value, 10);
                           val = Math.max(0, isNaN(val) ? 0 : val);
+                          if (gmMaxQualityLevels !== undefined && val > gmMaxQualityLevels) {
+                            val = gmMaxQualityLevels;
+                          }
                           onMiracleQualityChange(miracle.id, quality.id, 'levels', val);
                       }}
                       className="text-sm"
@@ -1348,5 +1352,6 @@ export function CharacterTabContent({
     
 
     
+
 
 
