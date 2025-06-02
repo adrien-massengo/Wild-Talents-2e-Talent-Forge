@@ -389,7 +389,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
         flaws: []
       },
       {
-        id: 'cont_q2_use', type: 'useful', capacity: 'mass', // Base capacity mass, range added via extra
+        id: 'cont_q2_use', type: 'useful', capacity: 'mass', levels: 0, // Base capacity mass, range added via extra
         extras: [
           { id: 'cont_q2_ex1', definitionId: 'controlled_effect', name: 'Controlled Effect', costModifier: 1, isCustom: false },
           { id: 'cont_q2_ex2', definitionId: 'power_capacity_mrs', name: 'Power Capacity (Range)', costModifier: 2, isCustom: false },
@@ -894,7 +894,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
         ]
       },
       {
-        id: 'jinx_q2_def', type: 'defends', capacity: 'self', // Base self, range is extra
+        id: 'jinx_q2_def', type: 'defends', capacity: 'self', levels: 0, // Base self, range is extra
         extras: [
           { id: 'jinx_q2_ex1', definitionId: 'interference', name: 'Interference', costModifier: 3, isCustom: false },
           { id: 'jinx_q2_ex2', definitionId: 'power_capacity_mrs', name: 'Power Capacity (Range)', costModifier: 2, isCustom: false }
@@ -921,15 +921,15 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     name: 'Light Armour',
     description: "You gain width in LAR. You can increase the LAR by taking additional Defends Power Quality Levels.\nTo be able to turn on your armor every time, without fail, always with the same effect, take two or more Hard Dice in Light Armor. For armor that you don’t even need to activate, take Hard Dice and change Endless to the Permanent Extra.\nFor attacks that pierce armor easily due to the Penetration Extra, you may need to add the Hardened defence Extra (page 126).",
     qualities: [
-      {
-        id: 'la_q1_def', type: 'defends', capacity: 'self', levels: 0,
-        extras: [
-          { id: 'la_q1_ex1', definitionId: 'endless', name: 'Endless', costModifier: 3, isCustom: false }
-        ],
-        flaws: [
-          { id: 'la_q1_fl1', definitionId: 'armored_defense', name: 'Armored defence', costModifier: -2, isCustom: false }
-        ]
-      }
+        {
+            id: 'la_q1_def', type: 'defends', capacity: 'self', levels: 0,
+            extras: [
+                { id: 'la_q1_ex1', definitionId: 'endless', name: 'Endless', costModifier: 3, isCustom: false }
+            ],
+            flaws: [
+                { id: 'la_q1_fl1', definitionId: 'armored_defense', name: 'Armored defence', costModifier: -2, isCustom: false }
+            ]
+        }
     ]
   },
    {
@@ -1299,7 +1299,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "Opens a portal between the user and the maximum range capacity rolled. It will allow the designated mass to pass through it, remaining open for as long as the user desires.",
     qualities: [
         {
-            id: 'port_q1_use', type: 'useful', capacity: 'mass', // Base mass, range added
+            id: 'port_q1_use', type: 'useful', capacity: 'mass', levels: 0, // Base mass, range added
             extras: [
                 { id: 'port_q1_ex1', definitionId: 'endless', name: 'Endless', costModifier: 3, isCustom: false },
                 { id: 'port_q1_ex2', definitionId: 'power_capacity_mrs', name: 'Power Capacity (Range)', costModifier: 2, isCustom: false }
@@ -1367,7 +1367,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "The user rolls the power and stores away dice. The action is limited by the location of the attack or block. For instance, a defends roll of this power that rolls as 2x1s, will only block that leg, at a width of 2, and nothing more. The if/then states that this can be delayed until it's needed, providing there is still room for the required width (If you have a width 3 action, the maximum you can roll that turn and still use is 7 dice).",
     qualities: [
         {
-            id: 'pea_q1_atk', type: 'attacks', capacity: 'range', // Or mass
+            id: 'pea_q1_atk', type: 'attacks', capacity: 'range', levels: 0, // Or mass
             extras: [
                 { id: 'pea_q1_ex1', definitionId: 'augment', name: 'Augment', costModifier: 4, isCustom: false },
                 { id: 'pea_q1_ex2', definitionId: 'spray', name: 'Spray', costModifier: 1, isCustom: false }
@@ -1498,7 +1498,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "You can mimic a skill possessed by any individual within 10 yards. You can only share one skill at a time, and you share it at the lower of your dice in Share Skill and the highest pool possessed by individuals in the area.",
     qualities: [
         {
-            id: 'ss_q1_atk', type: 'attacks', capacity: 'range', // Radius is an extra
+            id: 'ss_q1_atk', type: 'attacks', capacity: 'range', levels: 0, // Radius is an extra
             extras: [
                 { id: 'ss_q1_ex1', definitionId: 'radius', name: 'Radius', costModifier: 2, isCustom: false },
                 { id: 'ss_q1_ex2', definitionId: 'variable_effect', name: 'Variable Effect', costModifier: 4, isCustom: false }
@@ -1511,7 +1511,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
             ]
         },
         {
-            id: 'ss_q2_def', type: 'defends', capacity: 'range',
+            id: 'ss_q2_def', type: 'defends', capacity: 'range', levels: 0,
             extras: [
                 { id: 'ss_q2_ex1', definitionId: 'radius', name: 'Radius', costModifier: 2, isCustom: false },
                 { id: 'ss_q2_ex2', definitionId: 'variable_effect', name: 'Variable Effect', costModifier: 4, isCustom: false }
@@ -1524,7 +1524,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
             ]
         },
         {
-            id: 'ss_q3_use', type: 'useful', capacity: 'range',
+            id: 'ss_q3_use', type: 'useful', capacity: 'range', levels: 0,
             extras: [
                 { id: 'ss_q3_ex1', definitionId: 'radius', name: 'Radius', costModifier: 2, isCustom: false },
                 { id: 'ss_q3_ex2', definitionId: 'variable_effect', name: 'Variable Effect', costModifier: 4, isCustom: false }
@@ -1586,7 +1586,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "With a successful roll, you can suppress nuclear fusion. With the Duration Extra this lasts for the length of one encounter, or for a few minutes. To increase the duration, replace the Duration Extra with Endless or Permanent.",
     qualities: [
         {
-            id: 'snf_q1_use', type: 'useful', capacity: 'mass', // Base mass, range added by extra
+            id: 'snf_q1_use', type: 'useful', capacity: 'mass', levels: 0, // Base mass, range added by extra
             extras: [
                 { id: 'snf_q1_ex1', definitionId: 'booster', name: 'Booster (Mass) X26', costModifier: 26, isCustom: false },
                 { id: 'snf_q1_ex2', definitionId: 'booster', name: 'Booster (Range) X10', costModifier: 10, isCustom: false },
@@ -1603,7 +1603,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "You can move objects at a distance with the power of your mind. Telekinesis has the range capacity by default; the Power Capacity (Mass) Extra allows it to manipulate mass as well. With the Attacks quality you can slam targets around for width in Shock and Killing damage; with Defends you can deflect attacks or throw off an enemy’s aim.",
     qualities: [
         {
-            id: 'tk_q1_atk', type: 'attacks', capacity: 'range', // Base range, mass added
+            id: 'tk_q1_atk', type: 'attacks', capacity: 'range', levels: 0, // Base range, mass added
             extras: [
                 { id: 'tk_q1_ex1', definitionId: 'power_capacity_mrs', name: 'Power Capacity (Mass)', costModifier: 2, isCustom: false }
             ],
@@ -1611,7 +1611,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
         },
         { id: 'tk_q2_def', type: 'defends', capacity: 'self', levels: 0, extras: [], flaws: [] },
         {
-            id: 'tk_q3_use', type: 'useful', capacity: 'range', // Base range, mass added
+            id: 'tk_q3_use', type: 'useful', capacity: 'range', levels: 0, // Base range, mass added
             extras: [
                 { id: 'tk_q3_ex1', definitionId: 'power_capacity_mrs', name: 'Power Capacity (Mass)', costModifier: 2, isCustom: false }
             ],
@@ -1670,7 +1670,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     qualities: [
         { id: 'tfug_q1_def', type: 'defends', capacity: 'self', levels: 0, extras: [], flaws: [] }, // Implied, though text focuses on Useful
         {
-            id: 'tfug_q2_use', type: 'useful', capacity: 'mass', // Base mass, range added
+            id: 'tfug_q2_use', type: 'useful', capacity: 'mass', levels: 0, // Base mass, range added
             extras: [
                 { id: 'tfug_q2_ex1', definitionId: 'duration', name: 'Duration', costModifier: 2, isCustom: false },
                 { id: 'tfug_q2_ex2', definitionId: 'interference', name: 'Interference', costModifier: 3, isCustom: false },
@@ -1733,7 +1733,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "This power comes in two versions; choose one. With the first version, your power transforms some particular substance or type of energy into any other substance or type of energy—you could transform lead to anything you want with Transform Lead, or transform light into anything you want with Transform Light, or transform a human into anything with Transform Human, and so on.\nWith the second version, your power transforms any substance or energy into some specific thing—you could transform anything to lead with Transform to Lead, or anything to light with Transform to Light, or anything to one or more humans with Transform to Human, and so on.\nIf your power has the mass capacity, it transforms into a solid substance but you must touch the target. If it transforms non-solid energy, it can transform at range.\nThe transformation lasts for the duration of the current encounter or for a few minutes, according to the Duration Extra. Replace Duration with Endless or Permanent to extend the effects.\nTo restrict your power—transform lead to gold but to nothing else, for example—take the If/Then Flaw. To broaden it—transform anything to anything—take the Variable Effect Extra.",
     qualities: [
         {
-            id: 'trans_q1_use', type: 'useful', capacity: 'mass', // or range
+            id: 'trans_q1_use', type: 'useful', capacity: 'mass', levels: 0, // or range
             extras: [
                 { id: 'trans_q1_ex1', definitionId: 'duration', name: 'Duration', costModifier: 2, isCustom: false }
             ],
@@ -1820,7 +1820,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
     description: "The attacks quality enables the user to electrocute people with bolts of lightning, or buffet them with wind and other variable effects of the weather, dazing them and slowing them down with the cold.\nThe defends quality is a generic catch all for using the weather to defend one's self or others.\nThe useful quality is the same as the flight power, but has variable effect to allow all sorts of out of combat maneuvers with it.",
     qualities: [
         {
-            id: 'wc_q1_atk', type: 'attacks', capacity: 'mass', // base mass, range is extra
+            id: 'wc_q1_atk', type: 'attacks', capacity: 'mass', levels: 0, // base mass, range is extra
             extras: [
                 { id: 'wc_q1_ex1', definitionId: 'daze', name: 'Daze', costModifier: 1, isCustom: false },
                 { id: 'wc_q1_ex2', definitionId: 'electrocuting', name: 'Electrocuting', costModifier: 1, isCustom: false },
@@ -1844,7 +1844,7 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
             ]
         },
         {
-            id: 'wc_q3_use', type: 'useful', capacity: 'mass', // base mass, speed is extra
+            id: 'wc_q3_use', type: 'useful', capacity: 'mass', levels: 0, // base mass, speed is extra
             extras: [
                 { id: 'wc_q3_ex1', definitionId: 'power_capacity_mrs', name: 'Power Capacity (Speed)', costModifier: 2, isCustom: false }, // adding speed
                 { id: 'wc_q3_ex2', definitionId: 'spray', name: 'Spray', costModifier: 1, isCustom: false },
