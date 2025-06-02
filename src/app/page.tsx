@@ -336,14 +336,8 @@ export default function HomePage() {
                     const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', count, updatedMiracles, true, value, current);
                     if (Array.isArray(result)) {
                         updatedMiracles = result;
-                    } else { // This implies cost check failed, and full state was returned.
-                       // This means the toast was shown inside handleMetaQualityConfigChange
-                       // We should bail out of this specific update to avoid inconsistent state.
-                       // However, because handleMetaQualityConfigChange doesn't throw an error or return a specific signal
-                       // for failure when calledFromArchetypeChange is true, it's hard to stop the outer setCharacterData.
-                       // The ideal fix is for handleMetaQualityConfigChange to return a signal/throw if a sub-change fails
-                       // even when calledFromArchetypeChange. For now, we assume it modified updatedMiracles correctly or returned
-                       // the original miracles.
+                    } else { 
+                       // Toast shown in handleMetaQualityConfigChange
                     }
                 }
             }
@@ -463,7 +457,7 @@ export default function HomePage() {
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
                 
                 const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
-                if(Array.isArray(result)) { updatedMiracles = result; } else { /* Toast was shown, and full state returned */ return current; }
+                if(Array.isArray(result)) { updatedMiracles = result; } else { /* Toast was shown */ return current; }
            }
            if (mqType === 'intrinsic' && mqId === 'no_base_will') {
               newWillpower.purchasedBaseWill = 0;
@@ -1443,6 +1437,64 @@ export default function HomePage() {
     }
   };
 
+  const handleImportGmSettings = (importedSettings: GmSettings) => {
+    // Basic validation
+    if (
+      !importedSettings ||
+      typeof importedSettings !== 'object' ||
+      !importedSettings.pointRestrictions ||
+      !importedSettings.sampleArchetypes ||
+      !importedSettings.metaQualitiesSource ||
+      !importedSettings.metaQualitiesPermission ||
+      !importedSettings.metaQualitiesIntrinsic ||
+      !importedSettings.sampleSkills ||
+      !importedSettings.willpowerRestrictions ||
+      !importedSettings.miracleRestrictions
+    ) {
+      toast({
+        title: "Import Error",
+        description: "Invalid GM settings file structure.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // More specific validation can be added here if needed (e.g., checking types of nested properties)
+
+    setGmSettings(importedSettings);
+
+    // Apply imported point restrictions to characterData if they exist
+    setCharacterData(prevCharData => {
+      const newCharData = { ...prevCharData };
+      const { pointRestrictions: importedPointRestrictions } = importedSettings;
+
+      if (importedPointRestrictions.overallPointLimit !== undefined) {
+        newCharData.pointLimit = importedPointRestrictions.overallPointLimit;
+      }
+      if (importedPointRestrictions.archetypePointLimit !== undefined) {
+        newCharData.archetypePointLimit = importedPointRestrictions.archetypePointLimit;
+      }
+      if (importedPointRestrictions.statPointLimit !== undefined) {
+        newCharData.statPointLimit = importedPointRestrictions.statPointLimit;
+      }
+      if (importedPointRestrictions.willpowerPointLimit !== undefined) {
+        newCharData.willpowerPointLimit = importedPointRestrictions.willpowerPointLimit;
+      }
+      if (importedPointRestrictions.skillPointLimit !== undefined) {
+        newCharData.skillPointLimit = importedPointRestrictions.skillPointLimit;
+      }
+      if (importedPointRestrictions.miraclePointLimit !== undefined) {
+        newCharData.miraclePointLimit = importedPointRestrictions.miraclePointLimit;
+      }
+      return newCharData;
+    });
+
+    toast({
+      title: "GM Settings Imported",
+      description: "Character creation parameters have been successfully imported and applied to GM Tools. Relevant point limits have also been updated on the character sheet.",
+    });
+  };
+
 
   const getDiscardedAttributeFromBasicInfo = (bInfo: BasicInfo): DiscardedAttributeType => {
     if (bInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
@@ -1496,6 +1548,7 @@ export default function HomePage() {
         onSave={handleSaveCharacter}
         onLoad={handleLoadCharacter}
         onExport={handleExportCharacter}
+        onImportGmSettings={handleImportGmSettings}
       />
       <main className="flex-grow container mx-auto px-4 py-2 md:py-4">
         <Tabs defaultValue="character" className="w-full">
@@ -1593,3 +1646,4 @@ export default function HomePage() {
 
 
     
+
