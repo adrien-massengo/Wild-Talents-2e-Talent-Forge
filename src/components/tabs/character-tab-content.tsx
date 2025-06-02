@@ -306,10 +306,21 @@ export function CharacterTabContent({
     canUseHardWiggleDiceForStats
   } = React.useMemo(() => {
     const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
-    const canAddHS = ['hypertrained', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
+
+    const hasHypertrained = selectedPermissions.includes('hypertrained');
+    const hasOtherHyperskillPermission = [
+      'inventor',
+      'one_power',
+      'power_theme',
+      'super_permission',
+      'super_equipment'
+    ].some(id => selectedPermissions.includes(id));
+    const canAddHS = hasHypertrained || hasOtherHyperskillPermission;
+
     const canAddHStat = ['prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
     const canAddStandard = ['inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
     const canUseHardWiggle = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
+    
     return { 
       canAddHyperskillQuality: canAddHS, 
       canAddHyperstatQuality: canAddHStat, 
@@ -319,7 +330,7 @@ export function CharacterTabContent({
   }, [characterData.basicInfo.selectedPermissionMQIds]);
   
   const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
-  const onePowerLimitReached = characterData.basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.length >= 1;
+  const onePowerLimitReached = characterData.basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
   
   const filteredDynamicPqDefs = React.useMemo(() => {
       const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
@@ -339,8 +350,8 @@ export function CharacterTabContent({
 
   const filteredMiracleTemplates = React.useMemo(() => {
     return PREDEFINED_MIRACLES_TEMPLATES.filter(template => {
-        if (!template.qualities || template.qualities.length === 0) { // Templates without qualities are generally "customizable"
-             return canAddStandardMiracleQuality || canAddHyperstatQuality || canAddHyperskillQuality; // Allow if any permission is present
+        if (!template.qualities || template.qualities.length === 0) { 
+             return canAddStandardMiracleQuality || canAddHyperstatQuality || canAddHyperskillQuality; 
         }
         return template.qualities.every(quality => {
             const type = quality.type;
@@ -351,16 +362,16 @@ export function CharacterTabContent({
             } else if (type.startsWith('hyperskill_')) {
                 return canAddHyperskillQuality;
             }
-            return false; // Unknown quality type in template
+            return false; 
         });
     });
-  }, [characterData.basicInfo.selectedPermissionMQIds, canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
+  }, [canAddHyperskillQuality, canAddHyperstatQuality, canAddStandardMiracleQuality]);
 
   const isAddMiracleOverallDisabled = onePowerLimitReached || !canCharacterAddAnyMiracle;
 
   let addMiracleTooltipContent = "";
   if (onePowerLimitReached) {
-      addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1).";
+      addMiracleTooltipContent = "Cannot add more miracles due to 'One Power' permission limit (1 regular miracle).";
   } else if (!canCharacterAddAnyMiracle) {
       addMiracleTooltipContent = "No permissions selected that allow adding new miracles or specific miracle qualities.";
   } else if (filteredMiracleTemplates.length === 0 && PREDEFINED_MIRACLES_TEMPLATES.length > 0) {
@@ -643,7 +654,7 @@ export function CharacterTabContent({
 
 
   return (
-    <Accordion type="multiple" className="w-full space-y-6">
+    <Accordion type="multiple" className="w-full space-y-6" >
       <CollapsibleSectionItem title="Basic Information" value="basic-information">
         <div className="space-y-4">
           <div>
@@ -1125,6 +1136,7 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
 
 
 
