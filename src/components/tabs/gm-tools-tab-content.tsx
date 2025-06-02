@@ -152,7 +152,7 @@ export function GmToolsTabContent({
                  <Card>
                   <CardContent className="pt-6">
                     <Accordion type="multiple" className="w-full space-y-2">
-                        {renderToggleableList("Allowed Sample Miracles", PREDEFINED_MIRACLES_TEMPLATES.map(m => ({id: m.definitionId!, name: m.name})), gmSettings.miracleRestrictions.allowedSampleMiracles, 'allowedSampleMiracles')}
+                        {renderToggleableList("Allowed Sample Miracles", PREDEFINED_MIRACLES_TEMPLATES.map(m => ({id: m.definitionId!, name: m.name})).filter(m => m.id), gmSettings.miracleRestrictions.allowedSampleMiracles, 'allowedSampleMiracles')}
                         {renderToggleableList("Allowed Qualities", POWER_QUALITY_DEFINITIONS.map(q => ({id: q.key, name: q.label})), gmSettings.miracleRestrictions.allowedQualities, 'allowedQualities')}
                         {renderToggleableList("Allowed Capacities", POWER_CAPACITY_OPTIONS.map(c => ({id: c.value, name: c.label})), gmSettings.miracleRestrictions.allowedCapacities, 'allowedCapacities')}
                         {renderToggleableList("Allowed Extras", PREDEFINED_EXTRAS, gmSettings.miracleRestrictions.allowedExtras, 'allowedExtras')}
@@ -189,6 +189,12 @@ export function GmToolsTabContent({
                 </Card>
               </CollapsibleSectionItem>
             </Accordion>
+            <div className="mt-6 flex justify-end">
+              <Button onClick={onExportSettings}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Character Creation Parameters
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
@@ -232,15 +238,6 @@ export function GmToolsTabContent({
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
-      <div className="mt-6 flex justify-end">
-        <Button onClick={onExportSettings}>
-            <Download className="mr-2 h-4 w-4" />
-            Export GM Settings
-        </Button>
-      </div>
     </Accordion>
   );
 }
-
-
-    
