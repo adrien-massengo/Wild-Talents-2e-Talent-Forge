@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 interface SummaryTabContentProps {
   characterData: CharacterData;
   onPointLimitChange: (value: number) => void;
-  onSubPointLimitChange: (limitType: 'stat' | 'skill' | 'willpower' | 'miracle', value: string) => void;
+  onSubPointLimitChange: (limitType: 'archetype' | 'stat' | 'skill' | 'willpower' | 'miracle', value: string) => void;
   discardedAttribute?: DiscardedAttributeType;
   calculatedBaseWillFromStats: number;
   totalBaseWill: number;
@@ -110,7 +110,7 @@ export function SummaryTabContent({
     hasNoBaseWillIntrinsic,
     hasNoWillpowerIntrinsic,
 }: SummaryTabContentProps) {
-  const { basicInfo, stats, willpower, skills, miracles, pointLimit, statPointLimit, skillPointLimit, willpowerPointLimit, miraclePointLimit } = characterData;
+  const { basicInfo, stats, willpower, skills, miracles, pointLimit, archetypePointLimit, statPointLimit, skillPointLimit, willpowerPointLimit, miraclePointLimit } = characterData;
   const dynamicPqDefs = getDynamicPowerQualityDefinitions(skills);
 
   const totalStatPoints = Object.entries(stats || {}).reduce((sum, [key, stat]) => {
@@ -191,7 +191,7 @@ export function SummaryTabContent({
             <CardTitle className="text-xl">Overall Character Cost</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p>Archetype Cost: {currentArchetypePointCost}</p>
+            <p>Archetype Cost: {currentArchetypePointCost} {archetypePointLimit !== undefined ? `/ ${archetypePointLimit}` : ''}</p>
             <p>Stat Cost: {totalStatPoints} {statPointLimit !== undefined ? `/ ${statPointLimit}` : ''}</p>
             <p>Willpower Cost: {totalWillpowerPoints} {willpowerPointLimit !== undefined ? `/ ${willpowerPointLimit}` : ''}</p>
             <p>Skill Cost: {totalSkillPoints} {skillPointLimit !== undefined ? `/ ${skillPointLimit}` : ''}</p>
@@ -210,6 +210,18 @@ export function SummaryTabContent({
               />
             </div>
             <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="archetype-point-limit" className="font-medium">Archetype Point Limit:</Label>
+              <Input
+                id="archetype-point-limit"
+                type="number"
+                min="0"
+                placeholder="None"
+                value={archetypePointLimit === undefined ? '' : String(archetypePointLimit)}
+                onChange={(e) => onSubPointLimitChange('archetype', e.target.value)}
+                className="w-24"
+              />
+            </div>
+            <div className="grid grid-cols-2 items-center gap-2">
               <Label htmlFor="stat-point-limit" className="font-medium">Stat Point Limit:</Label>
               <Input
                 id="stat-point-limit"
@@ -222,18 +234,6 @@ export function SummaryTabContent({
               />
             </div>
             <div className="grid grid-cols-2 items-center gap-2">
-              <Label htmlFor="skill-point-limit" className="font-medium">Skill Point Limit:</Label>
-              <Input
-                id="skill-point-limit"
-                type="number"
-                min="0"
-                placeholder="None"
-                value={skillPointLimit === undefined ? '' : String(skillPointLimit)}
-                onChange={(e) => onSubPointLimitChange('skill', e.target.value)}
-                className="w-24"
-              />
-            </div>
-            <div className="grid grid-cols-2 items-center gap-2">
               <Label htmlFor="willpower-point-limit" className="font-medium">Willpower Point Limit:</Label>
               <Input
                 id="willpower-point-limit"
@@ -242,6 +242,18 @@ export function SummaryTabContent({
                 placeholder="None"
                 value={willpowerPointLimit === undefined ? '' : String(willpowerPointLimit)}
                 onChange={(e) => onSubPointLimitChange('willpower', e.target.value)}
+                className="w-24"
+              />
+            </div>
+            <div className="grid grid-cols-2 items-center gap-2">
+              <Label htmlFor="skill-point-limit" className="font-medium">Skill Point Limit:</Label>
+              <Input
+                id="skill-point-limit"
+                type="number"
+                min="0"
+                placeholder="None"
+                value={skillPointLimit === undefined ? '' : String(skillPointLimit)}
+                onChange={(e) => onSubPointLimitChange('skill', e.target.value)}
                 className="w-24"
               />
             </div>
@@ -491,3 +503,4 @@ export function SummaryTabContent({
   
 
     
+

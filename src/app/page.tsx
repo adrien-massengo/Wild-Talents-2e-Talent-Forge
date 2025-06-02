@@ -104,6 +104,7 @@ export interface CharacterData {
   skills: SkillInstance[];
   miracles: MiracleDefinition[];
   pointLimit: number;
+  archetypePointLimit?: number;
   statPointLimit?: number;
   skillPointLimit?: number;
   willpowerPointLimit?: number;
@@ -149,6 +150,7 @@ const initialCharacterData: CharacterData = {
   skills: [],
   miracles: [],
   pointLimit: 250,
+  archetypePointLimit: undefined,
   statPointLimit: undefined,
   skillPointLimit: undefined,
   willpowerPointLimit: undefined,
@@ -873,7 +875,7 @@ export default function HomePage() {
   };
 
   const handleSubPointLimitChange = (
-    limitType: 'stat' | 'skill' | 'willpower' | 'miracle',
+    limitType: 'archetype' | 'stat' | 'skill' | 'willpower' | 'miracle',
     value: string
   ) => {
     const numericValue = parseInt(value, 10);
@@ -1067,6 +1069,7 @@ export default function HomePage() {
             };
           }) : [],
           pointLimit: typeof parsedData.pointLimit === 'number' && parsedData.pointLimit >=0 ? parsedData.pointLimit : initialCharacterData.pointLimit,
+          archetypePointLimit: typeof parsedData.archetypePointLimit === 'number' && parsedData.archetypePointLimit >=0 ? parsedData.archetypePointLimit : initialCharacterData.archetypePointLimit,
           statPointLimit: typeof parsedData.statPointLimit === 'number' && parsedData.statPointLimit >=0 ? parsedData.statPointLimit : initialCharacterData.statPointLimit,
           skillPointLimit: typeof parsedData.skillPointLimit === 'number' && parsedData.skillPointLimit >=0 ? parsedData.skillPointLimit : initialCharacterData.skillPointLimit,
           willpowerPointLimit: typeof parsedData.willpowerPointLimit === 'number' && parsedData.willpowerPointLimit >=0 ? parsedData.willpowerPointLimit : initialCharacterData.willpowerPointLimit,
@@ -1283,3 +1286,4 @@ export default function HomePage() {
 
 
     
+
