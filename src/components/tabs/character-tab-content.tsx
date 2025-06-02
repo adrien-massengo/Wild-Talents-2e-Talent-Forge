@@ -303,7 +303,8 @@ export function CharacterTabContent({
     canAddHyperskillQuality,
     canAddHyperstatQuality,
     canAddStandardMiracleQuality,
-    canUseHardWiggleDiceForStats
+    canUseHardWiggleDiceForStats,
+    canUseHardWiggleDiceForSkills
   } = React.useMemo(() => {
     const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
 
@@ -319,13 +320,15 @@ export function CharacterTabContent({
 
     const canAddHStat = ['prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
     const canAddStandard = ['inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
-    const canUseHardWiggle = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
+    const canUseHardWiggleForStats = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
+    const canUseHardWiggleForSkillsPerm = selectedPermissions.includes('peak_performer');
     
     return { 
       canAddHyperskillQuality: canAddHS, 
       canAddHyperstatQuality: canAddHStat, 
       canAddStandardMiracleQuality: canAddStandard,
-      canUseHardWiggleDiceForStats: canUseHardWiggle
+      canUseHardWiggleDiceForStats: canUseHardWiggleForStats,
+      canUseHardWiggleDiceForSkills: canUseHardWiggleForSkillsPerm
     };
   }, [characterData.basicInfo.selectedPermissionMQIds]);
   
@@ -359,7 +362,13 @@ export function CharacterTabContent({
                 return canAddStandardMiracleQuality;
             } else if (type.startsWith('hyperstat_')) {
                 return canAddHyperstatQuality;
-            } else if (type.startsWith('hyperskill_')) {
+            } else if (type.startsWith('hyperskill_')) { // This check will be against generic 'hyperskill' for template, specific skill linked at instantiation
+                const skillIdFromTemplate = type.substring('hyperskill_'.length);
+                 // If the template specifies a hyperskill, check if THAT skill exists for the character
+                 // OR if the template is more generic and just needs 'canAddHyperskillQuality'
+                 // For now, templates with specific hyperskill IDs would require that exact skill ID to be present.
+                 // This might need refinement if templates are meant to be more abstract.
+                 // For simplicity, if it IS a hyperskill, we need general hyperskill permission.
                 return canAddHyperskillQuality;
             }
             return false; 
@@ -974,34 +983,38 @@ export function CharacterTabContent({
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor={`${skill.id}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
-                  <Select
-                    value={skill.hardDice}
-                    onValueChange={(value) => onSkillChange(skill.id, 'hardDice', value)}
-                  >
-                    <SelectTrigger id={`${skill.id}-hardDice`}>
-                      <SelectValue placeholder="HD" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor={`${skill.id}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
-                  <Select
-                    value={skill.wiggleDice}
-                    onValueChange={(value) => onSkillChange(skill.id, 'wiggleDice', value)}
-                  >
-                    <SelectTrigger id={`${skill.id}-wiggleDice`}>
-                      <SelectValue placeholder="WD" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {canUseHardWiggleDiceForSkills && (
+                  <>
+                    <div>
+                      <Label htmlFor={`${skill.id}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
+                      <Select
+                        value={skill.hardDice}
+                        onValueChange={(value) => onSkillChange(skill.id, 'hardDice', value)}
+                      >
+                        <SelectTrigger id={`${skill.id}-hardDice`}>
+                          <SelectValue placeholder="HD" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`${skill.id}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
+                      <Select
+                        value={skill.wiggleDice}
+                        onValueChange={(value) => onSkillChange(skill.id, 'wiggleDice', value)}
+                      >
+                        <SelectTrigger id={`${skill.id}-wiggleDice`}>
+                          <SelectValue placeholder="WD" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {wiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </div>
               {skill.isCustom ? (
                  <Textarea
@@ -1137,7 +1150,4 @@ export function CharacterTabContent({
   );
 }
 
-
-
-
-
+    
