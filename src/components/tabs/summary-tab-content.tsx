@@ -4,7 +4,7 @@
 
 import type { CharacterData, StatDetail, SkillInstance, BasicInfo } from "@/app/page";
 import type { MiracleDefinition } from "@/lib/miracles-definitions";
-import { DiscardedAttributeType } from "@/lib/character-definitions";
+import { DiscardedAttributeType, ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES } from "@/lib/character-definitions"; // Added ARCHETYPES import
 import { 
   bodyEffectsData, coordinationEffectsData, senseEffectsData, mindEffectsData, charmEffectsData, commandEffectsData, skillExamplesData,
   type BodyEffectData, type CoordinationEffectData, type SenseEffectData, type MindEffectData, type CharmEffectData, type CommandEffectData, type SkillExampleData
@@ -15,9 +15,12 @@ import {
   calculateTotalSkillPoints,
   calculateTotalMiraclePoints,
   calculateCurrentArchetypeCost,
-  calculateSingleStatPoints, // For individual stat cost if needed for display, though total is primary
-  calculateSingleSkillPoints, // For individual skill cost if needed
+  calculateSingleStatPoints,
+  calculateSingleSkillPoints,
+  calculateSingleMiracleTotalCost, // For individual miracle cost if needed
+  calculateSingleMiracleQualityCost, // For individual quality cost
 } from "@/lib/cost-calculations";
+import { getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 
 
 import { Accordion } from "@/components/ui/accordion";
@@ -476,6 +479,7 @@ export function SummaryTabContent({
   
 
     
+
 
 
 
