@@ -11,7 +11,8 @@ import {
   ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES,
   ALLERGY_SUBSTANCES, ALLERGY_EFFECTS,
   type IntrinsicMetaQuality, type SourceMetaQuality, type PermissionMetaQuality,
-  type AllergySubstanceType, type AllergyEffectType, type BruteFrailType, type DiscardedAttributeType
+  type AllergySubstanceType, type AllergyEffectType, type BruteFrailType, type DiscardedAttributeType,
+  type InhumanStatSetting, type AttributeCondition, type InhumanStatsSettings
 } from "@/lib/character-definitions";
 
 
@@ -32,7 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 interface CharacterTabContentProps {
   characterData: CharacterData;
-  onBasicInfoChange: (field: keyof Omit<BasicInfo, 'motivations'>, value: any) => void;
+  onBasicInfoChange: (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => void;
   onAddMotivation: () => void;
   onRemoveMotivation: (motivationId: string) => void;
   onMotivationChange: (motivationId: string, field: keyof MotivationObject, value: any) => void;
@@ -41,7 +42,15 @@ interface CharacterTabContentProps {
   totalWill: number;
   calculatedBaseWillFromStats: number;
   onMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
-  onIntrinsicConfigChange: (intrinsicId: string, configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, field: string, value: any, currentMiracles?: MiracleDefinition[], calledFromArchetypeChange?: boolean, newArchetypeIdForContext?: string) => void;
+  onMetaQualityConfigChange: (
+    metaQualityId: string, 
+    configKey: keyof Omit<BasicInfo, 'name'|'motivations'|'selectedArchetypeId'|'selectedSourceMQIds'|'selectedPermissionMQIds'|'selectedIntrinsicMQIds'>, 
+    fieldOrStatName: string, // For intrinsics: 'substance', etc. For InhumanStats: stat name like 'body'
+    valueOrSubField: any, // For intrinsics: the value. For InhumanStats: { field: 'condition'/'inferiorMaxDice', value: ... }
+    currentMiracles?: MiracleDefinition[], 
+    calledFromArchetypeChange?: boolean, 
+    newArchetypeIdForContext?: string
+  ) => void;
   onStatChange: (statName: keyof CharacterData['stats'], dieType: keyof StatDetail, value: string) => void;
   onWillpowerChange: (field: keyof CharacterData['willpower'], value: number) => void;
   onAddSkill: (skillDef: PredefinedSkillDef) => void;
@@ -75,6 +84,8 @@ const statsDefinitions: StatDefinition[] = [
   { name: 'charm', label: 'Charm', description: 'The Charm Stat measures charisma, influence and diplomacy. Beauty is often a part of high Charm, but not always; there are plenty of people who are physically unimpressive but terrifically charming. With high Charm you easily draw attention, dominate conversations, sway opinions, and persuade others to see things your way.' },
   { name: 'command', label: 'Command', description: 'The Command Stat measures your force of personality, your capacity for leadership, and your composure in the face of crisis. With high Command you remain uncracked under great pressure and people instinctively listen to you in a crisis.' },
 ];
+const ALL_STATS_KEYS = statsDefinitions.map(s => s.name);
+
 
 const attributeNames: AttributeName[] = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'];
 
@@ -94,6 +105,7 @@ export const calculateMiracleQualityCost = (quality: MiracleQuality, miracle: Mi
   
   const perNormalDieCostFactor = baseCostFactor + effectiveCostModifier;
   const costND = NDice > 0 ? NDice * Math.max(1, perNormalDieCostFactor) : 0;
+
 
   const perHardDieCostFactor = (baseCostFactor * 2) + effectiveCostModifier;
   const costHD = HDice * Math.max(0, perHardDieCostFactor);
@@ -116,12 +128,12 @@ interface MQCollapsibleProps {
   selectedMQIds: string[];
   onMQSelectionChange: (mqId: string, isSelected: boolean) => void;
   basicInfo: BasicInfo;
-  onIntrinsicConfigChange: CharacterTabContentProps['onIntrinsicConfigChange'];
+  onMetaQualityConfigChange: CharacterTabContentProps['onMetaQualityConfigChange'];
   mqType: 'source' | 'permission' | 'intrinsic';
 }
 
 const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
-  title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onIntrinsicConfigChange, mqType
+  title, mqList, selectedMQIds, onMQSelectionChange, basicInfo, onMetaQualityConfigChange, mqType
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -136,7 +148,9 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
       </CardHeader>
       {isOpen && (
         <CardContent className="p-3 space-y-3">
-          {mqList.map(mq => (
+          {mqList.map(mq => {
+            const configKey = mq.configKey as keyof BasicInfo | undefined;
+            return (
             <div key={mq.id} className="p-2 border rounded-md bg-background/70">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -151,17 +165,17 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
               {selectedMQIds.includes(mq.id) && (
                 <div className="mt-2 pl-6 text-xs space-y-2">
                   <p className="text-muted-foreground">{mq.description}</p>
-                  {mqType === 'intrinsic' && (mq as IntrinsicMetaQuality).configKey && (
+                  {configKey && mq.id !== 'inhuman_stats' && ( // Standard config for intrinsics
                     <div className="p-2 border rounded-md bg-muted/30 space-y-2">
                       <h5 className="text-xs font-semibold">Configuration:</h5>
-                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicAllergyConfig' && (
+                      {configKey === 'intrinsicAllergyConfig' && (
                         <>
                           <div>
                             <Label htmlFor={`${mq.id}-allergySubstance`} className="text-xs">Allergy Substance</Label>
                             <Select
                                // @ts-ignore
                               value={basicInfo.intrinsicAllergyConfig[mq.id]?.substance}
-                              onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicAllergyConfig', 'substance', val as AllergySubstanceType)}
+                              onValueChange={(val) => onMetaQualityConfigChange(mq.id, 'intrinsicAllergyConfig', 'substance', val as AllergySubstanceType)}
                             >
                               <SelectTrigger id={`${mq.id}-allergySubstance`} className="h-8 text-xs"><SelectValue placeholder="Select substance..."/></SelectTrigger>
                               <SelectContent>
@@ -174,7 +188,7 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                             <Select
                                // @ts-ignore
                               value={basicInfo.intrinsicAllergyConfig[mq.id]?.effect}
-                              onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicAllergyConfig', 'effect', val as AllergyEffectType)}
+                              onValueChange={(val) => onMetaQualityConfigChange(mq.id, 'intrinsicAllergyConfig', 'effect', val as AllergyEffectType)}
                             >
                               <SelectTrigger id={`${mq.id}-allergyEffect`} className="h-8 text-xs"><SelectValue placeholder="Select effect..."/></SelectTrigger>
                               <SelectContent>
@@ -184,13 +198,13 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           </div>
                         </>
                       )}
-                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicBruteFrailConfig' && (
+                      {configKey === 'intrinsicBruteFrailConfig' && (
                         <div>
                           <Label className="text-xs">Type</Label>
                           <RadioGroup
                              // @ts-ignore
                             value={basicInfo.intrinsicBruteFrailConfig[mq.id]?.type}
-                            onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicBruteFrailConfig', 'type', val as BruteFrailType)}
+                            onValueChange={(val) => onMetaQualityConfigChange(mq.id, 'intrinsicBruteFrailConfig', 'type', val as BruteFrailType)}
                             className="flex space-x-3 mt-1"
                           >
                             <div className="flex items-center space-x-1"><RadioGroupItem value="brute" id={`${mq.id}-brute`} className="h-3 w-3"/><Label htmlFor={`${mq.id}-brute`} className="text-xs font-normal">Brute</Label></div>
@@ -198,13 +212,13 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           </RadioGroup>
                         </div>
                       )}
-                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicCustomStatsConfig' && (
+                      {configKey === 'intrinsicCustomStatsConfig' && (
                         <div>
                           <Label className="text-xs">Discard Attribute</Label>
                           <RadioGroup
                              // @ts-ignore
                             value={basicInfo.intrinsicCustomStatsConfig[mq.id]?.discardedAttribute}
-                            onValueChange={(val) => onIntrinsicConfigChange(mq.id, 'intrinsicCustomStatsConfig', 'discardedAttribute', val as DiscardedAttributeType)}
+                            onValueChange={(val) => onMetaQualityConfigChange(mq.id, 'intrinsicCustomStatsConfig', 'discardedAttribute', val as DiscardedAttributeType)}
                             className="mt-1 space-y-1"
                           >
                             {(mq as IntrinsicMetaQuality).customStatsDiscardOptions?.map(opt => (
@@ -223,36 +237,71 @@ const MetaQualityCollapsible: React.FC<MQCollapsibleProps> = ({
                           )}
                         </div>
                       )}
-                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicMandatoryPowerConfig' && (
+                      {configKey === 'intrinsicMandatoryPowerConfig' && (
                         <div>
                           <Label htmlFor={`${mq.id}-mandatoryPowerCount`} className="text-xs">Number of Mandatory Powers</Label>
                           <Input
                             id={`${mq.id}-mandatoryPowerCount`} type="number" min="0"
                              // @ts-ignore
                             value={basicInfo.intrinsicMandatoryPowerConfig[mq.id]?.count ?? 0}
-                            onChange={(e) => onIntrinsicConfigChange(mq.id, 'intrinsicMandatoryPowerConfig', 'count', parseInt(e.target.value) || 0)}
+                            onChange={(e) => onMetaQualityConfigChange(mq.id, 'intrinsicMandatoryPowerConfig', 'count', parseInt(e.target.value) || 0)}
                             className="w-16 h-8 mt-1 text-xs"
                           />
                         </div>
                       )}
-                      {(mq as IntrinsicMetaQuality).configKey === 'intrinsicVulnerableConfig' && (
+                      {configKey === 'intrinsicVulnerableConfig' && (
                          <div>
                           <Label htmlFor={`${mq.id}-vulnerableExtraBoxes`} className="text-xs">Number of Extra Brain Boxes</Label>
                           <Input
                             id={`${mq.id}-vulnerableExtraBoxes`} type="number" min="0"
                              // @ts-ignore
                             value={basicInfo.intrinsicVulnerableConfig[mq.id]?.extraBoxes ?? 0}
-                            onChange={(e) => onIntrinsicConfigChange(mq.id, 'intrinsicVulnerableConfig', 'extraBoxes', parseInt(e.target.value) || 0)}
+                            onChange={(e) => onMetaQualityConfigChange(mq.id, 'intrinsicVulnerableConfig', 'extraBoxes', parseInt(e.target.value) || 0)}
                             className="w-16 h-8 mt-1 text-xs"
                           />
                         </div>
                       )}
                     </div>
                   )}
+                  {mq.id === 'inhuman_stats' && configKey === 'inhumanStatsSettings' && (
+                    <div className="p-2 border rounded-md bg-muted/30 space-y-3 mt-2">
+                        <h5 className="text-xs font-semibold">Inhuman Stats Configuration:</h5>
+                        {ALL_STATS_KEYS.map(statKey => (
+                            <div key={statKey} className="space-y-1 border-b border-border/50 pb-2 last:border-b-0 last:pb-0">
+                                <Label className="text-xs font-medium capitalize">{statKey} Condition:</Label>
+                                <Select
+                                    value={basicInfo.inhumanStatsSettings?.[statKey]?.condition || 'normal'}
+                                    onValueChange={(val) => onMetaQualityConfigChange(mq.id, 'inhumanStatsSettings', statKey, { field: 'condition', value: val as AttributeCondition })}
+                                >
+                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="normal" className="text-xs">Normal (Max 5D)</SelectItem>
+                                        <SelectItem value="superior" className="text-xs">Superior (Max 10D)</SelectItem>
+                                        <SelectItem value="inferior" className="text-xs">Inferior (Max 1-4D)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {basicInfo.inhumanStatsSettings?.[statKey]?.condition === 'inferior' && (
+                                    <div className="pl-2 mt-1">
+                                        <Label className="text-xs">Inferior Max Dice:</Label>
+                                        <Select
+                                            value={String(basicInfo.inhumanStatsSettings?.[statKey]?.inferiorMaxDice || 4)}
+                                            onValueChange={(val) => onMetaQualityConfigChange(mq.id, 'inhumanStatsSettings', statKey, { field: 'inferiorMaxDice', value: parseInt(val) })}
+                                        >
+                                            <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {[1,2,3,4].map(d => <SelectItem key={d} value={String(d)} className="text-xs">{d}D</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          ))}
+          )})}
         </CardContent>
       )}
     </Card>
@@ -271,7 +320,7 @@ export function CharacterTabContent({
   totalWill,
   calculatedBaseWillFromStats,
   onMQSelectionChange,
-  onIntrinsicConfigChange,
+  onMetaQualityConfigChange,
   onStatChange,
   onWillpowerChange,
   onAddSkill,
@@ -295,14 +344,14 @@ export function CharacterTabContent({
   const [selectedExtraToAdd, setSelectedExtraToAdd] = React.useState<{ [qualityId: string]: string }>({});
   const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
 
+  const { basicInfo, skills } = characterData;
+
   const {
     canAddHyperskillQuality,
     canAddHyperstatQuality,
     canAddStandardMiracleQuality,
-    canUseHardWiggleDiceForStats,
-    canUseHardWiggleDiceForSkills
   } = React.useMemo(() => {
-    const selectedPermissions = characterData.basicInfo.selectedPermissionMQIds;
+    const selectedPermissions = basicInfo.selectedPermissionMQIds;
     const hasHypertrained = selectedPermissions.includes('hypertrained');
     const hasOtherHyperskillPermission = [
       'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'
@@ -311,21 +360,16 @@ export function CharacterTabContent({
     const canAddHS = hasHypertrained || hasOtherHyperskillPermission;
     const canAddHStat = ['prime_specimen', 'inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
     const canAddStandard = ['inventor', 'one_power', 'power_theme', 'super_permission', 'super_equipment'].some(id => selectedPermissions.includes(id));
-    
-    const canUseHardWiggleForStatsPerm = selectedPermissions.includes('inhuman_stats') || selectedPermissions.includes('peak_performer');
-    const canUseHardWiggleForSkillsPerm = selectedPermissions.includes('peak_performer');
-    
+        
     return { 
       canAddHyperskillQuality: canAddHS, 
       canAddHyperstatQuality: canAddHStat, 
       canAddStandardMiracleQuality: canAddStandard,
-      canUseHardWiggleDiceForStats: canUseHardWiggleForStatsPerm,
-      canUseHardWiggleDiceForSkills: canUseHardWiggleForSkillsPerm
     };
-  }, [characterData.basicInfo.selectedPermissionMQIds]);
+  }, [basicInfo.selectedPermissionMQIds]);
   
   const canCharacterAddAnyMiracle = canAddHyperskillQuality || canAddHyperstatQuality || canAddStandardMiracleQuality;
-  const onePowerLimitReached = characterData.basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
+  const onePowerLimitReached = basicInfo.selectedPermissionMQIds.includes('one_power') && characterData.miracles.filter(m => !m.isMandatory).length >= 1;
   
   const filteredDynamicPqDefs = React.useMemo(() => {
       const allDynamicDefs = getDynamicPowerQualityDefinitions(characterData.skills);
@@ -373,15 +417,73 @@ export function CharacterTabContent({
       addMiracleTooltipContent = "No predefined miracle templates match your current permissions. You can still add a custom miracle.";
   }
 
-  const peakPerformerDiceCap = 5;
-  const inhumanDiceCap = 10;
-  const generateDiceOptions = (cap: number, suffix: 'HD' | 'WD') => Array.from({ length: cap + 1 }, (_, i) => `${i}${suffix}`);
+  const generateDiceOptions = (cap: number, suffix: 'D' | 'HD' | 'WD') => Array.from({ length: cap + 1 }, (_, i) => `${i}${suffix}`);
 
 
-  const getSkillNormalDiceOptions = (_linkedAttribute: AttributeName): string[] => {
-    const maxStatNormalDice = 5; // Skills are capped by stat normal dice, usually 5
-    return Array.from({ length: maxStatNormalDice + 1 }, (_, i) => `${i}D`); // 0D to 5D
+  const getStatDiceLimits = (statName: keyof CharacterData['stats']): { maxNormal: number; maxHDWD: number; showHDWD: boolean } => {
+    const hasInhumanStatsPerm = basicInfo.selectedPermissionMQIds.includes('inhuman_stats');
+    const hasPeakPerformerPerm = basicInfo.selectedPermissionMQIds.includes('peak_performer');
+    const statSetting = basicInfo.inhumanStatsSettings?.[statName];
+
+    let maxNormal = 5;
+    let maxHDWD = 0;
+    let showHDWD = false;
+
+    if (hasInhumanStatsPerm && statSetting) {
+        if (statSetting.condition === 'superior') {
+            maxNormal = 10;
+            maxHDWD = 10;
+            showHDWD = true;
+        } else if (statSetting.condition === 'inferior') {
+            maxNormal = statSetting.inferiorMaxDice || 4;
+            if (hasPeakPerformerPerm) {
+                maxHDWD = Math.min(5, maxNormal); // Peak performer HD/WD can't exceed inferior cap, nor 5
+                showHDWD = true;
+            }
+        } else { // normal condition with inhuman_stats (should not typically happen if properly managed)
+            maxNormal = 5;
+            if (hasPeakPerformerPerm) {
+                maxHDWD = 5;
+                showHDWD = true;
+            }
+        }
+    } else if (hasPeakPerformerPerm) { // No Inhuman Stats, but has Peak Performer
+        maxNormal = 5;
+        maxHDWD = 5;
+        showHDWD = true;
+    } else { // No relevant permissions
+        maxNormal = 5;
+        maxHDWD = 0;
+        showHDWD = false;
+    }
+    return { maxNormal, maxHDWD, showHDWD };
   };
+  
+  const getSkillDiceLimits = (linkedAttribute: AttributeName): { maxNormal: number; maxHDWD: number; showHDWD: boolean } => {
+    const linkedStatLimits = getStatDiceLimits(linkedAttribute);
+    const hasPeakPerformerPerm = basicInfo.selectedPermissionMQIds.includes('peak_performer');
+    
+    // Skill Normal Dice are capped by the linked attribute's maxNormal.
+    // Skill HD/WD are only shown if Peak Performer is active.
+    // Skill HD/WD max is the *lesser* of the linked attribute's maxHDWD (if superior) OR Peak Performer's cap (5),
+    // but also cannot exceed the skill's normal dice cap (which is linked attribute's normal dice cap).
+    
+    const skillMaxNormal = linkedStatLimits.maxNormal;
+    let skillMaxHDWD = 0;
+    let skillShowHDWD = false;
+
+    if (hasPeakPerformerPerm) {
+        skillShowHDWD = true;
+        // If linked stat is superior, it can go up to its max (10), otherwise capped at 5 by Peak Performer.
+        // And it can't exceed the skill's own normal dice cap.
+        const peakPerformerCap = 5;
+        const inhumanSuperiorCap = (basicInfo.inhumanStatsSettings?.[linkedAttribute]?.condition === 'superior') ? linkedStatLimits.maxHDWD : peakPerformerCap;
+        skillMaxHDWD = Math.min(skillMaxNormal, inhumanSuperiorCap);
+    }
+    
+    return { maxNormal: skillMaxNormal, maxHDWD: skillMaxHDWD, showHDWD: skillShowHDWD };
+  };
+
 
   const handleAddPredefinedSkill = () => {
     if (selectedSkillToAdd) {
@@ -435,7 +537,7 @@ export function CharacterTabContent({
       <>
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
-            {(miracle.isCustom || !miracle.definitionId || miracle.definitionId?.startsWith('archetype-mandatory-') || (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents')) ? (
+            {(miracle.isCustom || !miracle.definitionId || miracle.definitionId?.startsWith('archetype-mandatory-')) ? (
               <Input
                 value={miracle.name}
                 onChange={(e) => onMiracleChange(miracle.id, 'name', e.target.value)}
@@ -468,7 +570,7 @@ export function CharacterTabContent({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
               <Select value={miracle.dice} onValueChange={(v) => onMiracleChange(miracle.id, 'dice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
-                <SelectContent>{Array.from({ length: 11 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>{generateDiceOptions(10, 'D').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={miracle.hardDice} onValueChange={(v) => onMiracleChange(miracle.id, 'hardDice', v)}>
                 <SelectTrigger><SelectValue/></SelectTrigger>
@@ -692,7 +794,7 @@ export function CharacterTabContent({
             selectedMQIds={characterData.basicInfo.selectedSourceMQIds}
             onMQSelectionChange={(mqId, isSelected) => onMQSelectionChange('source', mqId, isSelected)}
             basicInfo={characterData.basicInfo}
-            onIntrinsicConfigChange={onIntrinsicConfigChange}
+            onMetaQualityConfigChange={onMetaQualityConfigChange}
             mqType="source"
           />
 
@@ -702,7 +804,7 @@ export function CharacterTabContent({
             selectedMQIds={characterData.basicInfo.selectedPermissionMQIds}
             onMQSelectionChange={(mqId, isSelected) => onMQSelectionChange('permission', mqId, isSelected)}
             basicInfo={characterData.basicInfo}
-            onIntrinsicConfigChange={onIntrinsicConfigChange}
+            onMetaQualityConfigChange={onMetaQualityConfigChange}
             mqType="permission"
           />
 
@@ -712,7 +814,7 @@ export function CharacterTabContent({
             selectedMQIds={characterData.basicInfo.selectedIntrinsicMQIds}
             onMQSelectionChange={(mqId, isSelected) => onMQSelectionChange('intrinsic', mqId, isSelected)}
             basicInfo={characterData.basicInfo}
-            onIntrinsicConfigChange={onIntrinsicConfigChange}
+            onMetaQualityConfigChange={onMetaQualityConfigChange}
             mqType="intrinsic"
           />
         </div>
@@ -798,25 +900,14 @@ export function CharacterTabContent({
           Costs: Normal Dice: 5 points per die. Hard Dice: 10 points per die. Wiggle Dice: 20 points per die.
         </p>
         <div className="space-y-6">
-          {statsDefinitions.map((stat) => {
-            const isDiscarded = discardedAttribute === stat.name;
-            const discardedDescription = isDiscarded && customStatsDefinition?.customStatsDiscardOptions?.find(opt => opt.value === stat.name)?.description;
+          {statsDefinitions.map((statDef) => {
+            const isDiscarded = discardedAttribute === statDef.name;
+            const discardedDescription = isDiscarded && customStatsDefinition?.customStatsDiscardOptions?.find(opt => opt.value === statDef.name)?.description;
+            const { maxNormal, maxHDWD, showHDWD } = getStatDiceLimits(statDef.name);
             
-            const showHardWiggleForThisStat = canUseHardWiggleDiceForStats && !isDiscarded;
-            let statHardDiceOptions = generateDiceOptions(0, 'HD');
-            let statWiggleDiceOptions = generateDiceOptions(0, 'WD');
-
-            if (showHardWiggleForThisStat) {
-                const cap = characterData.basicInfo.selectedPermissionMQIds.includes('inhuman_stats')
-                            ? inhumanDiceCap
-                            : peakPerformerDiceCap;
-                statHardDiceOptions = generateDiceOptions(cap, 'HD');
-                statWiggleDiceOptions = generateDiceOptions(cap, 'WD');
-            }
-
             return (
-            <div key={stat.name} className="p-4 border rounded-lg bg-card/50 shadow-sm">
-              <h4 className="text-xl font-headline mb-2 text-primary">{stat.label}</h4>
+            <div key={statDef.name} className="p-4 border rounded-lg bg-card/50 shadow-sm">
+              <h4 className="text-xl font-headline mb-2 text-primary">{statDef.label}</h4>
               {isDiscarded ? (
                 <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded-md">
                   <p><strong>This attribute is discarded due to the Custom Stats intrinsic.</strong></p>
@@ -824,49 +915,49 @@ export function CharacterTabContent({
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground mb-4">{stat.description}</p>
+                  <p className="text-sm text-muted-foreground mb-4">{statDef.description}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
                     <div>
-                      <Label htmlFor={`${stat.name}-dice`} className="text-xs font-semibold">Normal Dice</Label>
+                      <Label htmlFor={`${statDef.name}-dice`} className="text-xs font-semibold">Normal Dice</Label>
                       <Select
-                        value={characterData.stats[stat.name]?.dice || '2D'}
-                        onValueChange={(value) => onStatChange(stat.name, 'dice', value)}
+                        value={characterData.stats[statDef.name]?.dice || '2D'}
+                        onValueChange={(value) => onStatChange(statDef.name, 'dice', value)}
                       >
-                        <SelectTrigger id={`${stat.name}-dice`} aria-label={`${stat.label} Normal Dice`}>
+                        <SelectTrigger id={`${statDef.name}-dice`} aria-label={`${statDef.label} Normal Dice`}>
                           <SelectValue placeholder="Select dice" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 6 }, (_, i) => `${i}D`).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                          {generateDiceOptions(maxNormal, 'D').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
-                    {showHardWiggleForThisStat && (
+                    {showHDWD && (
                       <>
                         <div>
-                          <Label htmlFor={`${stat.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
+                          <Label htmlFor={`${statDef.name}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
                           <Select
-                            value={characterData.stats[stat.name]?.hardDice || '0HD'}
-                            onValueChange={(value) => onStatChange(stat.name, 'hardDice', value)}
+                            value={characterData.stats[statDef.name]?.hardDice || '0HD'}
+                            onValueChange={(value) => onStatChange(statDef.name, 'hardDice', value)}
                           >
-                            <SelectTrigger id={`${stat.name}-hardDice`} aria-label={`${stat.label} Hard Dice`}>
+                            <SelectTrigger id={`${statDef.name}-hardDice`} aria-label={`${statDef.label} Hard Dice`}>
                               <SelectValue placeholder="Select hard dice" />
                             </SelectTrigger>
                             <SelectContent>
-                              {statHardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                              {generateDiceOptions(maxHDWD, 'HD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor={`${stat.name}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
+                          <Label htmlFor={`${statDef.name}-wiggleDice`} className="text-xs font-semibold">Wiggle Dice</Label>
                           <Select
-                            value={characterData.stats[stat.name]?.wiggleDice || '0WD'}
-                            onValueChange={(value) => onStatChange(stat.name, 'wiggleDice', value)}
+                            value={characterData.stats[statDef.name]?.wiggleDice || '0WD'}
+                            onValueChange={(value) => onStatChange(statDef.name, 'wiggleDice', value)}
                           >
-                            <SelectTrigger id={`${stat.name}-wiggleDice`} aria-label={`${stat.label} Wiggle Dice`}>
+                            <SelectTrigger id={`${statDef.name}-wiggleDice`} aria-label={`${statDef.label} Wiggle Dice`}>
                               <SelectValue placeholder="Select wiggle dice" />
                             </SelectTrigger>
                             <SelectContent>
-                              {statWiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                              {generateDiceOptions(maxHDWD, 'WD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>
@@ -886,7 +977,7 @@ export function CharacterTabContent({
           Skill Costs: Normal Dice: 2 points/die. Hard Dice: 4 points/die. Wiggle Dice: 8 points/die.
         </p>
         <p className="text-sm text-muted-foreground mb-4">
-          Normal skill dice are capped by the linked attribute's maximum normal dice value (up to 5D).
+          Normal skill dice are capped by the linked attribute's maximum normal dice value. HD/WD for skills capped by Peak Performer or linked attribute if Superior.
         </p>
         <div className="mb-6 p-4 border rounded-lg bg-card/50 shadow-sm">
           <h4 className="text-lg font-headline mb-3">Add Skill</h4>
@@ -919,14 +1010,7 @@ export function CharacterTabContent({
 
         <div className="space-y-6">
           {characterData.skills.map((skill) => {
-            const showHardWiggleForThisSkill = canUseHardWiggleDiceForSkills;
-            let skillHardDiceOptions = generateDiceOptions(0, 'HD');
-            let skillWiggleDiceOptions = generateDiceOptions(0, 'WD');
-
-            if (showHardWiggleForThisSkill) {
-                skillHardDiceOptions = generateDiceOptions(peakPerformerDiceCap, 'HD');
-                skillWiggleDiceOptions = generateDiceOptions(peakPerformerDiceCap, 'WD');
-            }
+            const {maxNormal, maxHDWD, showHDWD} = getSkillDiceLimits(skill.linkedAttribute);
             return (
             <div key={skill.id} className="p-4 border rounded-lg bg-card/50 shadow-sm">
               <div className="flex justify-between items-start mb-2">
@@ -990,11 +1074,11 @@ export function CharacterTabContent({
                       <SelectValue placeholder="Dice" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getSkillNormalDiceOptions(skill.linkedAttribute).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                      {generateDiceOptions(maxNormal, 'D').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                {showHardWiggleForThisSkill && (
+                {showHDWD && (
                   <>
                     <div>
                       <Label htmlFor={`${skill.id}-hardDice`} className="text-xs font-semibold">Hard Dice</Label>
@@ -1006,7 +1090,7 @@ export function CharacterTabContent({
                           <SelectValue placeholder="HD" />
                         </SelectTrigger>
                         <SelectContent>
-                          {skillHardDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                          {generateDiceOptions(maxHDWD, 'HD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1020,7 +1104,7 @@ export function CharacterTabContent({
                           <SelectValue placeholder="WD" />
                         </SelectTrigger>
                         <SelectContent>
-                          {skillWiggleDiceOptions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                          {generateDiceOptions(maxHDWD, 'WD').map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1160,5 +1244,8 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
+
+    
+
 
     

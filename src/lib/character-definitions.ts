@@ -1,6 +1,6 @@
 
 // src/lib/character-definitions.ts
-import type { BasicInfo } from '@/app/page';
+import type { BasicInfo, CharacterData } from '@/app/page';
 
 export interface ArchetypeDefinition {
   id: string;
@@ -82,7 +82,7 @@ export const ARCHETYPES: ArchetypeDefinition[] = [
     sourceText: 'Source: Psi',
     permissionText: 'Permission: Super',
     intrinsicsText: 'Intrinsics: Mandatory Power, Willpower Contest, No Willpower No Way',
-    mandatoryPowerText: 'Perceive Godlike Talents 2hd (U; Flaw: See It First –1; costs 4 Points)',
+    mandatoryPowerText: 'Perceive (Godlike Talents) 0D 2HD 0WD (U; Flaw: See It First –1; costs 0 Points as mandatory)',
     description: 'Talents from Godlike are humans with the peculiar ability to change reality with the power of their minds alone. They possess several unique abilities and limitations—such as the ability to detect and resist the powers of others of their kind. There is no physiological aspect to the phenomena; they are wholly psychic in nature. In Godlike, Talents are usually built on 25 Points with normal Stats and Skills provided free. Using Wild Talents rules such characters are built on 125 Points.',
     additions: 'For postwar Wild Talents in the Godlike world, build them normally without this Archetype. You can pick or create any other Archetype you like; they have transcended the limitations of their predecessors and are now truly superhuman.',
     sourceMQIds: ['psi_source'],
@@ -163,9 +163,11 @@ export interface MetaQualityBase {
   id: string;
   name: string;
   label: string;
-  points: number | ((config?: any) => number);
+  points: number | ((config?: any, basicInfo?: BasicInfo) => number); // BasicInfo added for Inhuman Stats calc
   description?: string;
+  configKey?: string; // Used to link to a specific config object in BasicInfo
 }
+
 
 export interface SourceMetaQuality extends MetaQualityBase {}
 export const SOURCE_META_QUALITIES: SourceMetaQuality[] = [
@@ -184,13 +186,43 @@ export const SOURCE_META_QUALITIES: SourceMetaQuality[] = [
   { id: 'unknown_source', name: 'Source: Unknown', label: 'Unknown (-5 Pts)', points: -5, description: 'Your Source is a mystery. Your powers are just as baffling to you as they are to others.' },
 ];
 
+export type AttributeCondition = 'normal' | 'superior' | 'inferior';
+export interface InhumanStatSetting {
+  condition: AttributeCondition;
+  inferiorMaxDice?: number; // e.g., 1, 2, 3, 4 (only if condition is 'inferior')
+}
+export type InhumanStatsSettings = {
+  [statKey in keyof CharacterData['stats']]?: InhumanStatSetting;
+};
+
 export interface PermissionMetaQuality extends MetaQualityBase {}
 export const PERMISSION_META_QUALITIES: PermissionMetaQuality[] = [
   { id: 'hypertrained', name: 'Permission: Hypertrained', label: 'Hypertrained (5 Pts)', points: 5, description: 'You can purchase any number of Hyperskills and any kind of dice with them.' },
-  { id: 'inhuman_stats', name: 'Permission: Inhuman Stats', label: 'Inhuman Stats (1 Pt/Stat)', points: 1, description: 'Characters with this Permission have limits on Stats that are different from the ordinary limits. Where humans are limited to five dice in a Stat (not counting Hyperstat dice; see page 104), your Archetype might have more, perhaps even in more than one Stat. In addition, the maximum allowed Stat sets the maximum allowed Skill for all Skills based on that Stat. This Permission costs 3 Points for each inhuman Stat. That Stat, and all Skills based on it, can have up to 10d rather than the normal 5d limit, and can have Hard Dice, Wiggle Dice, additional Power Qualities, Power Quality Levels, Extras and Flaws. The inhuman Stat is not affected if your Willpower reaches zero, like a typical Hyperstat would be. For each Stat that has a maximum lower than five, subtract 1 Point from the cost of this Permission per die lower than five. This also restricts your maximum dice with Skills associated with the restricted Stat. The Permission has a minimum cost of 1 Point.' },
+  { 
+    id: 'inhuman_stats', 
+    name: 'Permission: Inhuman Stats', 
+    label: 'Inhuman Stats (Var Pts)', 
+    points: (_config, basicInfo?: BasicInfo) => {
+      if (!basicInfo || !basicInfo.inhumanStatsSettings) return 1;
+      let cost = 0;
+      const settings = basicInfo.inhumanStatsSettings;
+      for (const statKey in settings) {
+        const statSetting = settings[statKey as keyof CharacterData['stats']];
+        if (statSetting?.condition === 'superior') {
+          cost += 3;
+        } else if (statSetting?.condition === 'inferior') {
+          const maxDice = statSetting.inferiorMaxDice ?? 4; // Default to 4 if not set
+          cost += (maxDice - 5); // e.g., max 3D => 3-5 = -2 cost
+        }
+      }
+      return Math.max(1, cost);
+    },
+    description: 'Characters with this Permission have limits on Stats that are different from the ordinary limits. Superior stats can go up to 10D/HD/WD and increase cost by 3. Inferior stats reduce cost by 1 per die lower than 5D. The Permission costs a minimum of 1 Point.',
+    configKey: 'inhumanStatsSettings' // This key links to BasicInfo.inhumanStatsSettings
+  },
   { id: 'inventor', name: 'Permission: Inventor', label: 'Inventor (5 Pts)', points: 5, description: 'You can build external powers of any type embedded in foci, also known as gadgets (when based on high technology) or artifacts (when based on magic). You may buy any number of dice in the Gadgeteering power (see page 145), but all other powers must be built into foci. You cannot take any other permanent, internal power without buying another Permission.' },
   { id: 'one_power', name: 'Permission: One Power', label: 'One Power (1 Pt)', points: 1, description: 'You can have any one Hyperstat, Hyperskill, or Miracle—but only one. (This can still be pretty broad with a “Variable Effect” Miracle such as Cosmic Power, page 142.)' },
-  { id: 'peak_performer', name: 'Permission: Peak Performer', label: 'Peak Performer (5 Pts)', points: 5, description: 'You may purchase any kind of dice with your Stats and Skills, up to the normal limit of five dice in a Stat or Skill unless you have Inhuman Stats. You can have 5wd in Body, for example, or 5hd in Coordination and 5wd in Body, but not 6d in either one.' },
+  { id: 'peak_performer', name: 'Permission: Peak Performer', label: 'Peak Performer (5 Pts)', points: 5, description: 'You may purchase any kind of dice with your Stats and Skills, up to the normal limit of five dice in a Stat or Skill unless you have Inhuman Stats (Superior). You can have 5wd in Body, for example, or 5hd in Coordination and 5wd in Body, but not 6d in either one.' },
   { id: 'power_theme', name: 'Permission: Power Theme', label: 'Power Theme (5 Pts)', points: 5, description: 'You can buy Hyperstats, Hyperskills, and Miracles, but all powers must fit a certain theme, such as “cold-based powers,” “solar powers,” “monkey powers,” or whatever you and the GM agree on.' },
   { id: 'prime_specimen', name: 'Permission: Prime Specimen', label: 'Prime Specimen (5 Pts)', points: 5, description: 'You can buy Hyperstats without restriction.' },
   { id: 'super_permission', name: 'Permission: Super', label: 'Super (15 Pts)', points: 15, description: 'You can purchase any number and types of dice with Hyperstats, Hyperskills, and powers.' },
@@ -217,7 +249,6 @@ export type DiscardedAttributeType = 'body' | 'coordination' | 'sense' | 'mind' 
 
 
 export interface IntrinsicMetaQuality extends MetaQualityBase {
-  configKey?: 'intrinsicAllergyConfig' | 'intrinsicBruteFrailConfig' | 'intrinsicCustomStatsConfig' | 'intrinsicMandatoryPowerConfig' | 'intrinsicVulnerableConfig';
   customStatsDiscardOptions?: Array<{ value: Exclude<DiscardedAttributeType, undefined>; label: string; description: string }>;
 }
 
@@ -322,7 +353,7 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   basicInfo.selectedSourceMQIds.forEach(id => {
     const mq = SOURCE_META_QUALITIES.find(m => m.id === id);
     if (mq) {
-      const points = typeof mq.points === 'function' ? mq.points({}) : mq.points;
+      const points = typeof mq.points === 'function' ? mq.points({}, basicInfo) : mq.points;
       if (points > 0 && !firstPositiveSourceCostApplied && basicInfo.selectedArchetypeId === 'custom') {
         firstPositiveSourceCostApplied = true;
       } else {
@@ -334,7 +365,9 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   basicInfo.selectedPermissionMQIds.forEach(id => {
     const mq = PERMISSION_META_QUALITIES.find(m => m.id === id);
     if (mq) {
-      totalPoints += typeof mq.points === 'function' ? mq.points({}) : mq.points;
+      // Pass basicInfo to the points function for 'inhuman_stats'
+      const config = mq.configKey ? basicInfo[mq.configKey as keyof BasicInfo] : {};
+      totalPoints += typeof mq.points === 'function' ? mq.points(config, basicInfo) : mq.points;
     }
   });
 
@@ -343,17 +376,22 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
     if (mq) {
       let intrinsicConfig: any = {};
       if (mq.configKey) {
+        const configGroup = basicInfo[mq.configKey as keyof BasicInfo];
         // @ts-ignore
-        const configGroup = basicInfo[mq.configKey];
         if (configGroup && typeof configGroup === 'object' && id in configGroup) {
            // @ts-ignore
           intrinsicConfig = configGroup[id] || {};
+        } else if (configGroup && typeof configGroup === 'object' && mq.configKey === 'intrinsicMandatoryPowerConfig' && basicInfo.intrinsicMandatoryPowerConfig?.[id]) {
+            // Handle cases where the structure might be slightly different for intrinsicMandatoryPowerConfig
+            intrinsicConfig = basicInfo.intrinsicMandatoryPowerConfig[id];
         }
       }
-      totalPoints += typeof mq.points === 'function' ? mq.points(intrinsicConfig) : mq.points;
+      totalPoints += typeof mq.points === 'function' ? mq.points(intrinsicConfig, basicInfo) : mq.points;
     }
   });
   return totalPoints;
 }
+
+    
 
     
