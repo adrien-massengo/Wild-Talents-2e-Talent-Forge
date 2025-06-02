@@ -12,10 +12,50 @@ export function GmToolsTabContent() {
       <CollapsibleSectionItem title="Character Creation Parameters">
         <Card>
           <CardContent className="pt-6">
-            <p>Character Creation Parameters tools will be available here in a future update.</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              This section could help GMs define or adjust baseline parameters for character creation in their campaigns (e.g., starting points, allowed/disallowed MQs).
-            </p>
+            <Accordion type="multiple" className="w-full space-y-4">
+              <CollapsibleSectionItem title="Point Restrictions" value="gm-point-restrictions">
+                <Card>
+                  <CardContent className="pt-6 text-sm">
+                    <p>Tools to set default point limits (overall, stats, skills, etc.) for new characters will be available here in a future update.</p>
+                  </CardContent>
+                </Card>
+              </CollapsibleSectionItem>
+              <CollapsibleSectionItem title="Sample Archetypes Restrictions" value="gm-archetype-restrictions">
+                <Card>
+                  <CardContent className="pt-6 text-sm">
+                    <p>Tools to allow or disallow specific sample archetypes for character creation will be available here in a future update.</p>
+                  </CardContent>
+                </Card>
+              </CollapsibleSectionItem>
+              <CollapsibleSectionItem title="Allowed Sample meta-Qualities" value="gm-meta-quality-restrictions">
+                <Card>
+                  <CardContent className="pt-6 text-sm">
+                    <p>Tools to define which source, permission, or intrinsic meta-qualities are available by default will be available here in a future update.</p>
+                  </CardContent>
+                </Card>
+              </CollapsibleSectionItem>
+              <CollapsibleSectionItem title="Sample Skill Restrictions" value="gm-skill-restrictions">
+                <Card>
+                  <CardContent className="pt-6 text-sm">
+                    <p>Tools to manage the list of predefined skills available to characters will be available here in a future update.</p>
+                  </CardContent>
+                </Card>
+              </CollapsibleSectionItem>
+              <CollapsibleSectionItem title="Willpower Restrictions" value="gm-willpower-restrictions">
+                <Card>
+                  <CardContent className="pt-6 text-sm">
+                    <p>Tools to set default willpower purchasing rules or limits will be available here in a future update.</p>
+                  </CardContent>
+                </Card>
+              </CollapsibleSectionItem>
+              <CollapsibleSectionItem title="Miracle Restrictions" value="gm-miracle-restrictions">
+                <Card>
+                  <CardContent className="pt-6 text-sm">
+                    <p>Tools to manage allowed miracle templates or apply restrictions to custom miracle creation will be available here in a future update.</p>
+                  </CardContent>
+                </Card>
+              </CollapsibleSectionItem>
+            </Accordion>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
@@ -62,3 +102,4 @@ export function GmToolsTabContent() {
     </Accordion>
   );
 }
+
