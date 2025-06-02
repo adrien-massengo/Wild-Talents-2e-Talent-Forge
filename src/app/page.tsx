@@ -282,8 +282,13 @@ export default function HomePage() {
         const newArchetypeDef = ARCHETYPES.find(arch => arch.id === value);
         const previousArchetypeId = current.basicInfo.selectedArchetypeId;
 
+        // Specific logic for Godlike Talent's mandatory power
         if (previousArchetypeId === 'godlike_talent' && value !== 'godlike_talent') {
           updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
+        }
+        // Specific logic for Mystic's mandatory power
+        if (previousArchetypeId === 'mystic' && value !== 'mystic') {
+          updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'cosmic_power');
         }
         
         if (newArchetypeDef && newArchetypeDef.id !== previousArchetypeId) {
@@ -291,6 +296,8 @@ export default function HomePage() {
                 const isGenericMandatory = m.definitionId?.startsWith('archetype-mandatory-');
                 if (m.definitionId === 'perceive_godlike_talents' && value !== 'godlike_talent') return false;
                 if (m.definitionId === 'perceive_godlike_talents' && value === 'godlike_talent') return true; 
+                if (m.definitionId === 'cosmic_power' && value !== 'mystic') return false;
+                if (m.definitionId === 'cosmic_power' && value === 'mystic') return true;
                 if (isGenericMandatory) {
                     if (value === 'custom') return false; 
                     const newArchHasMandatoryPowerIntrinsic = newArchetypeDef?.intrinsicMQIds.includes('mandatory_power');
@@ -493,6 +500,9 @@ export default function HomePage() {
             if (newBasicInfo.selectedArchetypeId === 'godlike_talent' && mqId === 'mandatory_power') {
                 updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'perceive_godlike_talents');
             }
+            if (newBasicInfo.selectedArchetypeId === 'mystic' && mqId === 'mandatory_power') {
+                updatedMiracles = updatedMiracles.filter(m => m.definitionId !== 'cosmic_power');
+            }
         }
         if (mqType === 'permission' && mqId === 'inhuman_stats') {
             newInhumanStatsSettings = ALL_STATS.reduce((acc, statName) => {
@@ -573,7 +583,8 @@ export default function HomePage() {
         m.isMandatory && 
         (
           m.definitionId?.startsWith(`archetype-mandatory-${metaQualityId}-`) || 
-          (currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power')
+          (currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power') ||
+          (currentArchetypeForContext === 'mystic' && m.definitionId === 'cosmic_power' && metaQualityId === 'mandatory_power')
         )
       );
       const difference = newCount - mandatoryMiraclesForThisIntrinsic.length;
@@ -598,6 +609,23 @@ export default function HomePage() {
                         };
                     }
                   }
+              } else if (currentArchetypeForContext === 'mystic' && metaQualityId === 'mandatory_power') {
+                  const cpExists = updatedMiracles.some(m => m.definitionId === 'cosmic_power' && m.isMandatory);
+                  if (!cpExists) {
+                    const template = PREDEFINED_MIRACLES_TEMPLATES.find(t => t.definitionId === 'cosmic_power');
+                    if (template) {
+                        newMandatoryMiracle = {
+                            ...template,
+                            id: `miracle-arch-mandatory-cp-${Date.now()}-${i}`,
+                            dice: '1D', hardDice: '0HD', wiggleDice: '0WD', // Default dice for mandatory Cosmic Power
+                            qualities: template.qualities.map(tq => ({
+                              ...tq, id: `quality-instance-cp-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`,
+                              extras: tq.extras.map(tex => ({ ...tex, id: `extra-instance-cp-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`})),
+                              flaws: tq.flaws.map(tfl => ({ ...tfl, id: `flaw-instance-cp-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}`})),
+                            })), isCustom: false, isMandatory: true,
+                        };
+                    }
+                  }
               }
               if (!newMandatoryMiracle) { 
                   newMandatoryMiracle = {
@@ -616,8 +644,9 @@ export default function HomePage() {
           let removedCount = 0;
           updatedMiracles = updatedMiracles.filter(m => {
               const isPGTForGodlike = currentArchetypeForContext === 'godlike_talent' && m.definitionId === 'perceive_godlike_talents' && metaQualityId === 'mandatory_power';
+              const isCPForMystic = currentArchetypeForContext === 'mystic' && m.definitionId === 'cosmic_power' && metaQualityId === 'mandatory_power';
               const isGenericMandatoryForIntrinsic = m.definitionId?.startsWith(`archetype-mandatory-${metaQualityId}-`);
-              if (m.isMandatory && (isPGTForGodlike || isGenericMandatoryForIntrinsic) && removedCount < miraclesToRemoveCount) {
+              if (m.isMandatory && (isPGTForGodlike || isCPForMystic || isGenericMandatoryForIntrinsic) && removedCount < miraclesToRemoveCount) {
                   removedCount++; return false; 
               }
               return true; 
@@ -900,8 +929,11 @@ export default function HomePage() {
   const handleRemoveMiracle = (miracleId: string) => {
      const miracleToRemove = characterData.miracles.find(m => m.id === miracleId);
      const isIntrinsicMandatedUnremovable = miracleToRemove && miracleToRemove.isMandatory && 
-        (miracleToRemove.definitionId?.startsWith('archetype-mandatory-') || 
-         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracleToRemove.definitionId === 'perceive_godlike_talents'));
+        (
+          miracleToRemove.definitionId?.startsWith('archetype-mandatory-') || 
+          (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracleToRemove.definitionId === 'perceive_godlike_talents') ||
+          (characterData.basicInfo.selectedArchetypeId === 'mystic' && miracleToRemove.definitionId === 'cosmic_power')
+        );
 
      if (isIntrinsicMandatedUnremovable) {
         toast({ title: "Cannot remove intrinsic-mandated miracle", description: "This miracle's existence is tied to an archetype or intrinsic setting.", variant: "destructive"});
@@ -917,8 +949,11 @@ export default function HomePage() {
   const handleMiracleChange = (miracleId: string, field: keyof MiracleDefinition, value: any) => {
      const miracle = characterData.miracles.find(m => m.id === miracleId);
      const isIntrinsicMandatedUnremovable = miracle && miracle.isMandatory && 
-        (miracle.definitionId?.startsWith('archetype-mandatory-') || 
-         (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents'));
+        (
+          miracle.definitionId?.startsWith('archetype-mandatory-') || 
+          (characterData.basicInfo.selectedArchetypeId === 'godlike_talent' && miracle.definitionId === 'perceive_godlike_talents') ||
+          (characterData.basicInfo.selectedArchetypeId === 'mystic' && miracle.definitionId === 'cosmic_power')
+        );
 
      if (isIntrinsicMandatedUnremovable && field === 'isMandatory' && !value) {
        toast({ title: "Cannot change mandatory status", description: "This miracle is mandated by an archetype intrinsic or specific archetype rule.", variant: "destructive"});
@@ -1678,6 +1713,7 @@ export default function HomePage() {
 
 
     
+
 
 
 
