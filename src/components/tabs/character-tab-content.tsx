@@ -668,6 +668,21 @@ export function CharacterTabContent({
               className="text-sm"
             />
           </div>
+          
+          <p className="text-sm mt-3 pt-3 border-t border-dashed">
+            <strong>Miracle Quality Cost Factors (per ND):</strong>
+            {miracle.qualities.length > 0 ? (
+              <ul className="list-disc list-inside pl-2 text-xs">
+                {miracle.qualities.map(q => {
+                  const qDef = finalFilteredDynamicPqDefs.find(def => def.key === q.type);
+                  const factor = calculateDisplayedNDFactor(q);
+                  return <li key={`${miracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor}</li>;
+                })}
+              </ul>
+            ) : (
+              <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
+            )}
+          </p>
 
           <div className="space-y-3 mt-3">
             <div className="flex justify-between items-center">
@@ -839,21 +854,6 @@ export function CharacterTabContent({
               </Card>
             ))}
           </div>
-
-          <p className="text-sm mt-3 pt-3 border-t border-dashed">
-            <strong>Miracle Quality Cost Factors (per ND):</strong>
-            {miracle.qualities.length > 0 ? (
-              <ul className="list-disc list-inside pl-2 text-xs">
-                {miracle.qualities.map(q => {
-                  const qDef = finalFilteredDynamicPqDefs.find(def => def.key === q.type);
-                  const factor = calculateDisplayedNDFactor(q);
-                  return <li key={`${miracle.id}-${q.id}-factor`}>{qDef?.label || q.type}: {factor}</li>;
-                })}
-              </ul>
-            ) : (
-              <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
-            )}
-          </p>
 
           <p className="font-semibold mt-1">
             Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateMiracleTotalCost(miracle, characterData.skills)} points`}
@@ -1363,14 +1363,3 @@ export function CharacterTabContent({
     </Accordion>
   );
 }
-
-    
-
-
-    
-
-    
-
-
-
-
