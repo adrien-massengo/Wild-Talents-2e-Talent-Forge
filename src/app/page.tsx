@@ -730,7 +730,8 @@ export default function HomePage() {
     setCharacterData(current => {
       const localGmSettings = gmSettings; // Use the gmSettings from the HomePage closure
       const currentCalcBaseWillFromStats = calculateBaseWillFromStats(current.stats, getDiscardedAttributeFromBasicInfo(current.basicInfo));
-      let toastMessages: string[] = [];
+      let toastMessagesProps: Array<Parameters<typeof toast>[0]> = [];
+
 
       let newPurchasedBaseWill = field === 'purchasedBaseWill' ? value : current.willpower.purchasedBaseWill;
       let newPurchasedWill = field === 'purchasedWill' ? value : current.willpower.purchasedWill;
@@ -753,7 +754,7 @@ export default function HomePage() {
         newPurchasedBaseWill = Math.max(0, localGmSettings.willpowerRestrictions.maxBaseWill - currentCalcBaseWillFromStats);
         newTotalBaseWill = currentCalcBaseWillFromStats + newPurchasedBaseWill;
         if (oldPurchasedBaseWill !== newPurchasedBaseWill) {
-           toastMessages.push(`Purchased Base Will adjusted to ${newPurchasedBaseWill} to not exceed GM's Total Base Will limit of ${localGmSettings.willpowerRestrictions.maxBaseWill}.`);
+           toastMessagesProps.push({ title: "Willpower Adjusted by GM Settings", description: `Purchased Base Will adjusted to ${newPurchasedBaseWill} to not exceed GM's Total Base Will limit of ${localGmSettings.willpowerRestrictions.maxBaseWill}.`, variant: "default" });
         }
       }
 
@@ -762,9 +763,8 @@ export default function HomePage() {
       if (localGmSettings.willpowerRestrictions.maxTotalWill !== undefined && newTotalWill > localGmSettings.willpowerRestrictions.maxTotalWill) {
         const oldPurchasedWill = newPurchasedWill;
         newPurchasedWill = Math.max(0, localGmSettings.willpowerRestrictions.maxTotalWill - newTotalBaseWill);
-        // newTotalWill = newTotalBaseWill + newPurchasedWill; // Recalculate for toast, not strictly needed for state
          if (oldPurchasedWill !== newPurchasedWill) {
-            toastMessages.push(`Purchased Will adjusted to ${newPurchasedWill} to not exceed GM's Total Will limit of ${localGmSettings.willpowerRestrictions.maxTotalWill}.`);
+            toastMessagesProps.push({ title: "Willpower Adjusted by GM Settings", description: `Purchased Will adjusted to ${newPurchasedWill} to not exceed GM's Total Will limit of ${localGmSettings.willpowerRestrictions.maxTotalWill}.`, variant: "default" });
         }
       }
       
@@ -777,13 +777,15 @@ export default function HomePage() {
       );
 
       if (current.willpowerPointLimit !== undefined && potentialWillpowerCost > current.willpowerPointLimit) {
-        // This case should ideally be prevented by the individual caps, but as a fallback:
         toast({ title: "Willpower Limit Exceeded", description: `This change would make Willpower cost ${potentialWillpowerCost}pts, exceeding the limit of ${current.willpowerPointLimit}. Change reverted.`, variant: "destructive" });
-        return current; // Revert to original state if overall point limit is somehow still breached
+        return current; 
       }
 
-      if (toastMessages.length > 0) {
-        toast({ title: "Willpower Adjusted by GM Settings", description: toastMessages.join(' '), variant: "default" });
+      // Defer toast calls
+      if (toastMessagesProps.length > 0) {
+        setTimeout(() => {
+          toastMessagesProps.forEach(tProps => toast(tProps));
+        }, 0);
       }
       
       return {
@@ -922,7 +924,9 @@ export default function HomePage() {
     }
     
     if (adjustmentToastInfo) {
-      toast({ title: adjustmentToastInfo.title, description: adjustmentToastInfo.description, variant: "default" });
+      setTimeout(() => { // Defer adjustment toasts
+        toast({ title: adjustmentToastInfo.title, description: adjustmentToastInfo.description, variant: "default" });
+      }, 0);
     }
 
     setCharacterData(current => ({...current, miracles: newMiracles}));
@@ -1002,7 +1006,7 @@ export default function HomePage() {
       const dieSuffix = field === 'dice' ? 'D' : field === 'hardDice' ? 'HD' : 'WD';
       let numericPart = parseInt((value as string).replace(dieSuffix, ''), 10);
       
-      if (isNaN(numericPart)) { // Handle cases like "D", "HD", "WD" or empty string
+      if (isNaN(numericPart)) { 
         numericPart = (field === 'dice' ? 1: 0); 
       }
 
@@ -1079,7 +1083,6 @@ export default function HomePage() {
           ...m,
           qualities: m.qualities.map(q => {
             if (q.id === qualityId) {
-              // This inner update will use the already processed value
               return { ...q, [field]: processedValue };
             }
             return q;
@@ -1276,13 +1279,12 @@ export default function HomePage() {
     currentStats: CharacterData['stats'],
     currentBasicInfo: BasicInfo,
     activeGmSettings: GmSettings
-  ): { updatedWillpower: CharacterData['willpower'], toasts: { title: string, description: string, variant: "default" }[] } => {
+  ): { updatedWillpower: CharacterData['willpower'], toasts: Array<Parameters<typeof toast>[0]> } => {
     let { purchasedBaseWill, purchasedWill } = currentWillpower;
-    const toasts: { title: string, description: string, variant: "default" }[] = [];
+    const toastPropsArray: Array<Parameters<typeof toast>[0]> = [];
 
     const calcBaseWillFromStats = calculateBaseWillFromStats(currentStats, getDiscardedAttributeFromBasicInfo(currentBasicInfo));
     
-    // Respect intrinsics first
     if (currentBasicInfo.selectedIntrinsicMQIds.includes('no_base_will')) {
       purchasedBaseWill = 0;
       purchasedWill = 0;
@@ -1298,7 +1300,7 @@ export default function HomePage() {
       purchasedBaseWill = Math.max(0, gmMaxBaseWill - calcBaseWillFromStats);
       currentTotalBaseWill = calcBaseWillFromStats + purchasedBaseWill;
       if (oldPBase !== purchasedBaseWill) {
-        toasts.push({ title: "Willpower Adjusted by GM Setting", description: `Total Base Will was capped at ${gmMaxBaseWill} by GM settings. Purchased Base Will adjusted to ${purchasedBaseWill}.`, variant: "default" });
+        toastPropsArray.push({ title: "Willpower Adjusted by GM Setting", description: `Total Base Will was capped at ${gmMaxBaseWill} by GM settings. Purchased Base Will adjusted to ${purchasedBaseWill}.`, variant: "default" });
       }
     }
 
@@ -1308,13 +1310,12 @@ export default function HomePage() {
     if (gmMaxTotalWill !== undefined && currentTotalWill > gmMaxTotalWill) {
       const oldPWill = purchasedWill;
       purchasedWill = Math.max(0, gmMaxTotalWill - currentTotalBaseWill);
-      // currentTotalWill = currentTotalBaseWill + purchasedWill; // For completeness
       if (oldPWill !== purchasedWill) {
-         toasts.push({ title: "Willpower Adjusted by GM Setting", description: `Total Will was capped at ${gmMaxTotalWill} by GM settings. Purchased Will adjusted to ${purchasedWill}.`, variant: "default" });
+         toastPropsArray.push({ title: "Willpower Adjusted by GM Setting", description: `Total Will was capped at ${gmMaxTotalWill} by GM settings. Purchased Will adjusted to ${purchasedWill}.`, variant: "default" });
       }
     }
     
-    return { updatedWillpower: { purchasedBaseWill, purchasedWill }, toasts };
+    return { updatedWillpower: { purchasedBaseWill, purchasedWill }, toasts: toastPropsArray };
   };
 
 
@@ -1456,26 +1457,32 @@ export default function HomePage() {
         validatedData.willpower.purchasedBaseWill = Number(validatedData.willpower.purchasedBaseWill) || 0;
         validatedData.willpower.purchasedWill = Number(validatedData.willpower.purchasedWill) || 0;
         
-        // Apply GM willpower caps after loading
-        const { updatedWillpower, toasts: willpowerToasts } = applyWillpowerCaps(
+        const { updatedWillpower, toasts: willpowerToastProps } = applyWillpowerCaps(
           validatedData.willpower,
           validatedData.stats,
           validatedData.basicInfo,
-          gmSettings // Use current GM settings
+          gmSettings 
         );
         validatedData.willpower = updatedWillpower;
-        willpowerToasts.forEach(t => toast(t));
-
-
+        
         setCharacterData(validatedData);
-        toast({ title: "Character Loaded", description: "Character data has been loaded from local storage." });
+
+        setTimeout(() => {
+          willpowerToastProps.forEach(tProps => toast(tProps));
+          toast({ title: "Character Loaded", description: "Character data has been loaded from local storage." });
+        }, 0);
+
       } else {
-        toast({ title: "No Saved Data", description: "No character data found in local storage.", variant: "destructive" });
+        setTimeout(() => {
+          toast({ title: "No Saved Data", description: "No character data found in local storage.", variant: "destructive" });
+        }, 0);
         setCharacterData(initialCharacterData);
       }
     } catch (error) {
       console.error("Failed to load character:", error);
-      toast({ title: "Load Error", description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`, variant: "destructive" });
+      setTimeout(() => {
+        toast({ title: "Load Error", description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`, variant: "destructive" });
+      }, 0);
        setCharacterData(initialCharacterData);
     }
   };
@@ -1500,7 +1507,6 @@ export default function HomePage() {
     }
   };
   
-  // GM Settings Handlers
   const handleGmPointLimitChange = (limitType: keyof GmPointRestrictions, value: string) => {
     const numericValue = parseInt(value, 10);
     const processedValue = isNaN(numericValue) || numericValue < 0 ? undefined : numericValue;
@@ -1515,7 +1521,7 @@ export default function HomePage() {
 
   const handleGmToggleableItemChange = (
     category: keyof Pick<GmSettings, 'sampleArchetypes' | 'metaQualitiesSource' | 'metaQualitiesPermission' | 'metaQualitiesIntrinsic' | 'sampleSkills'> | 
-              keyof GmSettings['miracleRestrictions'], // for miracle sub-categories
+              keyof GmSettings['miracleRestrictions'], 
     itemId: string,
     isChecked: boolean
   ) => {
@@ -1601,15 +1607,19 @@ export default function HomePage() {
       !importedSettings.willpowerRestrictions ||
       !importedSettings.miracleRestrictions
     ) {
-      toast({
-        title: "Import Error",
-        description: "Invalid GM settings file structure.",
-        variant: "destructive",
-      });
+      setTimeout(() => {
+        toast({
+          title: "Import Error",
+          description: "Invalid GM settings file structure.",
+          variant: "destructive",
+        });
+      }, 0);
       return;
     }
 
     setGmSettings(importedSettings);
+
+    let willpowerToastProps: Array<Parameters<typeof toast>[0]> = [];
 
     setCharacterData(prevCharData => {
       let newCharData = { ...prevCharData };
@@ -1634,23 +1644,25 @@ export default function HomePage() {
         newCharData.miraclePointLimit = importedPointRestrictions.miraclePointLimit;
       }
 
-      // Apply willpower caps from newly imported GM settings
-      const { updatedWillpower, toasts: willpowerToasts } = applyWillpowerCaps(
+      const { updatedWillpower, toasts: willpowerToastsFromApply } = applyWillpowerCaps(
         newCharData.willpower,
         newCharData.stats,
         newCharData.basicInfo,
-        importedSettings // Use the new GM settings for capping
+        importedSettings
       );
       newCharData.willpower = updatedWillpower;
-      willpowerToasts.forEach(t => toast(t));
+      willpowerToastProps = willpowerToastsFromApply; 
       
       return newCharData;
     });
 
-    toast({
-      title: "GM Settings Imported",
-      description: "Character creation parameters have been successfully imported and applied. Character's willpower and point limits updated if necessary.",
-    });
+    setTimeout(() => {
+      willpowerToastProps.forEach(tProps => toast(tProps));
+      toast({
+        title: "GM Settings Imported",
+        description: "Character creation parameters have been successfully imported and applied. Character's willpower and point limits updated if necessary.",
+      });
+    }, 0);
   };
 
 
@@ -1810,6 +1822,7 @@ export default function HomePage() {
 
 
     
+
 
 
 
