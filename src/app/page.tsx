@@ -1244,14 +1244,14 @@ export default function HomePage() {
         archetypePointLimit: currentArchetypeLimitFromState, 
         statPointLimit: currentStatLimitFromState, 
         skillPointLimit: currentSkillLimitFromState, 
-        willpowerPointLimit: currentWillpowerLimitFromState, 
+        willpowerPointLimit: currentWillpowerPointLimitFromState, 
         miraclePointLimit: currentMiracleLimitFromState 
       } = characterData; 
   
       let sumOfOtherSubLimits = 0;
       if (limitType !== 'archetype') sumOfOtherSubLimits += (currentArchetypeLimitFromState || 0);
       if (limitType !== 'stat') sumOfOtherSubLimits += (currentStatLimitFromState || 0);
-      if (limitType !== 'willpower') sumOfOtherSubLimits += (currentWillpowerLimitFromState || 0);
+      if (limitType !== 'willpower') sumOfOtherSubLimits += (currentWillpowerPointLimitFromState || 0);
       if (limitType !== 'skill') sumOfOtherSubLimits += (currentSkillLimitFromState || 0);
       if (limitType !== 'miracle') sumOfOtherSubLimits += (currentMiracleLimitFromState || 0);
   
@@ -1659,41 +1659,39 @@ export default function HomePage() {
 
     setGmSettings(importedSettings);
 
-    setCharacterData(prevCharData => {
-      let newCharData = { ...prevCharData };
-      const { pointRestrictions: importedPointRestrictions } = importedSettings;
+    const updatedCharacterData = { ...characterData };
+    const { pointRestrictions: importedPointRestrictions } = importedSettings;
 
-      if (importedPointRestrictions.overallPointLimit !== undefined) {
-        newCharData.pointLimit = importedPointRestrictions.overallPointLimit;
-      }
-      if (importedPointRestrictions.archetypePointLimit !== undefined) {
-        newCharData.archetypePointLimit = importedPointRestrictions.archetypePointLimit;
-      }
-      if (importedPointRestrictions.statPointLimit !== undefined) {
-        newCharData.statPointLimit = importedPointRestrictions.statPointLimit;
-      }
-      if (importedPointRestrictions.willpowerPointLimit !== undefined) {
-        newCharData.willpowerPointLimit = importedPointRestrictions.willpowerPointLimit;
-      }
-      if (importedPointRestrictions.skillPointLimit !== undefined) {
-        newCharData.skillPointLimit = importedPointRestrictions.skillPointLimit;
-      }
-      if (importedPointRestrictions.miraclePointLimit !== undefined) {
-        newCharData.miraclePointLimit = importedPointRestrictions.miraclePointLimit;
-      }
+    if (importedPointRestrictions.overallPointLimit !== undefined) {
+        updatedCharacterData.pointLimit = importedPointRestrictions.overallPointLimit;
+    }
+    if (importedPointRestrictions.archetypePointLimit !== undefined) {
+        updatedCharacterData.archetypePointLimit = importedPointRestrictions.archetypePointLimit;
+    }
+    if (importedPointRestrictions.statPointLimit !== undefined) {
+        updatedCharacterData.statPointLimit = importedPointRestrictions.statPointLimit;
+    }
+    if (importedPointRestrictions.willpowerPointLimit !== undefined) {
+        updatedCharacterData.willpowerPointLimit = importedPointRestrictions.willpowerPointLimit;
+    }
+    if (importedPointRestrictions.skillPointLimit !== undefined) {
+        updatedCharacterData.skillPointLimit = importedPointRestrictions.skillPointLimit;
+    }
+    if (importedPointRestrictions.miraclePointLimit !== undefined) {
+        updatedCharacterData.miraclePointLimit = importedPointRestrictions.miraclePointLimit;
+    }
 
-      const { updatedWillpower, toasts: willpowerToastsFromApply } = applyWillpowerCaps(
-        newCharData.willpower,
-        newCharData.stats,
-        newCharData.basicInfo,
+    const { updatedWillpower, toasts: willpowerToastsFromApply } = applyWillpowerCaps(
+        updatedCharacterData.willpower,
+        updatedCharacterData.stats,
+        updatedCharacterData.basicInfo,
         importedSettings
-      );
-      newCharData.willpower = updatedWillpower;
-      willpowerToastPropsArray = willpowerToastsFromApply; 
-      
-      return newCharData;
-    });
+    );
+    updatedCharacterData.willpower = updatedWillpower;
+    willpowerToastPropsArray = willpowerToastsFromApply;
 
+    setCharacterData(updatedCharacterData);
+    
     setTimeout(() => {
       willpowerToastPropsArray.forEach(tProps => toast(tProps));
       toast({
@@ -1724,9 +1722,6 @@ export default function HomePage() {
       }, 0);
       return;
     }
-
-    // More detailed validation can be added here for specific fields,
-    // e.g., ensuring miracle structures are correct, MQ IDs are valid, etc.
 
     setCustomArchetypeData(importedArchetype);
     setTimeout(() => {
@@ -1820,6 +1815,7 @@ export default function HomePage() {
         } else {
           updatedMiracles.push({
             id: `gm-mandatory-miracle-${Date.now()}-${i}`,
+            definitionId: `gm-custom-mandatory-${Date.now()}-${i}`,
             name: `Mandatory Power ${i + 1}`,
             description: 'GM-defined mandatory power.',
             dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
@@ -1845,11 +1841,12 @@ export default function HomePage() {
     value: string
   ) => {
     setCustomArchetypeData(prev => {
-      const updatedMiracles = [...prev.mandatoryPowerDetails.miracles];
-      if (updatedMiracles[miracleIndex]) {
-        // @ts-ignore
-        updatedMiracles[miracleIndex] = { ...updatedMiracles[miracleIndex], [field]: value };
-      }
+      const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+          if (idx === miracleIndex) { // @ts-ignore
+            return { ...mir, [field]: value };
+          }
+          return mir;
+      });
       return {
         ...prev,
         mandatoryPowerDetails: {
@@ -1857,6 +1854,166 @@ export default function HomePage() {
           miracles: updatedMiracles,
         }
       };
+    });
+  };
+
+  const handleAddCustomArchetypeMandatoryMiracleQuality = (miracleIndex: number) => {
+    setCustomArchetypeData(prev => {
+        const newQuality: MiracleQuality = {
+          id: `gm-quality-${Date.now()}`, type: 'useful', capacity: 'touch', levels: 0, extras: [], flaws: [],
+        };
+        const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+            if (idx === miracleIndex) {
+                return { ...mir, qualities: [...mir.qualities, newQuality] };
+            }
+            return mir;
+        });
+        return { ...prev, mandatoryPowerDetails: { ...prev.mandatoryPowerDetails, miracles: updatedMiracles }};
+    });
+  };
+
+  const handleRemoveCustomArchetypeMandatoryMiracleQuality = (miracleIndex: number, qualityId: string) => {
+     setCustomArchetypeData(prev => {
+        const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+            if (idx === miracleIndex) {
+                return { ...mir, qualities: mir.qualities.filter(q => q.id !== qualityId) };
+            }
+            return mir;
+        });
+        return { ...prev, mandatoryPowerDetails: { ...prev.mandatoryPowerDetails, miracles: updatedMiracles }};
+    });
+  };
+
+  const handleCustomArchetypeMandatoryMiracleQualityChange = (
+    miracleIndex: number,
+    qualityId: string,
+    field: keyof MiracleQuality,
+    value: any
+  ) => {
+     setCustomArchetypeData(prev => {
+        const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+            if (idx === miracleIndex) {
+                return { 
+                    ...mir, 
+                    qualities: mir.qualities.map(q => 
+                        q.id === qualityId ? { ...q, [field]: value } : q
+                    ) 
+                };
+            }
+            return mir;
+        });
+        return { ...prev, mandatoryPowerDetails: { ...prev.mandatoryPowerDetails, miracles: updatedMiracles }};
+    });
+  };
+
+  const handleAddExtraOrFlawToCustomArchetypeMandatoryQuality = (
+    miracleIndex: number,
+    qualityId: string,
+    itemType: 'extra' | 'flaw',
+    definitionId?: string
+  ) => {
+    setCustomArchetypeData(prev => {
+        let newItem: AppliedExtraOrFlaw;
+        if (definitionId) {
+          const collection = itemType === 'extra' ? PREDEFINED_EXTRAS : PREDEFINED_FLAWS;
+          const definition = collection.find(item => item.id === definitionId);
+          if (!definition) return prev;
+          newItem = {
+            id: `gm-${itemType}-def-${definition.id}-${Date.now()}`, definitionId: definition.id,
+            name: definition.name, costModifier: definition.costModifier, isCustom: false,
+          };
+        } else { 
+          newItem = {
+            id: `gm-custom-${itemType}-${Date.now()}`, name: `Custom ${itemType === 'extra' ? 'Extra' : 'Flaw'}`,
+            costModifier: itemType === 'extra' ? 1 : -1, isCustom: true,
+          };
+        }
+
+        const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+            if (idx === miracleIndex) {
+                return {
+                    ...mir,
+                    qualities: mir.qualities.map(q => {
+                        if (q.id === qualityId) {
+                            return itemType === 'extra'
+                                ? { ...q, extras: [...q.extras, newItem] }
+                                : { ...q, flaws: [...q.flaws, newItem] };
+                        }
+                        return q;
+                    })
+                };
+            }
+            return mir;
+        });
+        return { ...prev, mandatoryPowerDetails: { ...prev.mandatoryPowerDetails, miracles: updatedMiracles }};
+    });
+  };
+
+  const handleRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality = (
+    miracleIndex: number,
+    qualityId: string,
+    itemType: 'extra' | 'flaw',
+    itemId: string
+  ) => {
+    setCustomArchetypeData(prev => {
+        const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+            if (idx === miracleIndex) {
+                return {
+                    ...mir,
+                    qualities: mir.qualities.map(q => {
+                        if (q.id === qualityId) {
+                            return itemType === 'extra'
+                                ? { ...q, extras: q.extras.filter(ex => ex.id !== itemId) }
+                                : { ...q, flaws: q.flaws.filter(fl => fl.id !== itemId) };
+                        }
+                        return q;
+                    })
+                };
+            }
+            return mir;
+        });
+        return { ...prev, mandatoryPowerDetails: { ...prev.mandatoryPowerDetails, miracles: updatedMiracles }};
+    });
+  };
+
+  const handleCustomArchetypeMandatoryExtraOrFlawChange = (
+    miracleIndex: number,
+    qualityId: string,
+    itemType: 'extra' | 'flaw',
+    itemId: string,
+    field: keyof AppliedExtraOrFlaw,
+    value: string | number
+  ) => {
+    setCustomArchetypeData(prev => {
+        const updatedMiracles = prev.mandatoryPowerDetails.miracles.map((mir, idx) => {
+            if (idx === miracleIndex) {
+                return {
+                    ...mir,
+                    qualities: mir.qualities.map(q => {
+                        if (q.id === qualityId) {
+                            const listToUpdate = itemType === 'extra' ? q.extras : q.flaws;
+                            const updatedList = listToUpdate.map(item => {
+                                if (item.id === itemId) {
+                                  let processedValue = value;
+                                  if (field === 'costModifier') {
+                                    const numericValue = Number(value); 
+                                    processedValue = isNaN(numericValue) ? 0 : numericValue;
+                                  }
+                                  return { ...item, [field]: processedValue };
+                                }
+                                return item;
+                            });
+                            return itemType === 'extra'
+                                ? { ...q, extras: updatedList }
+                                : { ...q, flaws: updatedList };
+                        }
+                        return q;
+                    })
+                };
+            }
+            return mir;
+        });
+        return { ...prev, mandatoryPowerDetails: { ...prev.mandatoryPowerDetails, miracles: updatedMiracles }};
     });
   };
   
@@ -1913,12 +2070,23 @@ export default function HomePage() {
     try {
       const archetypeToExport: GmCustomArchetypeData = {
         ...customArchetypeData,
-        // Ensure mandatory miracles have unique IDs if they were just placeholders
         mandatoryPowerDetails: {
             ...customArchetypeData.mandatoryPowerDetails,
             miracles: customArchetypeData.mandatoryPowerDetails.miracles.map((m, i) => ({
                 ...m,
-                id: m.id.startsWith('gm-mandatory-miracle-') ? `exported-gm-mandatory-${customArchetypeData.name.replace(/\s+/g, '_') || 'arch'}-${Date.now()}-${i}` : m.id
+                id: m.id.startsWith('gm-mandatory-miracle-') ? `exported-gm-mandatory-${customArchetypeData.name.replace(/\s+/g, '_') || 'arch'}-${Date.now()}-${i}` : m.id,
+                qualities: m.qualities.map(q => ({
+                    ...q,
+                    id: q.id.startsWith('gm-quality-') ? `exported-gm-quality-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}` : q.id,
+                    extras: q.extras.map(ex => ({
+                        ...ex,
+                        id: ex.id.startsWith('gm-extra-') || ex.id.startsWith('gm-custom-extra-') ? `exported-gm-extra-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}` : ex.id,
+                    })),
+                    flaws: q.flaws.map(fl => ({
+                        ...fl,
+                        id: fl.id.startsWith('gm-flaw-') || fl.id.startsWith('gm-custom-flaw-') ? `exported-gm-flaw-${Date.now()}-${i}-${Math.random().toString(36).substring(2)}` : fl.id,
+                    })),
+                }))
             }))
         }
       };
@@ -2048,6 +2216,13 @@ export default function HomePage() {
                   onCustomArchetypeIntrinsicConfigChange={handleCustomArchetypeIntrinsicConfigChange}
                   onCustomArchetypeInhumanStatSettingChange={handleCustomArchetypeInhumanStatSettingChange}
                   onExportCustomArchetype={handleExportCustomArchetype}
+                  // New handlers for detailed GM miracle editing
+                  onAddCustomArchetypeMandatoryMiracleQuality={handleAddCustomArchetypeMandatoryMiracleQuality}
+                  onRemoveCustomArchetypeMandatoryMiracleQuality={handleRemoveCustomArchetypeMandatoryMiracleQuality}
+                  onCustomArchetypeMandatoryMiracleQualityChange={handleCustomArchetypeMandatoryMiracleQualityChange}
+                  onAddExtraOrFlawToCustomArchetypeMandatoryQuality={handleAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+                  onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={handleRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
+                  onCustomArchetypeMandatoryExtraOrFlawChange={handleCustomArchetypeMandatoryExtraOrFlawChange}
                 />
               </TabsContent>
             </div>
@@ -2076,6 +2251,7 @@ export default function HomePage() {
 
 
     
+
 
 
 

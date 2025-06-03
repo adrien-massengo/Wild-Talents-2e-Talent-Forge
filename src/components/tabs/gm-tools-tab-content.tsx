@@ -14,37 +14,38 @@ import { Button } from "@/components/ui/button";
 import { Download, PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { MiracleDefinition } from "@/lib/miracles-definitions";
+import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
+import { POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
+import { calculateSingleMiracleTotalCost, calculateSingleMiracleQualityCost } from "@/lib/cost-calculations";
 
 
 import {
   ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES,
   ALLERGY_SUBSTANCES, ALLERGY_EFFECTS, type AllergySubstanceType, type AllergyEffectType,
   type BruteFrailType, type DiscardedAttributeType, type InhumanStatsSettings, type InhumanStatSetting, type AttributeCondition,
-  type SourceMetaQuality, type PermissionMetaQuality, type IntrinsicMetaQuality // Ensure these specific types are imported
+  type SourceMetaQuality, type PermissionMetaQuality, type IntrinsicMetaQuality
 } from "@/lib/character-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
-import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
+// Removed PREDEFINED_MIRACLES_TEMPLATES import as it's not directly used for GM mandatory miracle structure.
 
 const ALL_STATS_KEYS_GM = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'] as const;
 
 
-// Interface for the data structure of the custom archetype being created
 export interface CustomArchetypeCreationData {
   name: string;
   description: string;
   sourceMQIds: string[];
   permissionMQIds: string[];
   intrinsicMQIds: string[];
-  intrinsicConfigs: { // For intrinsics other than mandatory power
+  intrinsicConfigs: {
     intrinsicAllergyConfig: { [mqId: string]: { substance?: AllergySubstanceType; effect?: AllergyEffectType } };
     intrinsicBruteFrailConfig: { [mqId: string]: { type?: BruteFrailType } };
     intrinsicCustomStatsConfig: { [mqId: string]: { discardedAttribute?: DiscardedAttributeType } };
     intrinsicVulnerableConfig: { [mqId: string]: { extraBoxes?: number } };
   };
-  mandatoryPowerDetails: { // Specific for 'mandatory_power' intrinsic
+  mandatoryPowerDetails: {
     count: number;
-    miracles: MiracleDefinition[]; // Full MiracleDefinition for flexibility, though GM tool might only edit basics
+    miracles: MiracleDefinition[];
   };
   inhumanStatsSettings?: InhumanStatsSettings;
 }
@@ -62,7 +63,6 @@ interface GmToolsTabContentProps {
   onMiracleNumericRestrictionChange: (field: keyof GmSettings['miracleRestrictions']['numericRestrictions'], value: string) => void;
   onExportSettings: () => void;
 
-  // Props for Custom Archetype Creation
   customArchetypeData: CustomArchetypeCreationData;
   onCustomArchetypeFieldChange: (field: keyof Omit<CustomArchetypeCreationData, 'sourceMQIds' | 'permissionMQIds' | 'intrinsicMQIds' | 'intrinsicConfigs' | 'mandatoryPowerDetails' | 'inhumanStatsSettings'>, value: string) => void;
   onCustomArchetypeMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
@@ -71,7 +71,16 @@ interface GmToolsTabContentProps {
   onCustomArchetypeIntrinsicConfigChange: (metaQualityId: string, configKey: keyof CustomArchetypeCreationData['intrinsicConfigs'], field: string, value: any) => void;
   onCustomArchetypeInhumanStatSettingChange: (statName: keyof InhumanStatsSettings, field: keyof InhumanStatSetting, value: any) => void;
   onExportCustomArchetype: () => void;
+  
+  // Handlers for detailed GM mandatory miracle editing
+  onAddCustomArchetypeMandatoryMiracleQuality: (miracleIndex: number) => void;
+  onRemoveCustomArchetypeMandatoryMiracleQuality: (miracleIndex: number, qualityId: string) => void;
+  onCustomArchetypeMandatoryMiracleQualityChange: (miracleIndex: number, qualityId: string, field: keyof MiracleQuality, value: any) => void;
+  onAddExtraOrFlawToCustomArchetypeMandatoryQuality: (miracleIndex: number, qualityId: string, itemType: 'extra' | 'flaw', definitionId?: string) => void;
+  onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality: (miracleIndex: number, qualityId: string, itemType: 'extra' | 'flaw', itemId: string) => void;
+  onCustomArchetypeMandatoryExtraOrFlawChange: (miracleIndex: number, qualityId: string, itemType: 'extra' | 'flaw', itemId: string, field: keyof AppliedExtraOrFlaw, value: string | number) => void;
 }
+
 
 interface GmMetaQualityCollapsibleProps {
   title: string;
@@ -84,15 +93,47 @@ interface GmMetaQualityCollapsibleProps {
   onCustomArchetypeMandatoryPowerCountChange: GmToolsTabContentProps['onCustomArchetypeMandatoryPowerCountChange'];
   onCustomArchetypeMandatoryMiracleChange: GmToolsTabContentProps['onCustomArchetypeMandatoryMiracleChange'];
   mqType: 'source' | 'permission' | 'intrinsic';
+
+  // Pass down new handlers for mandatory miracle editing
+  onAddCustomArchetypeMandatoryMiracleQuality: GmToolsTabContentProps['onAddCustomArchetypeMandatoryMiracleQuality'];
+  onRemoveCustomArchetypeMandatoryMiracleQuality: GmToolsTabContentProps['onRemoveCustomArchetypeMandatoryMiracleQuality'];
+  onCustomArchetypeMandatoryMiracleQualityChange: GmToolsTabContentProps['onCustomArchetypeMandatoryMiracleQualityChange'];
+  onAddExtraOrFlawToCustomArchetypeMandatoryQuality: GmToolsTabContentProps['onAddExtraOrFlawToCustomArchetypeMandatoryQuality'];
+  onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality: GmToolsTabContentProps['onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality'];
+  onCustomArchetypeMandatoryExtraOrFlawChange: GmToolsTabContentProps['onCustomArchetypeMandatoryExtraOrFlawChange'];
 }
 
-const GmMetaQualityCollapsible = ({
-  title, mqList, selectedMQIds, onMQSelectionChange,
-  customArchetypeData, onCustomArchetypeIntrinsicConfigChange, onCustomArchetypeInhumanStatSettingChange,
-  onCustomArchetypeMandatoryPowerCountChange, onCustomArchetypeMandatoryMiracleChange,
-  mqType
-}: GmMetaQualityCollapsibleProps): JSX.Element => {
+const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Element => {
+  const {
+    title, mqList, selectedMQIds, onMQSelectionChange,
+    customArchetypeData, onCustomArchetypeIntrinsicConfigChange, onCustomArchetypeInhumanStatSettingChange,
+    onCustomArchetypeMandatoryPowerCountChange, onCustomArchetypeMandatoryMiracleChange, mqType,
+    onAddCustomArchetypeMandatoryMiracleQuality, onRemoveCustomArchetypeMandatoryMiracleQuality,
+    onCustomArchetypeMandatoryMiracleQualityChange, onAddExtraOrFlawToCustomArchetypeMandatoryQuality,
+    onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality, onCustomArchetypeMandatoryExtraOrFlawChange
+  } = props;
+
   const [isOpen, setIsOpen] = React.useState(false);
+  const [selectedExtraToAdd, setSelectedExtraToAdd] = React.useState<{ [qualityId: string]: string }>({});
+  const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
+
+  // For GM tools, we use static definitions as there are no character skills.
+  // An empty skill array means getDynamicPowerQualityDefinitions will return base definitions.
+  const gmPowerQualityDefinitions = React.useMemo(() => getDynamicPowerQualityDefinitions([]), []);
+
+  const calculateGmDisplayedNDFactor = (quality: MiracleQuality) => {
+    const qualityDef = gmPowerQualityDefinitions.find(def => def.key === quality.type);
+    if (!qualityDef) return 1; 
+
+    const baseCostFactor = qualityDef.baseCostFactor;
+    const totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
+    const totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
+    const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
+
+    return Math.max(1, baseCostFactor + effectiveCostModifier);
+  };
+
+
   return (
     <Card className="bg-card/50 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between p-3 cursor-pointer hover:bg-accent/5" onClick={() => setIsOpen(!isOpen)}>
@@ -127,21 +168,21 @@ const GmMetaQualityCollapsible = ({
                         />
                       </div>
                       {customArchetypeData.mandatoryPowerDetails.miracles.map((miracle, index) => (
-                        <Card key={miracle.id} className="p-2 my-2 bg-background/80">
-                          <Label className="text-xs font-semibold block mb-1">Mandatory Power {index + 1}</Label>
+                        <Card key={miracle.id} className="p-3 my-2 bg-background/80 shadow-inner">
+                          <Label className="text-sm font-semibold block mb-1">Mandatory Power {index + 1}</Label>
                           <Input
                             placeholder="Miracle Name"
                             value={miracle.name}
                             onChange={e => onCustomArchetypeMandatoryMiracleChange(index, 'name', e.target.value)}
-                            className="h-8 text-xs mb-1"
+                            className="h-8 text-sm mb-2"
                           />
                           <Textarea
                             placeholder="Miracle Description"
                             value={miracle.description}
                             onChange={e => onCustomArchetypeMandatoryMiracleChange(index, 'description', e.target.value)}
-                            className="text-xs mb-1 min-h-[40px]"
+                            className="text-sm mb-2 min-h-[40px]"
                           />
-                           <div className="grid grid-cols-3 gap-1">
+                           <div className="grid grid-cols-3 gap-2 mb-3">
                             <Select value={miracle.dice} onValueChange={v => onCustomArchetypeMandatoryMiracleChange(index, 'dice', v)}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue/></SelectTrigger>
                                 <SelectContent>{Array.from({length:11}, (_,i)=>`${i}D`).map(d=><SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>)}</SelectContent>
@@ -155,7 +196,145 @@ const GmMetaQualityCollapsible = ({
                                 <SelectContent>{Array.from({length:11}, (_,i)=>`${i}WD`).map(d=><SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>)}</SelectContent>
                             </Select>
                            </div>
-                          {/* Full quality editing UI for GM-defined miracles is omitted for brevity here but could be added */}
+
+                            <div className="mt-3 pt-3 border-t border-dashed">
+                                <div className="text-sm">
+                                <strong>Miracle Quality Cost Factors (per ND):</strong>
+                                {miracle.qualities.length > 0 ? (
+                                    <ul className="list-disc list-inside pl-2 text-xs">
+                                    {miracle.qualities.map(q => {
+                                        const qDef = gmPowerQualityDefinitions.find(def => def.key === q.type);
+                                        const factor = calculateGmDisplayedNDFactor(q);
+                                        return <li key={`${miracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor}</li>;
+                                    })}
+                                    </ul>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
+                                )}
+                                </div>
+                                <p className="font-semibold mt-1">Miracle Cost per ND: {miracle.qualities.reduce((sum, quality) => sum + calculateGmDisplayedNDFactor(quality), 0)} points</p>
+                                <p className="font-semibold mt-1">
+                                Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateSingleMiracleTotalCost(miracle, [])} points`}
+                                </p>
+                            </div>
+
+                           {/* Qualities Editing for GM Mandatory Miracle */}
+                            <div className="space-y-3 mt-3">
+                                <div className="flex justify-between items-center">
+                                <h5 className="text-sm font-semibold text-accent">Power Qualities</h5>
+                                <Button size="sm" variant="outline" onClick={() => onAddCustomArchetypeMandatoryMiracleQuality(index)}>
+                                    <PlusCircle className="mr-2 h-3 w-3"/> Add Quality
+                                </Button>
+                                </div>
+                                {miracle.qualities.length === 0 && <p className="text-xs text-muted-foreground">No qualities added yet.</p>}
+                                
+                                {miracle.qualities.map((quality) => (
+                                <Card key={quality.id} className="p-2 bg-background/60 border-border/70 shadow-sm">
+                                    <div className="flex justify-between items-center mb-1">
+                                    <p className="text-xs font-medium">Quality Config</p>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemoveCustomArchetypeMandatoryMiracleQuality(index, quality.id)}>
+                                        <Trash2 className="h-3 w-3 text-destructive"/>
+                                    </Button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-1">
+                                    <div>
+                                        <Label htmlFor={`${quality.id}-type-gm`} className="text-2xs">Type</Label>
+                                        <Select value={quality.type} onValueChange={(v) => onCustomArchetypeMandatoryMiracleQualityChange(index, quality.id, 'type', v)}>
+                                        <SelectTrigger id={`${quality.id}-type-gm`} className="h-7 text-xs"><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            {gmPowerQualityDefinitions.map(def => <SelectItem key={def.key} value={def.key} className="text-xs">{def.label}</SelectItem>)}
+                                        </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor={`${quality.id}-capacity-gm`} className="text-2xs">Capacity</Label>
+                                        <Select value={quality.capacity} onValueChange={(v) => onCustomArchetypeMandatoryMiracleQualityChange(index, quality.id, 'capacity', v as MiracleCapacityType)}>
+                                        <SelectTrigger id={`${quality.id}-capacity-gm`} className="h-7 text-xs"><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            {POWER_CAPACITY_OPTIONS.map(cap => <SelectItem key={cap.value} value={cap.value} className="text-xs">{cap.label}</SelectItem>)}
+                                        </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor={`${quality.id}-levels-gm`} className="text-2xs">Levels</Label>
+                                        <Input
+                                        id={`${quality.id}-levels-gm`} type="number" min="0"
+                                        value={String(Math.max(0, quality.levels || 0))}
+                                        onChange={(e) => onCustomArchetypeMandatoryMiracleQualityChange(index, quality.id, 'levels', parseInt(e.target.value,10) || 0)}
+                                        className="text-xs h-7" placeholder="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-2xs block">Eff. Factor (per ND)</Label>
+                                        <Input type="text" readOnly value={String(calculateGmDisplayedNDFactor(quality))} className="text-xs h-7 bg-muted cursor-not-allowed" />
+                                    </div>
+                                    </div>
+
+                                    {/* Extras for GM Quality */}
+                                    <div className="mt-2 pt-1 border-t border-dashed">
+                                      <Label className="text-2xs font-semibold">Extras</Label>
+                                      {quality.extras.map(extra => (
+                                        <div key={extra.id} className="my-0.5 text-2xs p-0.5 bg-primary/5 rounded-md">
+                                          <div className="flex items-center space-x-1">
+                                            {extra.isCustom ? (
+                                              <>
+                                                <Input value={extra.name} onChange={e => onCustomArchetypeMandatoryExtraOrFlawChange(index, quality.id, 'extra', extra.id, 'name', e.target.value)} placeholder="Custom Extra" className="flex-grow h-6 text-2xs"/>
+                                                <Input type="number" value={String(extra.costModifier)} onChange={e => onCustomArchetypeMandatoryExtraOrFlawChange(index, quality.id, 'extra', extra.id, 'costModifier', parseInt(e.target.value) || 0)} className="w-12 h-6 text-2xs" placeholder="Cost"/>
+                                              </>
+                                            ) : ( <span className="flex-grow">{extra.name} ({extra.costModifier > 0 ? '+' : ''}{extra.costModifier})</span> )}
+                                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality(index, quality.id, 'extra', extra.id)}><Trash2 className="h-2.5 w-2.5 text-destructive"/></Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <div className="flex items-end space-x-1 mt-0.5">
+                                        <Select value={selectedExtraToAdd[`${index}-${quality.id}`] || ""} onValueChange={val => setSelectedExtraToAdd(prev => ({...prev, [`${index}-${quality.id}`]: val}))}>
+                                            <SelectTrigger className="h-7 text-2xs flex-grow" ><SelectValue placeholder="Add Extra..."/></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="custom_extra" className="text-xs">Custom Extra</SelectItem>
+                                                {PREDEFINED_EXTRAS.map(ex => <SelectItem key={ex.id} value={ex.id} className="text-xs">{ex.name} ({ex.costModifier > 0 ? '+' : ''}{ex.costModifier})</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button size="sm" className="h-7 text-2xs px-2" onClick={() => {
+                                            const val = selectedExtraToAdd[`${index}-${quality.id}`];
+                                            onAddExtraOrFlawToCustomArchetypeMandatoryQuality(index, quality.id, 'extra', val === 'custom_extra' ? undefined : val);
+                                            setSelectedExtraToAdd(prev => ({...prev, [`${index}-${quality.id}`]: ""}));
+                                        }} disabled={!selectedExtraToAdd[`${index}-${quality.id}`]}>Add</Button>
+                                      </div>
+                                    </div>
+                                    {/* Flaws for GM Quality */}
+                                    <div className="mt-2 pt-1 border-t border-dashed">
+                                      <Label className="text-2xs font-semibold">Flaws</Label>
+                                      {quality.flaws.map(flaw => (
+                                        <div key={flaw.id} className="my-0.5 text-2xs p-0.5 bg-destructive/5 rounded-md">
+                                          <div className="flex items-center space-x-1">
+                                            {flaw.isCustom ? (
+                                               <>
+                                                <Input value={flaw.name} onChange={e => onCustomArchetypeMandatoryExtraOrFlawChange(index, quality.id, 'flaw', flaw.id, 'name', e.target.value)} placeholder="Custom Flaw" className="flex-grow h-6 text-2xs"/>
+                                                <Input type="number" value={String(flaw.costModifier)} onChange={e => onCustomArchetypeMandatoryExtraOrFlawChange(index, quality.id, 'flaw', flaw.id, 'costModifier', parseInt(e.target.value) || 0)} className="w-12 h-6 text-2xs" placeholder="Cost"/>
+                                               </>
+                                            ) : ( <span className="flex-grow">{flaw.name} ({flaw.costModifier})</span>)}
+                                            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality(index, quality.id, 'flaw', flaw.id)}><Trash2 className="h-2.5 w-2.5 text-destructive"/></Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <div className="flex items-end space-x-1 mt-0.5">
+                                        <Select value={selectedFlawToAdd[`${index}-${quality.id}`] || ""} onValueChange={val => setSelectedFlawToAdd(prev => ({...prev, [`${index}-${quality.id}`]: val}))}>
+                                            <SelectTrigger className="h-7 text-2xs flex-grow" ><SelectValue placeholder="Add Flaw..."/></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="custom_flaw" className="text-xs">Custom Flaw</SelectItem>
+                                                {PREDEFINED_FLAWS.map(fl => <SelectItem key={fl.id} value={fl.id} className="text-xs">{fl.name} ({fl.costModifier})</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button size="sm" className="h-7 text-2xs px-2" onClick={() => {
+                                            const val = selectedFlawToAdd[`${index}-${quality.id}`];
+                                            onAddExtraOrFlawToCustomArchetypeMandatoryQuality(index, quality.id, 'flaw', val === 'custom_flaw' ? undefined : val);
+                                            setSelectedFlawToAdd(prev => ({...prev, [`${index}-${quality.id}`]: ""}));
+                                        }} disabled={!selectedFlawToAdd[`${index}-${quality.id}`]}>Add</Button>
+                                      </div>
+                                    </div>
+                                </Card>
+                                ))}
+                            </div>
                         </Card>
                       ))}
                     </div>
@@ -252,7 +431,13 @@ export function GmToolsTabContent({
   onCustomArchetypeMandatoryMiracleChange,
   onCustomArchetypeIntrinsicConfigChange,
   onCustomArchetypeInhumanStatSettingChange,
-  onExportCustomArchetype
+  onExportCustomArchetype,
+  onAddCustomArchetypeMandatoryMiracleQuality,
+  onRemoveCustomArchetypeMandatoryMiracleQuality,
+  onCustomArchetypeMandatoryMiracleQualityChange,
+  onAddExtraOrFlawToCustomArchetypeMandatoryQuality,
+  onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality,
+  onCustomArchetypeMandatoryExtraOrFlawChange
 }: GmToolsTabContentProps) {
 
   const renderToggleableList = (
@@ -435,6 +620,12 @@ export function GmToolsTabContent({
               onCustomArchetypeMandatoryPowerCountChange={onCustomArchetypeMandatoryPowerCountChange}
               onCustomArchetypeMandatoryMiracleChange={onCustomArchetypeMandatoryMiracleChange}
               mqType="source"
+              onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
+              onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
+              onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+              onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
+              onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
              <GmMetaQualityCollapsible
               title="Permission Meta-Qualities"
@@ -447,6 +638,12 @@ export function GmToolsTabContent({
               onCustomArchetypeMandatoryPowerCountChange={onCustomArchetypeMandatoryPowerCountChange}
               onCustomArchetypeMandatoryMiracleChange={onCustomArchetypeMandatoryMiracleChange}
               mqType="permission"
+              onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
+              onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
+              onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+              onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
+              onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
              <GmMetaQualityCollapsible
               title="Intrinsic Meta-Qualities"
@@ -459,6 +656,12 @@ export function GmToolsTabContent({
               onCustomArchetypeMandatoryPowerCountChange={onCustomArchetypeMandatoryPowerCountChange}
               onCustomArchetypeMandatoryMiracleChange={onCustomArchetypeMandatoryMiracleChange}
               mqType="intrinsic"
+              onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
+              onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
+              onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+              onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
+              onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
 
             <div className="mt-6 flex justify-end">
@@ -503,3 +706,4 @@ export function GmToolsTabContent({
     </Accordion>
   );
 }
+
