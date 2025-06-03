@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { CharacterTabContent } from "@/components/tabs/character-tab-content";
 import { TablesTabContent } from "@/components/tabs/tables-tab-content";
 import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
-import { GmToolsTabContent, type CustomArchetypeCreationData as GmCustomArchetypeData } from "@/components/tabs/gm-tools-tab-content"; // Import new type
+import { GmToolsTabContent, type CustomArchetypeCreationData as GmCustomArchetypeData } from "@/components/tabs/gm-tools-tab-content";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
@@ -163,6 +163,9 @@ export interface GmSettings {
     numericRestrictions: GmMiracleNumericRestrictions;
   };
 }
+
+// Re-export for AppHeader prop, if not already available via CharacterData or similar
+export type { CustomArchetypeCreationData as GmCustomArchetypeData } from "@/components/tabs/gm-tools-tab-content";
 
 
 const initialStatDetail: StatDetail = { dice: '2D', hardDice: '0HD', wiggleDice: '0WD' };
@@ -753,7 +756,7 @@ export default function HomePage() {
 
   const handleWillpowerChange = (field: keyof CharacterData['willpower'], value: number) => {
     setCharacterData(current => {
-      const localGmSettings = gmSettings; // Use the gmSettings from the HomePage closure
+      const localGmSettings = gmSettings; 
       const currentCalcBaseWillFromStats = calculateBaseWillFromStats(current.stats, getDiscardedAttributeFromBasicInfo(current.basicInfo));
       let toastMessagesProps: Array<Parameters<typeof toast>[0]> = [];
 
@@ -761,7 +764,6 @@ export default function HomePage() {
       let newPurchasedBaseWill = field === 'purchasedBaseWill' ? value : current.willpower.purchasedBaseWill;
       let newPurchasedWill = field === 'purchasedWill' ? value : current.willpower.purchasedWill;
 
-      // Ensure non-negative and respect intrinsics
       newPurchasedBaseWill = Math.max(0, isNaN(newPurchasedBaseWill) ? 0 : newPurchasedBaseWill);
       newPurchasedWill = Math.max(0, isNaN(newPurchasedWill) ? 0 : newPurchasedWill);
 
@@ -772,7 +774,6 @@ export default function HomePage() {
         newPurchasedWill = 0;
       }
       
-      // Apply GM maxBaseWill limit
       let newTotalBaseWill = currentCalcBaseWillFromStats + newPurchasedBaseWill;
       if (localGmSettings.willpowerRestrictions.maxBaseWill !== undefined && newTotalBaseWill > localGmSettings.willpowerRestrictions.maxBaseWill) {
         const oldPurchasedBaseWill = newPurchasedBaseWill;
@@ -783,7 +784,6 @@ export default function HomePage() {
         }
       }
 
-      // Apply GM maxTotalWill limit
       let newTotalWill = newTotalBaseWill + newPurchasedWill;
       if (localGmSettings.willpowerRestrictions.maxTotalWill !== undefined && newTotalWill > localGmSettings.willpowerRestrictions.maxTotalWill) {
         const oldPurchasedWill = newPurchasedWill;
@@ -806,7 +806,6 @@ export default function HomePage() {
         return current; 
       }
 
-      // Defer toast calls
       if (toastMessagesProps.length > 0) {
         setTimeout(() => {
           toastMessagesProps.forEach(tProps => toast(tProps));
@@ -949,7 +948,7 @@ export default function HomePage() {
     }
     
     if (adjustmentToastInfo) {
-      setTimeout(() => { // Defer adjustment toasts
+      setTimeout(() => { 
         toast({ title: adjustmentToastInfo.title, description: adjustmentToastInfo.description, variant: "default" });
       }, 0);
     }
@@ -1504,14 +1503,14 @@ export default function HomePage() {
         setTimeout(() => {
           toast({ title: "No Saved Data", description: "No character data found in local storage.", variant: "destructive" });
         }, 0);
-        setCharacterData(initialCharacterData); // Reset to initial if no data found
+        setCharacterData(initialCharacterData); 
       }
     } catch (error) {
       console.error("Failed to load character:", error);
       setTimeout(() => {
         toast({ title: "Load Error", description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`, variant: "destructive" });
       }, 0);
-       setCharacterData(initialCharacterData); // Reset to initial on error
+       setCharacterData(initialCharacterData); 
     }
   };
 
@@ -1538,7 +1537,7 @@ export default function HomePage() {
   const handleResetToDefault = () => {
     setCharacterData(initialCharacterData);
     setGmSettings(initialGmSettings);
-    setCustomArchetypeData(initialCustomArchetypeData); // Reset custom archetype data
+    setCustomArchetypeData(initialCustomArchetypeData); 
     setTimeout(() => {
       toast({
         title: "Data Reset",
@@ -1704,6 +1703,40 @@ export default function HomePage() {
     }, 0);
   };
 
+  const handleImportCustomArchetype = (importedArchetype: GmCustomArchetypeData) => {
+    // Basic validation
+    if (
+      !importedArchetype ||
+      typeof importedArchetype !== 'object' ||
+      typeof importedArchetype.name !== 'string' ||
+      !Array.isArray(importedArchetype.sourceMQIds) ||
+      !Array.isArray(importedArchetype.permissionMQIds) ||
+      !Array.isArray(importedArchetype.intrinsicMQIds) ||
+      typeof importedArchetype.intrinsicConfigs !== 'object' ||
+      typeof importedArchetype.mandatoryPowerDetails !== 'object'
+    ) {
+      setTimeout(() => {
+        toast({
+          title: "Import Error",
+          description: "Invalid Custom Archetype file structure.",
+          variant: "destructive",
+        });
+      }, 0);
+      return;
+    }
+
+    // More detailed validation can be added here for specific fields,
+    // e.g., ensuring miracle structures are correct, MQ IDs are valid, etc.
+
+    setCustomArchetypeData(importedArchetype);
+    setTimeout(() => {
+      toast({
+        title: "Custom Archetype Imported",
+        description: `Custom Archetype "${importedArchetype.name}" has been loaded into the GM Tools.`,
+      });
+    }, 0);
+  };
+
 
   const getDiscardedAttributeFromBasicInfo = (bInfo: BasicInfo): DiscardedAttributeType => {
     if (bInfo.selectedIntrinsicMQIds.includes('custom_stats')) {
@@ -1758,11 +1791,9 @@ export default function HomePage() {
         if (!currentSelection.includes(mqId)) currentSelection.push(mqId);
       } else {
         currentSelection = currentSelection.filter(id => id !== mqId);
-        // If unselecting 'mandatory_power', reset its config
         if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
           newCustomData.mandatoryPowerDetails = { count: 0, miracles: [] };
         }
-        // Also remove specific intrinsic configs if the MQ is deselected
         const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
         if (mqType === 'intrinsic' && intrinsicDef?.configKey && intrinsicDef.configKey !== 'intrinsicMandatoryPowerConfig') {
            // @ts-ignore
@@ -1793,7 +1824,7 @@ export default function HomePage() {
             description: 'GM-defined mandatory power.',
             dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
             qualities: [],
-            isCustom: true, // Always custom from GM's perspective here
+            isCustom: true, 
             isMandatory: true,
           });
         }
@@ -1829,7 +1860,6 @@ export default function HomePage() {
     });
   };
   
-  // Placeholder for more complex intrinsic configs for GM archetypes
   const handleCustomArchetypeIntrinsicConfigChange = (
     metaQualityId: string,
     configKey: keyof GmCustomArchetypeData['intrinsicConfigs'],
@@ -1881,27 +1911,16 @@ export default function HomePage() {
 
   const handleExportCustomArchetype = () => {
     try {
-      // Construct a simplified ArchetypeDefinition-like object for export
-      const archetypeToExport = {
-        id: customArchetypeData.name.toLowerCase().replace(/\s+/g, '_') || `custom_arch_${Date.now()}`,
-        name: customArchetypeData.name,
-        description: customArchetypeData.description,
-        // Points calculation would be complex here; GM would manually set it or it implies dynamic calculation if imported.
-        // For now, let's omit points or set to a placeholder.
-        points: 0, // Placeholder, or could be calculated based on MQ selection if desired later
-        sourceMQIds: customArchetypeData.sourceMQIds,
-        permissionMQIds: customArchetypeData.permissionMQIds,
-        intrinsicMQIds: customArchetypeData.intrinsicMQIds,
-        // For simplicity, text fields are omitted here but could be derived or manually added by GM post-export
-        sourceText: customArchetypeData.sourceMQIds.map(id => SOURCE_META_QUALITIES.find(mq => mq.id === id)?.name).join(', ') || 'N/A',
-        permissionText: customArchetypeData.permissionMQIds.map(id => PERMISSION_META_QUALITIES.find(mq => mq.id === id)?.name).join(', ') || 'N/A',
-        intrinsicsText: customArchetypeData.intrinsicMQIds.map(id => INTRINSIC_META_QUALITIES.find(mq => mq.id === id)?.name).join(', ') || 'N/A',
-        // Include mandatory power details if any
-        mandatoryPowerDetails: customArchetypeData.intrinsicMQIds.includes('mandatory_power') ? customArchetypeData.mandatoryPowerDetails : undefined,
-        // Include other intrinsic configs
-        intrinsicConfigs: customArchetypeData.intrinsicConfigs,
-        inhumanStatsSettings: customArchetypeData.inhumanStatsSettings,
-
+      const archetypeToExport: GmCustomArchetypeData = {
+        ...customArchetypeData,
+        // Ensure mandatory miracles have unique IDs if they were just placeholders
+        mandatoryPowerDetails: {
+            ...customArchetypeData.mandatoryPowerDetails,
+            miracles: customArchetypeData.mandatoryPowerDetails.miracles.map((m, i) => ({
+                ...m,
+                id: m.id.startsWith('gm-mandatory-miracle-') ? `exported-gm-mandatory-${customArchetypeData.name.replace(/\s+/g, '_') || 'arch'}-${Date.now()}-${i}` : m.id
+            }))
+        }
       };
       const jsonString = JSON.stringify(archetypeToExport, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
@@ -1949,6 +1968,7 @@ export default function HomePage() {
         onLoad={handleLoadCharacter}
         onExport={handleExportCharacter}
         onImportGmSettings={handleImportGmSettings}
+        onImportCustomArchetype={handleImportCustomArchetype} // Pass new handler
         onResetToDefault={handleResetToDefault}
       />
       <main className="flex-grow container mx-auto px-4 py-2 md:py-4">
@@ -2020,7 +2040,6 @@ export default function HomePage() {
                   onWillpowerRestrictionChange={handleGmWillpowerRestrictionChange}
                   onMiracleNumericRestrictionChange={handleGmMiracleNumericRestrictionChange}
                   onExportSettings={handleExportGmSettings}
-                  // Custom Archetype Props
                   customArchetypeData={customArchetypeData}
                   onCustomArchetypeFieldChange={handleCustomArchetypeFieldChange}
                   onCustomArchetypeMQSelectionChange={handleCustomArchetypeMQSelectionChange}
@@ -2057,6 +2076,7 @@ export default function HomePage() {
 
 
     
+
 
 
 

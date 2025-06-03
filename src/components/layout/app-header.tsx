@@ -4,6 +4,7 @@
 
 import * as React from "react";
 import type { GmSettings } from "@/app/page"; // Added for onImportGmSettings
+import type { GmCustomArchetypeData } from "@/app/page"; // Import for custom archetype data
 import { Button } from "@/components/ui/button";
 import { Save, Upload, Download, Settings, Moon, Sun, ChevronRight, ChevronLeft, User, FileInput, RotateCcw } from "lucide-react";
 import {
@@ -25,34 +26,46 @@ interface AppHeaderProps {
   onLoad: () => void;
   onExport: () => void;
   onImportGmSettings: (settings: GmSettings) => void;
-  onResetToDefault: () => void; // New prop for resetting to default
+  onImportCustomArchetype: (archetypeData: GmCustomArchetypeData) => void; // New prop
+  onResetToDefault: () => void;
 }
 
 type SettingsView = 'main' | 'appearance' | 'characters' | 'imports'; 
 type ThemeOption = 'light' | 'dark';
+type ImportType = 'gmSettings' | 'customArchetype' | null; // To track what to import
 
-export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onResetToDefault }: AppHeaderProps) {
+export function AppHeader({ 
+  onSave, 
+  onLoad, 
+  onExport, 
+  onImportGmSettings, 
+  onImportCustomArchetype, // Destructure new prop
+  onResetToDefault 
+}: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [settingsView, setSettingsView] = React.useState<SettingsView>('main');
+  const [importType, setImportType] = React.useState<ImportType>(null); // New state for import type
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast(); 
 
   const handleOpenChange = (open: boolean) => {
     setIsSettingsOpen(open);
     if (!open) {
-      // Reset to main view when dialog is closed
       setSettingsView('main');
+      setImportType(null); // Reset import type when dialog closes
     }
   };
 
-  const handleImportButtonClick = () => {
+  const handleTriggerImport = (type: ImportType) => {
+    setImportType(type);
     fileInputRef.current?.click();
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
+      setImportType(null); // Reset if no file selected
       return;
     }
 
@@ -63,27 +76,39 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onRese
         if (typeof text !== 'string') {
           throw new Error("Failed to read file content.");
         }
-        const importedSettings = JSON.parse(text) as GmSettings;
-        // Basic validation can be done here, or more thoroughly in the parent
-        if (importedSettings && typeof importedSettings === 'object' && importedSettings.pointRestrictions) {
-          onImportGmSettings(importedSettings);
-          toast({ title: "GM Settings Imported", description: "Character creation parameters have been successfully imported and applied." });
-          handleOpenChange(false); // Close dialog on successful import
-        } else {
-          throw new Error("Invalid GM settings file format.");
+        
+        if (importType === 'gmSettings') {
+          const importedSettings = JSON.parse(text) as GmSettings;
+          if (importedSettings && typeof importedSettings === 'object' && importedSettings.pointRestrictions) {
+            onImportGmSettings(importedSettings);
+            // Toast is handled in page.tsx to ensure proper sequencing with state updates
+            handleOpenChange(false); 
+          } else {
+            throw new Error("Invalid GM settings file format.");
+          }
+        } else if (importType === 'customArchetype') {
+          const importedArchetype = JSON.parse(text) as GmCustomArchetypeData;
+          // Basic validation for custom archetype
+          if (importedArchetype && typeof importedArchetype === 'object' && importedArchetype.name !== undefined && importedArchetype.sourceMQIds) {
+            onImportCustomArchetype(importedArchetype);
+             // Toast is handled in page.tsx
+            handleOpenChange(false);
+          } else {
+            throw new Error("Invalid Custom Archetype file format.");
+          }
         }
       } catch (error) {
-        console.error("Failed to import GM settings:", error);
+        console.error(`Failed to import ${importType}:`, error);
         toast({
           title: "Import Error",
-          description: error instanceof Error ? error.message : "Could not parse or apply GM settings.",
+          description: error instanceof Error ? error.message : `Could not parse or apply ${importType} data.`,
           variant: "destructive",
         });
       } finally {
-        // Reset file input value to allow importing the same file again
         if (event.target) {
           event.target.value = "";
         }
+        setImportType(null); // Reset import type after handling
       }
     };
     reader.readAsText(file);
@@ -130,7 +155,7 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onRese
                 )}
                 {settingsView === 'imports' && (
                   <DialogDescription>
-                    Import settings files.
+                    Import GM settings or custom archetype files.
                   </DialogDescription>
                 )}
               </DialogHeader>
@@ -155,7 +180,7 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onRese
                       onClick={() => setSettingsView('imports')}
                     >
                       <div className="flex items-center">
-                        <FileInput className="mr-2 h-4 w-4" /> {/* Using FileInput as placeholder icon */}
+                        <FileInput className="mr-2 h-4 w-4" />
                         <span>Import Settings</span>
                       </div>
                       <ChevronRight className="h-4 w-4" />
@@ -208,8 +233,11 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onRese
                       Back to Settings
                     </Button>
                     <div className="flex flex-col space-y-3 px-2">
-                       <Button variant="outline" onClick={handleImportButtonClick} aria-label="Import Character Creation Parameters">
-                        <Upload className="mr-2 h-4 w-4" /> Import Character Creation Parameters
+                       <Button variant="outline" onClick={() => handleTriggerImport('gmSettings')} aria-label="Import Character Creation Parameters">
+                        <Upload className="mr-2 h-4 w-4" /> Import GM Settings
+                      </Button>
+                      <Button variant="outline" onClick={() => handleTriggerImport('customArchetype')} aria-label="Import Custom Archetype">
+                        <Upload className="mr-2 h-4 w-4" /> Import Custom Archetype
                       </Button>
                       <input
                         type="file"
@@ -258,3 +286,4 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onRese
     </header>
   );
 }
+
