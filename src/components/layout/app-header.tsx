@@ -5,7 +5,7 @@
 import * as React from "react";
 import type { GmSettings } from "@/app/page"; // Added for onImportGmSettings
 import { Button } from "@/components/ui/button";
-import { Save, Upload, Download, Settings, Moon, Sun, ChevronRight, ChevronLeft, User, FileInput } from "lucide-react";
+import { Save, Upload, Download, Settings, Moon, Sun, ChevronRight, ChevronLeft, User, FileInput, RotateCcw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,24 +18,25 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "@/hooks/use-theme";
-import { useToast } from "@/hooks/use-toast"; // Added for import feedback
+import { useToast } from "@/hooks/use-toast"; 
 
 interface AppHeaderProps {
   onSave: () => void;
   onLoad: () => void;
   onExport: () => void;
-  onImportGmSettings: (settings: GmSettings) => void; // New prop
+  onImportGmSettings: (settings: GmSettings) => void;
+  onResetToDefault: () => void; // New prop for resetting to default
 }
 
-type SettingsView = 'main' | 'appearance' | 'characters' | 'imports'; // Added 'imports'
+type SettingsView = 'main' | 'appearance' | 'characters' | 'imports'; 
 type ThemeOption = 'light' | 'dark';
 
-export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings }: AppHeaderProps) {
+export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings, onResetToDefault }: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [settingsView, setSettingsView] = React.useState<SettingsView>('main');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { toast } = useToast(); // Added for import feedback
+  const { toast } = useToast(); 
 
   const handleOpenChange = (open: boolean) => {
     setIsSettingsOpen(open);
@@ -98,6 +99,9 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings }: AppH
         <div className="flex space-x-2 items-center">
           <Button variant="outline" onClick={onExport} aria-label="Export Character">
             <Download className="mr-2 h-4 w-4" /> Export
+          </Button>
+          <Button variant="outline" onClick={onResetToDefault} aria-label="Reset to Default">
+            <RotateCcw className="mr-2 h-4 w-4" /> Default
           </Button>
 
           <Dialog open={isSettingsOpen} onOpenChange={handleOpenChange}>
@@ -254,4 +258,3 @@ export function AppHeader({ onSave, onLoad, onExport, onImportGmSettings }: AppH
     </header>
   );
 }
-

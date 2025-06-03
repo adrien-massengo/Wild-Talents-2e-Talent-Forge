@@ -1322,6 +1322,8 @@ export default function HomePage() {
   const handleLoadCharacter = () => {
     try {
       const savedData = localStorage.getItem("wildTalentsCharacter");
+      let willpowerToastProps: Array<Parameters<typeof toast>[0]> = [];
+
       if (savedData) {
         const parsedData = JSON.parse(savedData) as Partial<CharacterData>;
 
@@ -1457,13 +1459,14 @@ export default function HomePage() {
         validatedData.willpower.purchasedBaseWill = Number(validatedData.willpower.purchasedBaseWill) || 0;
         validatedData.willpower.purchasedWill = Number(validatedData.willpower.purchasedWill) || 0;
         
-        const { updatedWillpower, toasts: willpowerToastProps } = applyWillpowerCaps(
+        const { updatedWillpower, toasts: toastsFromCaps } = applyWillpowerCaps(
           validatedData.willpower,
           validatedData.stats,
           validatedData.basicInfo,
           gmSettings 
         );
         validatedData.willpower = updatedWillpower;
+        willpowerToastProps = toastsFromCaps;
         
         setCharacterData(validatedData);
 
@@ -1476,14 +1479,14 @@ export default function HomePage() {
         setTimeout(() => {
           toast({ title: "No Saved Data", description: "No character data found in local storage.", variant: "destructive" });
         }, 0);
-        setCharacterData(initialCharacterData);
+        setCharacterData(initialCharacterData); // Reset to initial if no data found
       }
     } catch (error) {
       console.error("Failed to load character:", error);
       setTimeout(() => {
         toast({ title: "Load Error", description: `Could not load character data. ${error instanceof Error ? error.message : 'Unknown error.'}`, variant: "destructive" });
       }, 0);
-       setCharacterData(initialCharacterData);
+       setCharacterData(initialCharacterData); // Reset to initial on error
     }
   };
 
@@ -1505,6 +1508,17 @@ export default function HomePage() {
        console.error("Failed to export character:", error);
        toast({ title: "Export Error", description: "Could not export character data.", variant: "destructive" });
     }
+  };
+
+  const handleResetToDefault = () => {
+    setCharacterData(initialCharacterData);
+    setGmSettings(initialGmSettings);
+    setTimeout(() => {
+      toast({
+        title: "Data Reset",
+        description: "Character data and GM settings have been reset to default.",
+      });
+    }, 0);
   };
   
   const handleGmPointLimitChange = (limitType: keyof GmPointRestrictions, value: string) => {
@@ -1619,7 +1633,7 @@ export default function HomePage() {
 
     setGmSettings(importedSettings);
 
-    let willpowerToastProps: Array<Parameters<typeof toast>[0]> = [];
+    let willpowerToastPropsArray: Array<Parameters<typeof toast>[0]> = [];
 
     setCharacterData(prevCharData => {
       let newCharData = { ...prevCharData };
@@ -1651,13 +1665,13 @@ export default function HomePage() {
         importedSettings
       );
       newCharData.willpower = updatedWillpower;
-      willpowerToastProps = willpowerToastsFromApply; 
+      willpowerToastPropsArray = willpowerToastsFromApply; 
       
       return newCharData;
     });
 
     setTimeout(() => {
-      willpowerToastProps.forEach(tProps => toast(tProps));
+      willpowerToastPropsArray.forEach(tProps => toast(tProps));
       toast({
         title: "GM Settings Imported",
         description: "Character creation parameters have been successfully imported and applied. Character's willpower and point limits updated if necessary.",
@@ -1724,6 +1738,7 @@ export default function HomePage() {
         onLoad={handleLoadCharacter}
         onExport={handleExportCharacter}
         onImportGmSettings={handleImportGmSettings}
+        onResetToDefault={handleResetToDefault}
       />
       <main className="flex-grow container mx-auto px-4 py-2 md:py-4">
         <Tabs defaultValue="character" className="w-full">
@@ -1822,6 +1837,7 @@ export default function HomePage() {
 
 
     
+
 
 
 
