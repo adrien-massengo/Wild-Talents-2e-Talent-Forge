@@ -233,7 +233,7 @@ export function AppHeader({
                       Back to Settings
                     </Button>
                     <div className="flex flex-col space-y-3 px-2">
-                       <Button variant="outline" onClick={() => handleTriggerImport('gmSettings')} aria-label="Import Character Creation Parameters">
+                       <Button variant="outline" onClick={() => handleTriggerImport('gmSettings')} aria-label="Import GM Settings">
                         <Upload className="mr-2 h-4 w-4" /> Import GM Settings
                       </Button>
                       <Button variant="outline" onClick={() => handleTriggerImport('customArchetype')} aria-label="Import Custom Archetype">
