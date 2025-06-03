@@ -15,7 +15,7 @@ import { Download, PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
-import { POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
+import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import { calculateSingleMiracleTotalCost, calculateSingleMiracleQualityCost } from "@/lib/cost-calculations";
 
 
@@ -706,4 +706,5 @@ export function GmToolsTabContent({
     </Accordion>
   );
 }
+
 
