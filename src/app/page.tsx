@@ -8,7 +8,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { CharacterTabContent } from "@/components/tabs/character-tab-content";
 import { TablesTabContent } from "@/components/tabs/tables-tab-content";
 import { SummaryTabContent } from "@/components/tabs/summary-tab-content";
-import { GmToolsTabContent } from "@/components/tabs/gm-tools-tab-content";
+import { GmToolsTabContent, type CustomArchetypeCreationData as GmCustomArchetypeData } from "@/components/tabs/gm-tools-tab-content"; // Import new type
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { AttributeName, SkillDefinition as PredefinedSkillDef } from "@/lib/skills-definitions";
@@ -85,7 +85,7 @@ export interface BasicInfo {
         discardedAttribute?: DiscardedAttributeType;
     }
   };
-  intrinsicMandatoryPowerConfig: {
+  intrinsicMandatoryPowerConfig: { // This remains for character's direct mandatory powers
     [intrinsicId: string]: {
         count: number;
     }
@@ -243,10 +243,33 @@ const initialGmSettings: GmSettings = {
   },
 };
 
+const initialCustomArchetypeData: GmCustomArchetypeData = {
+  name: '',
+  description: '',
+  sourceMQIds: [],
+  permissionMQIds: [],
+  intrinsicMQIds: [],
+  intrinsicConfigs: {
+    intrinsicAllergyConfig: {},
+    intrinsicBruteFrailConfig: {},
+    intrinsicCustomStatsConfig: {},
+    intrinsicVulnerableConfig: {},
+  },
+  mandatoryPowerDetails: {
+    count: 0,
+    miracles: [],
+  },
+  inhumanStatsSettings: ALL_STATS.reduce((acc, statName) => {
+    acc[statName] = { condition: 'normal' };
+    return acc;
+  }, {} as InhumanStatsSettings),
+};
+
 
 export default function HomePage() {
   const [characterData, setCharacterData] = React.useState<CharacterData>(initialCharacterData);
   const [gmSettings, setGmSettings] = React.useState<GmSettings>(initialGmSettings);
+  const [customArchetypeData, setCustomArchetypeData] = React.useState<GmCustomArchetypeData>(initialCustomArchetypeData);
   const { toast } = useToast();
 
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
@@ -323,7 +346,7 @@ export default function HomePage() {
           newBasicInfo.intrinsicAllergyConfig = {};
           newBasicInfo.intrinsicBruteFrailConfig = {};
           newBasicInfo.intrinsicCustomStatsConfig = {};
-          newBasicInfo.intrinsicMandatoryPowerConfig = {};
+          newBasicInfo.intrinsicMandatoryPowerConfig = {}; // Reset character's direct mandatory power count config
           newBasicInfo.intrinsicVulnerableConfig = {};
 
           (newArchetypeDef.intrinsicMQIds || []).forEach(mqId => {
@@ -336,7 +359,7 @@ export default function HomePage() {
                     : (intrinsicDef.configKey === 'intrinsicVulnerableConfig' ? {extraBoxes:0} : {})
                   );
 
-                 if (intrinsicDef.id === 'mandatory_power') {
+                 if (intrinsicDef.id === 'mandatory_power' && intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig') { // Ensure it's the correct config key
                     const count = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || (newArchetypeDef.mandatoryPowerText ? 1 : 0);
                     newBasicInfo.intrinsicMandatoryPowerConfig[mqId] = { count };
                     
@@ -461,9 +484,11 @@ export default function HomePage() {
           currentActualSelection.push(mqId);
            if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
                 const currentCount = newBasicInfo.intrinsicMandatoryPowerConfig[mqId]?.count || 0;
-                
-                const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
-                if(Array.isArray(result)) { updatedMiracles = result; } else { /* Toast was shown */ return current; }
+                const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
+                if (intrinsicDef?.configKey === 'intrinsicMandatoryPowerConfig') { // Check configKey
+                    const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', currentCount, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
+                    if(Array.isArray(result)) { updatedMiracles = result; } else { /* Toast was shown */ return current; }
+                }
            }
            if (mqType === 'intrinsic' && mqId === 'no_base_will') {
               newWillpower.purchasedBaseWill = 0;
@@ -487,7 +512,7 @@ export default function HomePage() {
             if (intrinsicDef?.configKey) {
                  // @ts-ignore
                 delete newBasicInfo[intrinsicDef.configKey][mqId];
-                 if (intrinsicDef.id === 'mandatory_power') {
+                 if (intrinsicDef.id === 'mandatory_power' && intrinsicDef.configKey === 'intrinsicMandatoryPowerConfig') { // Check configKey
                     const result = handleMetaQualityConfigChange(mqId, 'intrinsicMandatoryPowerConfig', 'count', 0, updatedMiracles, false, newBasicInfo.selectedArchetypeId, current);
                     if(Array.isArray(result)) {updatedMiracles = result;} else { return current; }
                 }
@@ -1513,10 +1538,11 @@ export default function HomePage() {
   const handleResetToDefault = () => {
     setCharacterData(initialCharacterData);
     setGmSettings(initialGmSettings);
+    setCustomArchetypeData(initialCustomArchetypeData); // Reset custom archetype data
     setTimeout(() => {
       toast({
         title: "Data Reset",
-        description: "Character data and GM settings have been reset to default.",
+        description: "Character data, GM settings, and custom archetype form have been reset to default.",
       });
     }, 0);
   };
@@ -1609,6 +1635,7 @@ export default function HomePage() {
   };
 
   const handleImportGmSettings = (importedSettings: GmSettings) => {
+    let willpowerToastPropsArray: Array<Parameters<typeof toast>[0]> = [];
     if (
       !importedSettings ||
       typeof importedSettings !== 'object' ||
@@ -1632,8 +1659,6 @@ export default function HomePage() {
     }
 
     setGmSettings(importedSettings);
-
-    let willpowerToastPropsArray: Array<Parameters<typeof toast>[0]> = [];
 
     setCharacterData(prevCharData => {
       let newCharData = { ...prevCharData };
@@ -1711,6 +1736,192 @@ export default function HomePage() {
     return charmValue + commandValue;
   };
   
+  // Custom Archetype Creation Handlers
+  const handleCustomArchetypeFieldChange = (field: keyof Omit<GmCustomArchetypeData, 'sourceMQIds' | 'permissionMQIds' | 'intrinsicMQIds' | 'intrinsicConfigs' | 'mandatoryPowerDetails' | 'inhumanStatsSettings'>, value: string) => {
+    setCustomArchetypeData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCustomArchetypeMQSelectionChange = (
+    mqType: 'source' | 'permission' | 'intrinsic',
+    mqId: string,
+    isSelected: boolean
+  ) => {
+    setCustomArchetypeData(prev => {
+      const newCustomData = { ...prev };
+      let currentSelection: string[] = [];
+
+      if (mqType === 'source') currentSelection = [...newCustomData.sourceMQIds];
+      else if (mqType === 'permission') currentSelection = [...newCustomData.permissionMQIds];
+      else if (mqType === 'intrinsic') currentSelection = [...newCustomData.intrinsicMQIds];
+
+      if (isSelected) {
+        if (!currentSelection.includes(mqId)) currentSelection.push(mqId);
+      } else {
+        currentSelection = currentSelection.filter(id => id !== mqId);
+        // If unselecting 'mandatory_power', reset its config
+        if (mqType === 'intrinsic' && mqId === 'mandatory_power') {
+          newCustomData.mandatoryPowerDetails = { count: 0, miracles: [] };
+        }
+        // Also remove specific intrinsic configs if the MQ is deselected
+        const intrinsicDef = INTRINSIC_META_QUALITIES.find(imq => imq.id === mqId);
+        if (mqType === 'intrinsic' && intrinsicDef?.configKey && intrinsicDef.configKey !== 'intrinsicMandatoryPowerConfig') {
+           // @ts-ignore
+          delete newCustomData.intrinsicConfigs[intrinsicDef.configKey][mqId];
+        }
+      }
+
+      if (mqType === 'source') newCustomData.sourceMQIds = currentSelection;
+      else if (mqType === 'permission') newCustomData.permissionMQIds = currentSelection;
+      else if (mqType === 'intrinsic') newCustomData.intrinsicMQIds = currentSelection;
+      
+      return newCustomData;
+    });
+  };
+  
+  const handleCustomArchetypeMandatoryPowerCountChange = (newCountString: string) => {
+    const newCount = Math.max(0, parseInt(newCountString, 10) || 0);
+    setCustomArchetypeData(prev => {
+      const currentMiracles = prev.mandatoryPowerDetails.miracles;
+      const updatedMiracles: MiracleDefinition[] = [];
+      for (let i = 0; i < newCount; i++) {
+        if (i < currentMiracles.length) {
+          updatedMiracles.push(currentMiracles[i]);
+        } else {
+          updatedMiracles.push({
+            id: `gm-mandatory-miracle-${Date.now()}-${i}`,
+            name: `Mandatory Power ${i + 1}`,
+            description: 'GM-defined mandatory power.',
+            dice: '1D', hardDice: '0HD', wiggleDice: '0WD',
+            qualities: [],
+            isCustom: true, // Always custom from GM's perspective here
+            isMandatory: true,
+          });
+        }
+      }
+      return {
+        ...prev,
+        mandatoryPowerDetails: {
+          count: newCount,
+          miracles: updatedMiracles,
+        }
+      };
+    });
+  };
+
+  const handleCustomArchetypeMandatoryMiracleChange = (
+    miracleIndex: number,
+    field: keyof Pick<MiracleDefinition, 'name' | 'description' | 'dice' | 'hardDice' | 'wiggleDice'>,
+    value: string
+  ) => {
+    setCustomArchetypeData(prev => {
+      const updatedMiracles = [...prev.mandatoryPowerDetails.miracles];
+      if (updatedMiracles[miracleIndex]) {
+        // @ts-ignore
+        updatedMiracles[miracleIndex] = { ...updatedMiracles[miracleIndex], [field]: value };
+      }
+      return {
+        ...prev,
+        mandatoryPowerDetails: {
+          ...prev.mandatoryPowerDetails,
+          miracles: updatedMiracles,
+        }
+      };
+    });
+  };
+  
+  // Placeholder for more complex intrinsic configs for GM archetypes
+  const handleCustomArchetypeIntrinsicConfigChange = (
+    metaQualityId: string,
+    configKey: keyof GmCustomArchetypeData['intrinsicConfigs'],
+    field: string,
+    value: any
+  ) => {
+    setCustomArchetypeData(prev => ({
+      ...prev,
+      intrinsicConfigs: {
+        ...prev.intrinsicConfigs,
+        [configKey]: {
+          // @ts-ignore
+          ...(prev.intrinsicConfigs[configKey] || {}),
+          [metaQualityId]: {
+             // @ts-ignore
+            ...(prev.intrinsicConfigs[configKey]?.[metaQualityId] || {}),
+            [field]: value,
+          }
+        }
+      }
+    }));
+  };
+   const handleCustomArchetypeInhumanStatSettingChange = (
+    statName: keyof InhumanStatsSettings,
+    field: keyof InhumanStatSetting,
+    value: any
+  ) => {
+    setCustomArchetypeData(prev => {
+        const newInhumanSettings = {
+            ...(prev.inhumanStatsSettings || {}),
+            [statName]: {
+                ...(prev.inhumanStatsSettings?.[statName] || { condition: 'normal' }),
+                [field]: value,
+            }
+        } as InhumanStatsSettings;
+
+        if (field === 'condition' && value !== 'inferior') {
+            delete newInhumanSettings[statName]?.inferiorMaxDice;
+        }
+        if (field === 'condition' && value === 'inferior' && !newInhumanSettings[statName]?.inferiorMaxDice) {
+            if(newInhumanSettings[statName]) { // @ts-ignore
+                 newInhumanSettings[statName].inferiorMaxDice = 4;
+            }
+        }
+        return { ...prev, inhumanStatsSettings: newInhumanSettings };
+    });
+  };
+
+
+  const handleExportCustomArchetype = () => {
+    try {
+      // Construct a simplified ArchetypeDefinition-like object for export
+      const archetypeToExport = {
+        id: customArchetypeData.name.toLowerCase().replace(/\s+/g, '_') || `custom_arch_${Date.now()}`,
+        name: customArchetypeData.name,
+        description: customArchetypeData.description,
+        // Points calculation would be complex here; GM would manually set it or it implies dynamic calculation if imported.
+        // For now, let's omit points or set to a placeholder.
+        points: 0, // Placeholder, or could be calculated based on MQ selection if desired later
+        sourceMQIds: customArchetypeData.sourceMQIds,
+        permissionMQIds: customArchetypeData.permissionMQIds,
+        intrinsicMQIds: customArchetypeData.intrinsicMQIds,
+        // For simplicity, text fields are omitted here but could be derived or manually added by GM post-export
+        sourceText: customArchetypeData.sourceMQIds.map(id => SOURCE_META_QUALITIES.find(mq => mq.id === id)?.name).join(', ') || 'N/A',
+        permissionText: customArchetypeData.permissionMQIds.map(id => PERMISSION_META_QUALITIES.find(mq => mq.id === id)?.name).join(', ') || 'N/A',
+        intrinsicsText: customArchetypeData.intrinsicMQIds.map(id => INTRINSIC_META_QUALITIES.find(mq => mq.id === id)?.name).join(', ') || 'N/A',
+        // Include mandatory power details if any
+        mandatoryPowerDetails: customArchetypeData.intrinsicMQIds.includes('mandatory_power') ? customArchetypeData.mandatoryPowerDetails : undefined,
+        // Include other intrinsic configs
+        intrinsicConfigs: customArchetypeData.intrinsicConfigs,
+        inhumanStatsSettings: customArchetypeData.inhumanStatsSettings,
+
+      };
+      const jsonString = JSON.stringify(archetypeToExport, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = customArchetypeData.name ? `${customArchetypeData.name.replace(/\s+/g, '_')}_archetype.json` : "custom_archetype.json";
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Custom Archetype Exported", description: `Archetype definition downloaded as ${fileName}.` });
+    } catch (error) {
+       console.error("Failed to export custom archetype:", error);
+       toast({ title: "Export Error", description: "Could not export custom archetype data.", variant: "destructive" });
+    }
+  };
+
+
   const discardedAttribute = getDiscardedAttributeFromBasicInfo(characterData.basicInfo);
   const calculatedBaseWillFromStats = calculateBaseWillFromStats(characterData.stats, discardedAttribute);
   
@@ -1809,6 +2020,15 @@ export default function HomePage() {
                   onWillpowerRestrictionChange={handleGmWillpowerRestrictionChange}
                   onMiracleNumericRestrictionChange={handleGmMiracleNumericRestrictionChange}
                   onExportSettings={handleExportGmSettings}
+                  // Custom Archetype Props
+                  customArchetypeData={customArchetypeData}
+                  onCustomArchetypeFieldChange={handleCustomArchetypeFieldChange}
+                  onCustomArchetypeMQSelectionChange={handleCustomArchetypeMQSelectionChange}
+                  onCustomArchetypeMandatoryPowerCountChange={handleCustomArchetypeMandatoryPowerCountChange}
+                  onCustomArchetypeMandatoryMiracleChange={handleCustomArchetypeMandatoryMiracleChange}
+                  onCustomArchetypeIntrinsicConfigChange={handleCustomArchetypeIntrinsicConfigChange}
+                  onCustomArchetypeInhumanStatSettingChange={handleCustomArchetypeInhumanStatSettingChange}
+                  onExportCustomArchetype={handleExportCustomArchetype}
                 />
               </TabsContent>
             </div>
@@ -1837,6 +2057,7 @@ export default function HomePage() {
 
 
     
+
 
 
 
