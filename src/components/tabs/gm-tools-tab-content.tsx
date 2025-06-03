@@ -26,7 +26,6 @@ import {
   type SourceMetaQuality, type PermissionMetaQuality, type IntrinsicMetaQuality
 } from "@/lib/character-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
-// Removed PREDEFINED_MIRACLES_TEMPLATES import as it's not directly used for GM mandatory miracle structure.
 
 const ALL_STATS_KEYS_GM = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'] as const;
 
@@ -72,7 +71,6 @@ interface GmToolsTabContentProps {
   onCustomArchetypeInhumanStatSettingChange: (statName: keyof InhumanStatsSettings, field: keyof InhumanStatSetting, value: any) => void;
   onExportCustomArchetype: () => void;
   
-  // Handlers for detailed GM mandatory miracle editing
   onAddCustomArchetypeMandatoryMiracleQuality: (miracleIndex: number) => void;
   onRemoveCustomArchetypeMandatoryMiracleQuality: (miracleIndex: number, qualityId: string) => void;
   onCustomArchetypeMandatoryMiracleQualityChange: (miracleIndex: number, qualityId: string, field: keyof MiracleQuality, value: any) => void;
@@ -93,8 +91,6 @@ interface GmMetaQualityCollapsibleProps {
   onCustomArchetypeMandatoryPowerCountChange: GmToolsTabContentProps['onCustomArchetypeMandatoryPowerCountChange'];
   onCustomArchetypeMandatoryMiracleChange: GmToolsTabContentProps['onCustomArchetypeMandatoryMiracleChange'];
   mqType: 'source' | 'permission' | 'intrinsic';
-
-  // Pass down new handlers for mandatory miracle editing
   onAddCustomArchetypeMandatoryMiracleQuality: GmToolsTabContentProps['onAddCustomArchetypeMandatoryMiracleQuality'];
   onRemoveCustomArchetypeMandatoryMiracleQuality: GmToolsTabContentProps['onRemoveCustomArchetypeMandatoryMiracleQuality'];
   onCustomArchetypeMandatoryMiracleQualityChange: GmToolsTabContentProps['onCustomArchetypeMandatoryMiracleQualityChange'];
@@ -117,8 +113,6 @@ const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Ele
   const [selectedExtraToAdd, setSelectedExtraToAdd] = React.useState<{ [qualityId: string]: string }>({});
   const [selectedFlawToAdd, setSelectedFlawToAdd] = React.useState<{ [qualityId: string]: string }>({});
 
-  // For GM tools, we use static definitions as there are no character skills.
-  // An empty skill array means getDynamicPowerQualityDefinitions will return base definitions.
   const gmPowerQualityDefinitions = React.useMemo(() => getDynamicPowerQualityDefinitions([]), []);
 
   const calculateGmDisplayedNDFactor = (quality: MiracleQuality) => {
@@ -453,7 +447,7 @@ export function GmToolsTabContent({
             <div key={item.id} className="flex items-center space-x-2">
               <Checkbox
                 id={`gm-${categoryKey}-${item.id}`}
-                checked={checkedItems[item.id] === undefined ? true : checkedItems[item.id]} // Default to true if undefined
+                checked={checkedItems[item.id] === undefined ? true : checkedItems[item.id]}
                 onCheckedChange={(checked) => onToggleableItemChange(categoryKey, item.id, !!checked)}
               />
               <Label htmlFor={`gm-${categoryKey}-${item.id}`} className="text-sm font-normal">
@@ -551,7 +545,12 @@ export function GmToolsTabContent({
                  <Card>
                   <CardContent className="pt-6">
                     <Accordion type="multiple" className="w-full space-y-2">
-                        {renderToggleableList("Allowed Sample Miracles", PREDEFINED_MIRACLES_TEMPLATES.map(m => ({id: m.definitionId!, name: m.name})).filter(m => m.id), gmSettings.miracleRestrictions.allowedSampleMiracles, 'allowedSampleMiracles')}
+                        {renderToggleableList(
+                            "Allowed Sample Miracles", 
+                            PREDEFINED_MIRACLES_TEMPLATES.filter(m => m.definitionId).map(m => ({id: m.definitionId as string, name: m.name})), 
+                            gmSettings.miracleRestrictions.allowedSampleMiracles, 
+                            'allowedSampleMiracles'
+                        )}
                         {renderToggleableList("Allowed Qualities", POWER_QUALITY_DEFINITIONS.map(q => ({id: q.key, name: q.label})), gmSettings.miracleRestrictions.allowedQualities, 'allowedQualities')}
                         {renderToggleableList("Allowed Capacities", POWER_CAPACITY_OPTIONS.map(c => ({id: c.value, name: c.label})), gmSettings.miracleRestrictions.allowedCapacities, 'allowedCapacities')}
                         {renderToggleableList("Allowed Extras", PREDEFINED_EXTRAS, gmSettings.miracleRestrictions.allowedExtras, 'allowedExtras')}
@@ -707,4 +706,4 @@ export function GmToolsTabContent({
   );
 }
 
-
+    
