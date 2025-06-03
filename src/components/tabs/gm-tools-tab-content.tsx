@@ -17,10 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { MiracleDefinition } from "@/lib/miracles-definitions";
 
 
-import { 
+import {
   ARCHETYPES, SOURCE_META_QUALITIES, PERMISSION_META_QUALITIES, INTRINSIC_META_QUALITIES,
   ALLERGY_SUBSTANCES, ALLERGY_EFFECTS, type AllergySubstanceType, type AllergyEffectType,
-  type BruteFrailType, type DiscardedAttributeType, type InhumanStatsSettings, type InhumanStatSetting, type AttributeCondition
+  type BruteFrailType, type DiscardedAttributeType, type InhumanStatsSettings, type InhumanStatSetting, type AttributeCondition,
+  type SourceMetaQuality, type PermissionMetaQuality, type IntrinsicMetaQuality // Ensure these specific types are imported
 } from "@/lib/character-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS } from "@/lib/miracles-definitions";
@@ -72,9 +73,9 @@ interface GmToolsTabContentProps {
   onExportCustomArchetype: () => void;
 }
 
-const GmMetaQualityCollapsible: React.FC<{
+interface GmMetaQualityCollapsibleProps {
   title: string;
-  mqList: typeof SOURCE_META_QUALITIES | typeof PERMISSION_META_QUALITIES | typeof INTRINSIC_META_QUALITIES;
+  mqList: (SourceMetaQuality | PermissionMetaQuality | IntrinsicMetaQuality)[];
   selectedMQIds: string[];
   onMQSelectionChange: (mqId: string, isSelected: boolean) => void;
   customArchetypeData: CustomArchetypeCreationData;
@@ -83,12 +84,14 @@ const GmMetaQualityCollapsible: React.FC<{
   onCustomArchetypeMandatoryPowerCountChange: GmToolsTabContentProps['onCustomArchetypeMandatoryPowerCountChange'];
   onCustomArchetypeMandatoryMiracleChange: GmToolsTabContentProps['onCustomArchetypeMandatoryMiracleChange'];
   mqType: 'source' | 'permission' | 'intrinsic';
-}> = ({
+}
+
+const GmMetaQualityCollapsible = ({
   title, mqList, selectedMQIds, onMQSelectionChange,
   customArchetypeData, onCustomArchetypeIntrinsicConfigChange, onCustomArchetypeInhumanStatSettingChange,
   onCustomArchetypeMandatoryPowerCountChange, onCustomArchetypeMandatoryMiracleChange,
   mqType
-}) => {
+}: GmMetaQualityCollapsibleProps): JSX.Element => {
   const [isOpen, setIsOpen] = React.useState(false);
   return (
     <Card className="bg-card/50 shadow-sm">
@@ -157,7 +160,7 @@ const GmMetaQualityCollapsible: React.FC<{
                       ))}
                     </div>
                   )}
-                  {mq.configKey && mq.id !== 'mandatory_power' && mq.id !== 'inhuman_stats' && ( // Standard config for other intrinsics
+                  {mq.configKey && mq.id !== 'mandatory_power' && mq.id !== 'inhuman_stats' && (
                     <div className="p-2 border rounded-md bg-muted/30 space-y-2">
                        <h5 className="text-xs font-semibold">Configuration:</h5>
                        {mq.configKey === 'intrinsicAllergyConfig' && (
@@ -184,9 +187,9 @@ const GmMetaQualityCollapsible: React.FC<{
                            </div>
                          </>
                        )}
-                        {mq.configKey === 'intrinsicBruteFrailConfig' && ( /* Similar structure for Brute/Frail */ )}
-                        {mq.configKey === 'intrinsicCustomStatsConfig' && ( /* Similar structure for Custom Stats */ )}
-                        {mq.configKey === 'intrinsicVulnerableConfig' && ( /* Similar structure for Vulnerable */ )}
+                        {mq.configKey === 'intrinsicBruteFrailConfig' && ( <p className="text-xs text-muted-foreground">Brute/Frail config UI placeholder.</p> )}
+                        {mq.configKey === 'intrinsicCustomStatsConfig' && ( <p className="text-xs text-muted-foreground">Custom Stats config UI placeholder.</p> )}
+                        {mq.configKey === 'intrinsicVulnerableConfig' && ( <p className="text-xs text-muted-foreground">Vulnerable config UI placeholder.</p> )}
                     </div>
                   )}
                    {mq.id === 'inhuman_stats' && mq.configKey === 'inhumanStatsSettings' && (
@@ -500,5 +503,3 @@ export function GmToolsTabContent({
     </Accordion>
   );
 }
-
-    
