@@ -622,7 +622,7 @@ export function GmToolsTabContent({
               onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
               onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
               onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
-              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
@@ -640,7 +640,7 @@ export function GmToolsTabContent({
               onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
               onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
               onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
-              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
@@ -658,7 +658,7 @@ export function GmToolsTabContent({
               onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
               onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
               onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
-              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
@@ -682,23 +682,45 @@ export function GmToolsTabContent({
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
-      <CollapsibleSectionItem title="Custom Extra Creation">
+      <CollapsibleSectionItem title="Custom Extra Creation" value="gm-custom-extra-creation">
         <Card>
-          <CardContent className="pt-6 text-sm">
-            <p>Custom Extra Creation tools will be available here in a future update.</p>
-            <p className="mt-2 text-muted-foreground">
-              Aids for GMs to create balanced custom Extras for powers.
-            </p>
+          <CardContent className="pt-6 space-y-3">
+            <div>
+              <Label htmlFor="gm-customExtraName">Name</Label>
+              <Input id="gm-customExtraName" placeholder="e.g., Lingering Damage" />
+            </div>
+            <div>
+              <Label htmlFor="gm-customExtraDesc">Description</Label>
+              <Textarea id="gm-customExtraDesc" placeholder="Describe how this extra modifies a power quality..." />
+            </div>
+            <div>
+              <Label htmlFor="gm-customExtraCost">Cost Modifier (per die)</Label>
+              <Input id="gm-customExtraCost" type="number" placeholder="e.g., 1 or 2" />
+            </div>
+             <div className="flex justify-end">
+                <Button variant="outline" size="sm" disabled>Save Custom Extra (WIP)</Button>
+            </div>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
-      <CollapsibleSectionItem title="Custom Flaw Creation">
+      <CollapsibleSectionItem title="Custom Flaw Creation" value="gm-custom-flaw-creation">
         <Card>
-          <CardContent className="pt-6 text-sm">
-            <p>Custom Flaw Creation tools will be available here in a future update.</p>
-            <p className="mt-2 text-muted-foreground">
-              Aids for GMs to create balanced custom Flaws for powers.
-            </p>
+          <CardContent className="pt-6 space-y-3">
+            <div>
+              <Label htmlFor="gm-customFlawName">Name</Label>
+              <Input id="gm-customFlawName" placeholder="e.g., Unreliable Trigger" />
+            </div>
+            <div>
+              <Label htmlFor="gm-customFlawDesc">Description</Label>
+              <Textarea id="gm-customFlawDesc" placeholder="Describe how this flaw restricts a power quality..." />
+            </div>
+            <div>
+              <Label htmlFor="gm-customFlawCost">Cost Modifier (per die)</Label>
+              <Input id="gm-customFlawCost" type="number" placeholder="e.g., -1 or -2" />
+            </div>
+            <div className="flex justify-end">
+                <Button variant="outline" size="sm" disabled>Save Custom Flaw (WIP)</Button>
+            </div>
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
