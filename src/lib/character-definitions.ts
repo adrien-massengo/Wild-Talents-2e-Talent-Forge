@@ -199,23 +199,24 @@ export type InhumanStatsSettings = {
 export interface PermissionMetaQuality extends MetaQualityBase {}
 export const PERMISSION_META_QUALITIES: PermissionMetaQuality[] = [
   { id: 'hypertrained', name: 'Permission: Hypertrained', label: 'Hypertrained (5 Pts)', points: 5, description: 'You can purchase any number of Hyperskills and any kind of dice with them.' },
-  { 
-    id: 'inhuman_stats', 
-    name: 'Permission: Inhuman Stats', 
-    label: 'Inhuman Stats (Var Pts)', 
+  {
+    id: 'inhuman_stats',
+    name: 'Permission: Inhuman Stats',
+    label: 'Inhuman Stats (Var Pts)',
     points: (_config, basicInfo?: BasicInfo) => {
       if (!basicInfo || !basicInfo.inhumanStatsSettings) return 1;
       let cost = 0;
       const settings = basicInfo.inhumanStatsSettings;
-      for (const statKey in settings) {
-        const statSetting = settings[statKey as keyof CharacterData['stats']];
+      Object.keys(settings).forEach(statKeyString => {
+        const statKey = statKeyString as keyof CharacterData['stats'];
+        const statSetting = settings[statKey];
         if (statSetting?.condition === 'superior') {
           cost += 3;
         } else if (statSetting?.condition === 'inferior') {
           const maxDice = statSetting.inferiorMaxDice ?? 4; // Default to 4 if not set
           cost += (maxDice - 5); // e.g., max 3D => 3-5 = -2 cost
         }
-      }
+      });
       return Math.max(1, cost);
     },
     description: 'Characters with this Permission have limits on Stats that are different from the ordinary limits. Superior stats can go up to 10D/HD/WD and increase cost by 3. Inferior stats reduce cost by 1 per die lower than 5D. The Permission costs a minimum of 1 Point.',
@@ -366,7 +367,6 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   basicInfo.selectedPermissionMQIds.forEach(id => {
     const mq = PERMISSION_META_QUALITIES.find(m => m.id === id);
     if (mq) {
-      // Pass basicInfo to the points function for 'inhuman_stats'
       const config = mq.configKey ? basicInfo[mq.configKey as keyof BasicInfo] : {};
       totalPoints += typeof mq.points === 'function' ? mq.points(config, basicInfo) : mq.points;
     }
@@ -383,7 +383,6 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
            // @ts-ignore
           intrinsicConfig = configGroup[id] || {};
         } else if (configGroup && typeof configGroup === 'object' && mq.configKey === 'intrinsicMandatoryPowerConfig' && basicInfo.intrinsicMandatoryPowerConfig?.[id]) {
-            // Handle cases where the structure might be slightly different for intrinsicMandatoryPowerConfig
             intrinsicConfig = basicInfo.intrinsicMandatoryPowerConfig[id];
         }
       }
@@ -392,9 +391,3 @@ export function calculateMetaQualitiesPointCost(basicInfo: BasicInfo): number {
   });
   return totalPoints;
 }
-
-    
-
-    
-
-    
