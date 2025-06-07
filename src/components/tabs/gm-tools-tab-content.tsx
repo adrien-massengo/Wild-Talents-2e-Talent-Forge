@@ -622,7 +622,7 @@ export function GmToolsTabContent({
               onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
               onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
               onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
-              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawFromCustomArchetypeMandatoryQuality}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
@@ -640,7 +640,7 @@ export function GmToolsTabContent({
               onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
               onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
               onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
-              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawFromCustomArchetypeMandatoryQuality}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
@@ -658,7 +658,7 @@ export function GmToolsTabContent({
               onAddCustomArchetypeMandatoryMiracleQuality={onAddCustomArchetypeMandatoryMiracleQuality}
               onRemoveCustomArchetypeMandatoryMiracleQuality={onRemoveCustomArchetypeMandatoryMiracleQuality}
               onCustomArchetypeMandatoryMiracleQualityChange={onCustomArchetypeMandatoryMiracleQualityChange}
-              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawFromCustomArchetypeMandatoryQuality}
+              onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
             />
@@ -729,3 +729,4 @@ export function GmToolsTabContent({
 }
 
     
+
