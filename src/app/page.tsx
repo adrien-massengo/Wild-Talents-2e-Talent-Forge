@@ -3,6 +3,7 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppHeader } from "@/components/layout/app-header";
 import { CharacterTabContent } from "@/components/tabs/character-tab-content";
@@ -274,6 +275,46 @@ export default function HomePage() {
   const [gmSettings, setGmSettings] = React.useState<GmSettings>(initialGmSettings);
   const [customArchetypeData, setCustomArchetypeData] = React.useState<GmCustomArchetypeData>(initialCustomArchetypeData);
   const { toast } = useToast();
+  const [customExtraCreationData, setCustomExtraCreationData] = useState({
+      name: '',
+      description: '',
+      costModifier: 0,
+    });
+const handleExportCustomExtra = () => {
+  // Generate a unique ID for the custom extra
+  const id = `custom-extra-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+  // Create the object to be exported
+  const exportedExtra = {
+    id: id,
+    name: customExtraCreationData.name || 'Unnamed Custom Extra', // Use the name or a default
+    description: customExtraCreationData.description || '', // Include description
+    costModifier: customExtraCreationData.costModifier || 0, // Include cost modifier
+    isCustom: true, // Add a flag to indicate it's a custom extra
+  };
+
+  const jsonData = JSON.stringify(exportedExtra, null, 2);
+
+  const blob = new Blob([jsonData], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  // Use the custom extra name for the filename, with a fallback
+  a.download = `${customExtraCreationData.name.replace(/\s+/g, '_').toLowerCase() || 'custom_extra'}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  console.log('Exported custom extra:', exportedExtra);
+};
+
+  const handleCustomExtraCreationFieldChange = (field: keyof typeof customExtraCreationData, value: string | number) => {
+  setCustomExtraCreationData(prevData => ({
+    ...prevData,
+    [field]: value,
+  }));
+};
 
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
     let potentialArchetypeCost = 0;
@@ -2201,7 +2242,7 @@ export default function HomePage() {
                 />
               </TabsContent>
               <TabsContent value="gm-tools" className="mt-0">
-                <GmToolsTabContent 
+             <GmToolsTabContent
                   gmSettings={gmSettings}
                   onPointLimitChange={handleGmPointLimitChange}
                   onToggleableItemChange={handleGmToggleableItemChange}
@@ -2223,8 +2264,13 @@ export default function HomePage() {
                   onAddExtraOrFlawToCustomArchetypeMandatoryQuality={handleAddExtraOrFlawToCustomArchetypeMandatoryQuality}
                   onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={handleRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
                   onCustomArchetypeMandatoryExtraOrFlawChange={handleCustomArchetypeMandatoryExtraOrFlawChange}
+                  // Add the missing props here
+                  customExtraCreationData={customExtraCreationData} 
+                  onExportCustomExtra={handleExportCustomExtra} 
+                  onCustomExtraCreationFieldChange={handleCustomExtraCreationFieldChange} 
                 />
               </TabsContent>
+
             </div>
           </ScrollArea>
         </Tabs>

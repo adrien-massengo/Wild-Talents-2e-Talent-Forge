@@ -63,6 +63,11 @@ interface GmToolsTabContentProps {
   onExportSettings: () => void;
 
   customArchetypeData: CustomArchetypeCreationData;
+ customExtraCreationData: {
+    name: string;
+ description: string;
+ costModifier: number;
+  };
   onCustomArchetypeFieldChange: (field: keyof Omit<CustomArchetypeCreationData, 'sourceMQIds' | 'permissionMQIds' | 'intrinsicMQIds' | 'intrinsicConfigs' | 'mandatoryPowerDetails' | 'inhumanStatsSettings'>, value: string) => void;
   onCustomArchetypeMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
   onCustomArchetypeMandatoryPowerCountChange: (newCount: string) => void;
@@ -71,6 +76,13 @@ interface GmToolsTabContentProps {
   onCustomArchetypeInhumanStatSettingChange: (statName: keyof InhumanStatsSettings, field: keyof InhumanStatSetting, value: any) => void;
   onExportCustomArchetype: () => void;
   
+  customExtraCreationData: {
+    name: string;
+    description: string;
+    costModifier: number;
+  };
+ onCustomExtraCreationFieldChange: (field: keyof GmToolsTabContentProps['customExtraCreationData'], value: string | number) => void;
+  onExportCustomExtra: () => void;
   onAddCustomArchetypeMandatoryMiracleQuality: (miracleIndex: number) => void;
   onRemoveCustomArchetypeMandatoryMiracleQuality: (miracleIndex: number, qualityId: string) => void;
   onCustomArchetypeMandatoryMiracleQualityChange: (miracleIndex: number, qualityId: string, field: keyof MiracleQuality, value: any) => void;
@@ -426,6 +438,9 @@ export function GmToolsTabContent({
   onCustomArchetypeIntrinsicConfigChange,
   onCustomArchetypeInhumanStatSettingChange,
   onExportCustomArchetype,
+  onCustomExtraCreationFieldChange,
+  customExtraCreationData,
+  onExportCustomExtra,
   onAddCustomArchetypeMandatoryMiracleQuality,
   onRemoveCustomArchetypeMandatoryMiracleQuality,
   onCustomArchetypeMandatoryMiracleQualityChange,
@@ -686,19 +701,28 @@ export function GmToolsTabContent({
         <Card>
           <CardContent className="pt-6 space-y-3">
             <div>
-              <Label htmlFor="gm-customExtraName">Name</Label>
-              <Input id="gm-customExtraName" placeholder="e.g., Lingering Damage" />
+              <Label htmlFor="gm-customExtraName" className="font-headline">Name</Label>
+              <Input 
+                id="gm-customExtraName" 
+                placeholder="e.g., Lingering Damage" 
+                value={customExtraCreationData?.name || ''} 
+                onChange={(e) => onCustomExtraCreationFieldChange('name', e.target.value)} 
+              />
             </div>
             <div>
-              <Label htmlFor="gm-customExtraDesc">Description</Label>
-              <Textarea id="gm-customExtraDesc" placeholder="Describe how this extra modifies a power quality..." />
+              <Label htmlFor="gm-customExtraDesc" className="font-headline">Description</Label>
+              <Textarea 
+                id="gm-customExtraDesc" 
+                placeholder="Describe how this extra modifies a power quality..." 
+                value={customExtraCreationData?.description || ''} 
+                onChange={(e) => onCustomExtraCreationFieldChange('description', e.target.value)} />
             </div>
             <div>
-              <Label htmlFor="gm-customExtraCost">Cost Modifier (per die)</Label>
-              <Input id="gm-customExtraCost" type="number" placeholder="e.g., 1 or 2" />
+              <Label htmlFor="gm-customExtraCost" className="font-headline">Cost Modifier (per die)</Label>
+              <Input id="gm-customExtraCost" type="number" placeholder="e.g., 1 or 2" value={customExtraCreationData?.costModifier || 0} onChange={(e) => onCustomExtraCreationFieldChange('costModifier', parseInt(e.target.value) || 0)} />
             </div>
              <div className="flex justify-end">
-                <Button variant="outline" size="sm" disabled>Save Custom Extra (WIP)</Button>
+                <Button variant="outline" size="sm" onClick={onExportCustomExtra}>Export Custom Extra</Button>
             </div>
           </CardContent>
         </Card>
@@ -707,15 +731,15 @@ export function GmToolsTabContent({
         <Card>
           <CardContent className="pt-6 space-y-3">
             <div>
-              <Label htmlFor="gm-customFlawName">Name</Label>
+              <Label htmlFor="gm-customFlawName" className="font-headline">Name</Label>
               <Input id="gm-customFlawName" placeholder="e.g., Unreliable Trigger" />
             </div>
             <div>
-              <Label htmlFor="gm-customFlawDesc">Description</Label>
+              <Label htmlFor="gm-customFlawDesc" className="font-headline">Description</Label>
               <Textarea id="gm-customFlawDesc" placeholder="Describe how this flaw restricts a power quality..." />
             </div>
             <div>
-              <Label htmlFor="gm-customFlawCost">Cost Modifier (per die)</Label>
+              <Label htmlFor="gm-customFlawCost" className="font-headline">Cost Modifier (per die)</Label>
               <Input id="gm-customFlawCost" type="number" placeholder="e.g., -1 or -2" />
             </div>
             <div className="flex justify-end">
@@ -728,5 +752,4 @@ export function GmToolsTabContent({
   );
 }
 
-    
 
