@@ -1895,6 +1895,11 @@ export const PREDEFINED_MIRACLES_TEMPLATES: Omit<MiracleDefinition, 'id' | 'isCu
 
 // Helper function to generate dynamic hyperskill quality definitions
 export const getDynamicPowerQualityDefinitions = (skills: SkillInstance[]): PowerQualityDefinition[] => {
+  if (!Array.isArray(skills)) {
+    console.error("getDynamicPowerQualityDefinitions received non-array skills:", skills);
+    return []; // Return an empty array or handle the error as appropriate
+  }
+
   const hyperskillDefinitions: PowerQualityDefinition[] = skills.map(skill => ({
     key: `hyperskill_${skill.id}`, // Use skill instance ID for uniqueness
     label: `Hyperskill: ${skill.name}`,
