@@ -196,6 +196,17 @@ export function AppHeader({
                       </div>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
+                    <Button
+                      // Note: `open={true}` is not a valid prop for Button from @/components/ui/button
+                      asChild // Use asChild to render an anchor tag
+                    >
+                      <a 
+                        href="https://coff.ee/mono5140"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 w-full text-center hover:bg-[#FF5C00] hover:text-white focus:bg-[#FF5C00] focus:text-white"
+                      >Support Me!</a>
+                    </Button>
                   </>
                 )}
 
