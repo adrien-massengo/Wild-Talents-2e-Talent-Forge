@@ -2296,7 +2296,7 @@ const handleExportPower = (powerToExport: MiracleDefinition) => {
             <TabsTrigger value="gm-tools">GM Tools</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="h-[calc(100vh-200px)] md:h-[calc(100vh-220px)]">
+          <ScrollArea className="h-[calc(100vh-200px)] md:h-[calc(100vh-220px)] pb-12">
             <div className="p-1">
               <TabsContent value="character" className="mt-0">
                 <CharacterTabContent
@@ -2387,7 +2387,7 @@ const handleExportPower = (powerToExport: MiracleDefinition) => {
           </ScrollArea>
         </Tabs>
       </main>
-      <footer className="text-center p-4 text-sm text-muted-foreground">
+      <footer className="text-center p-4 text-sm text-muted-foreground fixed bottom-0 left-0 w-full bg-card rounded-t-lg shadow-xl z-10">
         Wild Talents 2e: Talent Forge
       </footer>
     </div>
