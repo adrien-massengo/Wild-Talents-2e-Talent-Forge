@@ -116,7 +116,7 @@ export function AppHeader({
 
 
   return (
-    <header className="mb-8 p-4 bg-card shadow-md rounded-b-lg">
+    <header className="mb-8 p-4 bg-card rounded-b-lg outline outline-solid outline-1 outline-primary">
       <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center">
         <h1 className="font-headline text-3xl text-primary mb-4 sm:mb-0">
           Wild Talents 2e: Talent Forge

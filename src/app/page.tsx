@@ -2387,7 +2387,7 @@ const handleExportPower = (powerToExport: MiracleDefinition) => {
           </ScrollArea>
         </Tabs>
       </main>
-      <footer className="text-center p-4 text-sm text-muted-foreground fixed bottom-0 left-0 w-full bg-card rounded-t-lg shadow-xl z-10">
+      <footer className="text-center p-4 text-sm text-muted-foreground fixed bottom-0 left-0 right-0 bg-card rounded-t-lg z-10 outline outline-solid outline-1 outline-primary">
         Wild Talents 2e: Talent Forge
       </footer>
     </div>
