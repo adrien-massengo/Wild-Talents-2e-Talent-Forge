@@ -983,7 +983,7 @@ export function GmToolsTabContent({
  />
             </div>
              <div className="flex justify-end">
-                <Button size="sm" onClick={onExportCustomExtra}>Export Custom Extra</Button>
+                <Button size="sm" onClick={onExportCustomExtra}><Download className="mr-2 h-4 w-4" /> Export Custom Extra</Button>
             </div>
           </CardContent>
         </Card>
@@ -1030,7 +1030,7 @@ export function GmToolsTabContent({
         />
       </div>
       <div className="flex justify-end">
-          <Button  size="sm" onClick={onExportCustomFlaw}>Export Custom Flaw</Button>
+          <Button  size="sm" onClick={onExportCustomFlaw}><Download className="mr-2 h-4 w-4" /> Export Custom Flaw</Button>
       </div>
     </CardContent>
   </Card>
