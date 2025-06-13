@@ -227,7 +227,7 @@ const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Ele
                                 )}
                                 </div>
  {/* Miracle Cost Per ND Calculation */}
- <p><strong className="font-semibold">Miracle Cost Per ND:</strong> {miracle.qualities.reduce((sum, quality) => sum + calculateGmDisplayedNDFactor(quality), 0)} points</p>
+ 
   <>
     <p className="font-semibold mt-1">
       Miracle Cost per ND: {miracle.qualities.reduce((sum, quality) => sum + calculateGmDisplayedNDFactor(quality), 0)} points
@@ -276,7 +276,7 @@ const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Ele
                                         </Select>
                                     </div>
                                     <div>
-                                        <Label htmlFor={`${quality.id}-levels-gm`} className="text-2xs">Levels</Label>
+                                        <Label htmlFor={`${quality.id}-levels-gm`} className="text-2xs">Power Quality Levels</Label>
                                         <Input
                                         id={`${quality.id}-levels-gm`} type="number" min="0"
                                         value={String(Math.max(0, quality.levels || 0))}
@@ -904,7 +904,7 @@ export function GmToolsTabContent({
         </Select>
         </div>
         <div>
-        <Label htmlFor={`${quality.id}-levels`}>Levels</Label>
+        <Label htmlFor={`${quality.id}-levels`}>Power Quality Levels</Label>
         <Input
         id={`${quality.id}-levels`}
         type="number"
