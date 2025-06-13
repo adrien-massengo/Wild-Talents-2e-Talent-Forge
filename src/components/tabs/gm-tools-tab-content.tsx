@@ -5,7 +5,6 @@
 import * as React from "react";
 import type { GmSettings } from "@/app/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion } from "@/components/ui/accordion";
 import { CollapsibleSectionItem } from "@/components/shared/collapsible-section-item";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +14,7 @@ import { Download, PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { MiracleDefinition, MiracleQuality, AppliedExtraOrFlaw, MiracleQualityType, MiracleCapacityType } from "@/lib/miracles-definitions";
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for generating unique IDs
 import { PREDEFINED_MIRACLES_TEMPLATES, POWER_QUALITY_DEFINITIONS, POWER_CAPACITY_OPTIONS, PREDEFINED_EXTRAS, PREDEFINED_FLAWS, getDynamicPowerQualityDefinitions } from "@/lib/miracles-definitions";
 import { calculateSingleMiracleTotalCost, calculateSingleMiracleQualityCost } from "@/lib/cost-calculations";
 
@@ -26,6 +26,8 @@ import {
   type SourceMetaQuality, type PermissionMetaQuality, type IntrinsicMetaQuality
 } from "@/lib/character-definitions";
 import { SKILL_DEFINITIONS } from "@/lib/skills-definitions";
+import type { SkillInstance } from "@/app/page";
+import { Accordion } from "@/components/ui/accordion";
 
 const ALL_STATS_KEYS_GM = ['body', 'coordination', 'sense', 'mind', 'charm', 'command'] as const;
 
@@ -61,12 +63,13 @@ interface GmToolsTabContentProps {
   onWillpowerRestrictionChange: (field: keyof GmSettings['willpowerRestrictions'], value: string) => void;
   onMiracleNumericRestrictionChange: (field: keyof GmSettings['miracleRestrictions']['numericRestrictions'], value: string) => void;
   onExportSettings: () => void;
+  onExportPower: (power: MiracleDefinition) => void;
 
   customArchetypeData: CustomArchetypeCreationData;
- customExtraCreationData: {
+  customExtraCreationData: {
     name: string;
- description: string;
- costModifier: number;
+    description: string;
+    costModifier: number;
   };
   onCustomArchetypeFieldChange: (field: keyof Omit<CustomArchetypeCreationData, 'sourceMQIds' | 'permissionMQIds' | 'intrinsicMQIds' | 'intrinsicConfigs' | 'mandatoryPowerDetails' | 'inhumanStatsSettings'>, value: string) => void;
   onCustomArchetypeMQSelectionChange: (mqType: 'source' | 'permission' | 'intrinsic', mqId: string, isSelected: boolean) => void;
@@ -76,7 +79,7 @@ interface GmToolsTabContentProps {
   onCustomArchetypeInhumanStatSettingChange: (statName: keyof InhumanStatsSettings, field: keyof InhumanStatSetting, value: any) => void;
   onExportCustomArchetype: () => void;
   
-  customExtraCreationData: {
+  customFlawCreationData: {
     name: string;
     description: string;
     costModifier: number;
@@ -89,6 +92,9 @@ interface GmToolsTabContentProps {
   onAddExtraOrFlawToCustomArchetypeMandatoryQuality: (miracleIndex: number, qualityId: string, itemType: 'extra' | 'flaw', definitionId?: string) => void;
   onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality: (miracleIndex: number, qualityId: string, itemType: 'extra' | 'flaw', itemId: string) => void;
   onCustomArchetypeMandatoryExtraOrFlawChange: (miracleIndex: number, qualityId: string, itemType: 'extra' | 'flaw', itemId: string, field: keyof AppliedExtraOrFlaw, value: string | number) => void;
+ allSkills: SkillInstance[]; // Add allSkills prop
+ onCustomFlawCreationFieldChange: (field: keyof GmToolsTabContentProps['customFlawCreationData'], value: string | number) => void;
+  onExportCustomFlaw: () => void;
 }
 
 
@@ -109,6 +115,7 @@ interface GmMetaQualityCollapsibleProps {
   onAddExtraOrFlawToCustomArchetypeMandatoryQuality: GmToolsTabContentProps['onAddExtraOrFlawToCustomArchetypeMandatoryQuality'];
   onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality: GmToolsTabContentProps['onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality'];
   onCustomArchetypeMandatoryExtraOrFlawChange: GmToolsTabContentProps['onCustomArchetypeMandatoryExtraOrFlawChange'];
+  allSkills: SkillInstance[];
 }
 
 const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Element => {
@@ -118,7 +125,8 @@ const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Ele
     onCustomArchetypeMandatoryPowerCountChange, onCustomArchetypeMandatoryMiracleChange, mqType,
     onAddCustomArchetypeMandatoryMiracleQuality, onRemoveCustomArchetypeMandatoryMiracleQuality,
     onCustomArchetypeMandatoryMiracleQualityChange, onAddExtraOrFlawToCustomArchetypeMandatoryQuality,
-    onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality, onCustomArchetypeMandatoryExtraOrFlawChange
+    onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality, onCustomArchetypeMandatoryExtraOrFlawChange,
+    allSkills
   } = props;
 
   const [isOpen, setIsOpen] = React.useState(false);
@@ -205,26 +213,32 @@ const GmMetaQualityCollapsible = (props: GmMetaQualityCollapsibleProps): JSX.Ele
 
                             <div className="mt-3 pt-3 border-t border-dashed">
                                 <div className="text-sm">
-                                <strong>Miracle Quality Cost Factors (per ND):</strong>
-                                {miracle.qualities.length > 0 ? (
-                                    <ul className="list-disc list-inside pl-2 text-xs">
-                                    {miracle.qualities.map(q => {
+ <p><strong className="font-semibold">Miracle Quality Cost Factors (per ND):</strong></p>
+                                {miracle.qualities.length > 0 && gmPowerQualityDefinitions.length > 0 ? ( // Added check for gmPowerQualityDefinitions
+ <ul className="list-disc list-inside pl-4 space-y-1">
+ {miracle.qualities.map(q => { // Modified line
                                         const qDef = gmPowerQualityDefinitions.find(def => def.key === q.type);
                                         const factor = calculateGmDisplayedNDFactor(q);
-                                        return <li key={`${miracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor}</li>;
+ return <li key={`${miracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor} points</li>;
                                     })}
-                                    </ul>
+ </ul>
                                 ) : (
-                                    <span className="text-xs text-muted-foreground"> N/A (No qualities)</span>
+ <p className="ml-4 text-muted-foreground">No qualities added.</p>
                                 )}
                                 </div>
-                                <p className="font-semibold mt-1">Miracle Cost per ND: {miracle.qualities.reduce((sum, quality) => sum + calculateGmDisplayedNDFactor(quality), 0)} points</p>
-                                <p className="font-semibold mt-1">
-                                Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateSingleMiracleTotalCost(miracle, [])} points`}
-                                </p>
-                            </div>
+ {/* Miracle Cost Per ND Calculation */}
+ <p><strong className="font-semibold">Miracle Cost Per ND:</strong> {miracle.qualities.reduce((sum, quality) => sum + calculateGmDisplayedNDFactor(quality), 0)} points</p>
+  <>
+    <p className="font-semibold mt-1">
+      Miracle Cost per ND: {miracle.qualities.reduce((sum, quality) => sum + calculateGmDisplayedNDFactor(quality), 0)} points
+    </p>
+  </>
+<p className="font-semibold mt-1">
+  Total Miracle Cost: {miracle.isMandatory ? '0 points (Mandatory)' : `${calculateSingleMiracleTotalCost(miracle, allSkills)} points`}
+  </p>
+ </div>
 
-                           {/* Qualities Editing for GM Mandatory Miracle */}
+ {/* Qualities Editing for GM Mandatory Miracle */}
                             <div className="space-y-3 mt-3">
                                 <div className="flex justify-between items-center">
                                 <h5 className="text-sm font-semibold text-accent">Power Qualities</h5>
@@ -430,6 +444,7 @@ export function GmToolsTabContent({
   onWillpowerRestrictionChange,
   onMiracleNumericRestrictionChange,
   onExportSettings,
+  onExportPower,
   customArchetypeData,
   onCustomArchetypeFieldChange,
   onCustomArchetypeMQSelectionChange,
@@ -441,13 +456,99 @@ export function GmToolsTabContent({
   onCustomExtraCreationFieldChange,
   customExtraCreationData,
   onExportCustomExtra,
+  onCustomFlawCreationFieldChange,
+  customFlawCreationData,
+  onExportCustomFlaw,
   onAddCustomArchetypeMandatoryMiracleQuality,
   onRemoveCustomArchetypeMandatoryMiracleQuality,
   onCustomArchetypeMandatoryMiracleQualityChange,
   onAddExtraOrFlawToCustomArchetypeMandatoryQuality,
   onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality,
-  onCustomArchetypeMandatoryExtraOrFlawChange
-}: GmToolsTabContentProps) {
+  onCustomArchetypeMandatoryExtraOrFlawChange,
+  allSkills,
+} : GmToolsTabContentProps & { allSkills: SkillInstance[] }) { // Destructure allSkills prop
+
+
+  const handleMiracleChange = (key: keyof MiracleDefinition, value: any) => {
+    setCurrentMiracle(prevMiracle => ({
+      ...prevMiracle,
+      [key]: value
+    }));
+  };
+
+  const handleRemoveQuality = (qualityIdToRemove: string) => {
+    setCurrentMiracle(prevMiracle => ({
+      ...prevMiracle,
+      qualities: prevMiracle.qualities.filter(quality => quality.id !== qualityIdToRemove)
+    }));
+  };
+
+  const handleQualityChange = (qualityIdToUpdate: string, field: keyof MiracleQuality, value: any) => {
+    setCurrentMiracle(prevMiracle => ({
+      ...prevMiracle,
+      qualities: prevMiracle.qualities.map(quality => {
+        if (quality.id === qualityIdToUpdate) {
+          return { ...quality, [field]: value };
+        }
+        return quality;
+      })
+    }));
+  };
+  
+
+
+  const handleAddQuality = () => {
+    const newQuality: MiracleQuality = {
+      id: uuidv4(), // Generate unique ID
+      type: 'area', // Default type
+      capacity: 'mass', // Default capacity
+      levels: 0,
+      extras: [],
+      flaws: []
+    };
+    setCurrentMiracle(prevMiracle => ({ ...prevMiracle, qualities: [...prevMiracle.qualities, newQuality] }));
+  };
+
+  const handleResetMiracleCreator = () => {
+ setCurrentMiracle({
+ id: '', // This should ideally be a unique ID generator or handled server-side
+ definitionId: undefined,
+ name: '',
+ description: '',
+ dice: '0D',
+ hardDice: '0HD',
+ wiggleDice: '0WD',
+ qualities: [],
+ isMandatory: false,
+ isCustom: true,
+    });
+  };
+  const [currentMiracle, setCurrentMiracle] = React.useState<MiracleDefinition>({
+    id: '', // This should ideally be a unique ID generator or handled server-side
+    definitionId: undefined,
+    name: '',
+    description: '',
+    dice: '0D',
+    hardDice: '0HD',
+    wiggleDice: '0WD',
+    qualities: [],
+    isMandatory: false, // This creator is for non-mandatory powers
+ isCustom: true, // This is a custom miracle creator
+  });
+
+  const gmPowerQualityDefinitions = React.useMemo(() => getDynamicPowerQualityDefinitions([]), []);
+
+  const calculateGmDisplayedNDFactor = (quality: MiracleQuality) => {
+    const qualityDef = gmPowerQualityDefinitions.find(def => def.key === quality.type);
+    if (!qualityDef) return 1;
+
+    const baseCostFactor = qualityDef.baseCostFactor;
+    const totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
+    const totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);
+    const effectiveCostModifier = quality.levels + totalExtrasCostModifier + totalFlawsCostModifier;
+
+    return Math.max(1, baseCostFactor + effectiveCostModifier);
+  };
 
   const renderToggleableList = (
     title: string, 
@@ -476,8 +577,7 @@ export function GmToolsTabContent({
   );
 
 
-  return (
-    <Accordion type="multiple" className="w-full space-y-6">
+  return (<Accordion type="multiple" className="w-full space-y-6">
       <CollapsibleSectionItem title="Character Creation Parameters">
         <Card>
           <CardContent className="pt-6">
@@ -640,6 +740,7 @@ export function GmToolsTabContent({
               onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
+              allSkills={allSkills}
             />
              <GmMetaQualityCollapsible
               title="Permission Meta-Qualities"
@@ -658,6 +759,7 @@ export function GmToolsTabContent({
               onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
+              allSkills={allSkills}
             />
              <GmMetaQualityCollapsible
               title="Intrinsic Meta-Qualities"
@@ -676,6 +778,7 @@ export function GmToolsTabContent({
               onAddExtraOrFlawToCustomArchetypeMandatoryQuality={onAddExtraOrFlawToCustomArchetypeMandatoryQuality}
               onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality={onRemoveExtraOrFlawFromCustomArchetypeMandatoryQuality}
               onCustomArchetypeMandatoryExtraOrFlawChange={onCustomArchetypeMandatoryExtraOrFlawChange}
+              allSkills={allSkills}
             />
 
             <div className="mt-6 flex justify-end">
@@ -688,16 +791,167 @@ export function GmToolsTabContent({
         </Card>
       </CollapsibleSectionItem>
       <CollapsibleSectionItem title="Custom Power Creation">
-        <Card>
-          <CardContent className="pt-6 text-sm">
-            <p>Custom Power Creation tools will be available here in a future update.</p>
-            <p className="mt-2 text-muted-foreground">
-              This tool could assist GMs in designing and costing new Miracles or power qualities.
-            </p>
-          </CardContent>
+       <Card>
+       <CardContent className="pt-6 space-y-4">
+ <Accordion type="multiple" className="w-full space-y-4">
+        {/* Miracle Creation Section */}
+        {/* Miracle Name and Description */}
+                <div>
+        <Label htmlFor="miracleName" className="font-headline">Miracle Name</Label>
+        <Input
+        id="miracleName"
+        value={currentMiracle.name}
+        onChange={(e) => handleMiracleChange('name', e.target.value)}
+        placeholder="Enter the name of the Miracle"
+        />
+                </div>
+                <div>
+        <Label htmlFor="miracleDescription" className="font-headline">Description</Label>
+        <Textarea
+        id="miracleDescription"
+        value={currentMiracle.description}
+        onChange={(e) => handleMiracleChange('description', e.target.value)}
+        placeholder="Describe the Miracle's effects"
+        />
+                </div>
+
+        {/* Dice Pools */}
+                <div className="grid grid-cols-3 gap-4">
+        <div>
+        <Label htmlFor="normalDice">Normal Dice</Label>
+        <Select
+                         value={currentMiracle.dice}
+                        onValueChange={(value) => handleMiracleChange('dice', value)}
+        >
+        <SelectTrigger id="normalDice"><SelectValue /></SelectTrigger>
+        <SelectContent>
+        {Array.from({ length: 11 }, (_, i) => `${i}D`).map(d => (
+        <SelectItem key={d} value={d}>{d}</SelectItem>
+        ))}
+        </SelectContent>
+        </Select>
+        </div>
+        <div>
+        <Label htmlFor="hardDice">Hard Dice</Label>
+        <Select
+                         value={currentMiracle.hardDice}
+                         onValueChange={(value) => handleMiracleChange('hardDice', value)}
+        >
+        <SelectTrigger id="hardDice"><SelectValue /></SelectTrigger>
+        <SelectContent>
+        {Array.from({ length: 11 }, (_, i) => `${i}HD`).map(d => (
+        <SelectItem key={d} value={d}>{d}</SelectItem>
+        ))}
+        </SelectContent>
+        </Select>
+        </div>
+        <div>
+        <Label htmlFor="wiggleDice">Wiggle Dice</Label>
+        <Select
+                         value={currentMiracle.wiggleDice}
+                        onValueChange={(value) => handleMiracleChange('wiggleDice', value)}
+        >
+        <SelectTrigger id="wiggleDice"><SelectValue /></SelectTrigger>
+        <SelectContent>
+        {Array.from({ length: 11 }, (_, i) => `${i}WD`).map(d => (
+        <SelectItem key={d} value={d}>{d}</SelectItem>
+        ))}
+        </SelectContent>
+        </Select>
+        </div>
+                       </div>
+               {/* Miracle Qualities */}
+                  <div className="space-y-3 mt-6">
+        <div className="flex justify-between items-center">
+        <h4 className="text-lg font-headline">Miracle Qualities</h4>
+        <Button size="sm" variant="outline" onClick={handleAddQuality}
+        >
+        <PlusCircle className="mr-2 h-4 w-4" /> Add Quality
+        </Button>
+        </div>
+        {currentMiracle.qualities.length === 0 && (
+        <p className="text-sm text-muted-foreground">Add qualities to define the Miracle's nature.</p>
+        )}
+        {currentMiracle.qualities.map(quality => (
+        <Card key={quality.id} className="p-4 space-y-3">
+        <div className="flex justify-between items-center">
+        <h5 className="text-sm font-semibold">Quality Configuration</h5>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveQuality(quality.id)}>
+        <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+        <Label htmlFor={`${quality.id}-type`}>Type</Label>
+        <Select value={quality.type} onValueChange={(value) => handleQualityChange(quality.id, 'type', value)}>
+        <SelectTrigger id={`${quality.id}-type`}><SelectValue /></SelectTrigger>
+        <SelectContent>
+        {POWER_QUALITY_DEFINITIONS.map(def => (
+        <SelectItem key={def.key} value={def.key}>{def.label}</SelectItem>
+        ))}
+        </SelectContent>
+        </Select>
+        </div>
+        <div>
+        <Label htmlFor={`${quality.id}-capacity`}>Capacity</Label>
+        <Select value={quality.capacity} onValueChange={(value) => handleQualityChange(quality.id, 'capacity', value as MiracleCapacityType)}>
+        <SelectTrigger id={`${quality.id}-capacity`}><SelectValue /></SelectTrigger>
+        <SelectContent>
+        {POWER_CAPACITY_OPTIONS.map(cap => (
+        <SelectItem key={cap.value} value={cap.value}>{cap.label}</SelectItem>
+        ))}
+        </SelectContent>
+        </Select>
+        </div>
+        <div>
+        <Label htmlFor={`${quality.id}-levels`}>Levels</Label>
+        <Input
+        id={`${quality.id}-levels`}
+        type="number"
+        min="0"
+        value={String(quality.levels)}
+        onChange={(e) => handleQualityChange(quality.id, 'levels', parseInt(e.target.value, 10) || 0)}
+        placeholder="0"
+        />
+        </div>
+        </div>
         </Card>
+        ))}
+                        </div>
+         {/* Calculated Costs */}
+ <div className="mt-6 pt-6 border-t border-border space-y-2 text-sm">
+ <p><strong className="font-semibold">Miracle Quality Cost Factors (per ND):</strong></p>
+ {/* Display individual quality costs */}
+ {currentMiracle.qualities.length > 0 ? (
+ <ul className="list-disc list-inside pl-4 space-y-1"> 
+ {currentMiracle.qualities.map(q => {
+                                        const qDef = gmPowerQualityDefinitions.find(def => def.key === q.type);
+                                        const factor = calculateGmDisplayedNDFactor(q);
+ return <li key={`${currentMiracle.id}-${q.id}-factor-display`}>{qDef?.label || q.type}: {factor} points</li>;
+                                    })}
+         
+ </ul>
+ ) : (
+ <p className="ml-4 text-muted-foreground">No qualities added.</p> )}
+ {/* Display total cost per ND */}
+ <p><strong className="font-semibold">Miracle Cost Per ND:</strong> {currentMiracle.qualities.reduce((sum, quality) => sum + calculateSingleMiracleQualityCost(quality, currentMiracle, allSkills) / Math.max(1, parseInt(currentMiracle.dice, 10) + parseInt(currentMiracle.hardDice, 10) + parseInt(currentMiracle.wiggleDice, 10)), 0)} points</p> {/* Pass allSkills */}
+
+ {/* Display total miracle cost */}
+ <p><strong className="font-semibold">Total Miracle Cost:</strong> {calculateSingleMiracleTotalCost(currentMiracle, allSkills)} points</p>
+ </div> {/* Pass allSkills */}
+                       {/* Actions */}
+        <div className="flex justify-end space-x-2 mt-6">
+                         <Button variant="outline" onClick={handleResetMiracleCreator}>Reset</Button>
+        <Button onClick={() => onExportPower(currentMiracle)}>  <Download className="mr-2 h-4 w-4" />
+        Export Custom power</Button>
+                </div>
+
+ </Accordion>
+ </CardContent>
+ </Card>
       </CollapsibleSectionItem>
-      <CollapsibleSectionItem title="Custom Extra Creation" value="gm-custom-extra-creation">
+
+   <CollapsibleSectionItem title="Custom Extra Creation" value="gm-custom-extra-creation">
         <Card>
           <CardContent className="pt-6 space-y-3">
             <div>
@@ -719,7 +973,14 @@ export function GmToolsTabContent({
             </div>
             <div>
               <Label htmlFor="gm-customExtraCost" className="font-headline">Cost Modifier (per die)</Label>
-              <Input id="gm-customExtraCost" type="number" placeholder="e.g., 1 or 2" value={customExtraCreationData?.costModifier || 0} onChange={(e) => onCustomExtraCreationFieldChange('costModifier', parseInt(e.target.value) || 0)} />
+ <Input
+ id="gm-customExtraCost"
+ type="number"
+ min="0" // Add min attribute
+ placeholder="e.g., 1 or 2"
+ value={customExtraCreationData?.costModifier === undefined ? '' : String(customExtraCreationData.costModifier)}
+ onChange={(e) => onCustomExtraCreationFieldChange('costModifier', parseInt(e.target.value) || 0)}
+ />
             </div>
              <div className="flex justify-end">
                 <Button variant="outline" size="sm" onClick={onExportCustomExtra}>Export Custom Extra</Button>
@@ -727,27 +988,53 @@ export function GmToolsTabContent({
           </CardContent>
         </Card>
       </CollapsibleSectionItem>
-      <CollapsibleSectionItem title="Custom Flaw Creation" value="gm-custom-flaw-creation">
-        <Card>
-          <CardContent className="pt-6 space-y-3">
-            <div>
-              <Label htmlFor="gm-customFlawName" className="font-headline">Name</Label>
-              <Input id="gm-customFlawName" placeholder="e.g., Unreliable Trigger" />
-            </div>
-            <div>
-              <Label htmlFor="gm-customFlawDesc" className="font-headline">Description</Label>
-              <Textarea id="gm-customFlawDesc" placeholder="Describe how this flaw restricts a power quality..." />
-            </div>
-            <div>
-              <Label htmlFor="gm-customFlawCost" className="font-headline">Cost Modifier (per die)</Label>
-              <Input id="gm-customFlawCost" type="number" placeholder="e.g., -1 or -2" />
-            </div>
-            <div className="flex justify-end">
-                <Button variant="outline" size="sm" disabled>Save Custom Flaw (WIP)</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </CollapsibleSectionItem>
+   <CollapsibleSectionItem title="Custom Flaw Creation" value="gm-custom-flaw-creation">
+  <Card>
+    <CardContent className="pt-6 space-y-3">
+      <div>
+        <Label htmlFor="gm-customFlawName" className="font-headline">Name</Label>
+        <Input
+          id="gm-customFlawName"
+          placeholder="e.g., Unreliable Trigger"
+          value={customFlawCreationData?.name || ''} // Bind value
+          onChange={(e) => onCustomFlawCreationFieldChange('name', e.target.value)} // Bind onChange
+        />
+      </div>
+      <div>
+        <Label htmlFor="gm-customFlawDesc" className="font-headline">Description</Label>
+        <Textarea
+          id="gm-customFlawDesc"
+          placeholder="Describe how this flaw restricts a power quality..."
+          value={customFlawCreationData?.description || ''} // Bind value
+          onChange={(e) => onCustomFlawCreationFieldChange('description', e.target.value)} // Bind onChange
+        />
+      </div>
+      <div>
+        <Label htmlFor="gm-customFlawCost" className="font-headline">Cost Modifier (per die)</Label>
+        <Input
+          id="gm-customFlawCost"
+          type="number"
+ placeholder="e.g., -1 or -2"
+ value={customFlawCreationData?.costModifier === undefined ? '' : String(customFlawCreationData.costModifier)}
+ onChange={(e) => {
+ const value = parseInt(e.target.value, 10);
+ if (isNaN(value)) {
+ onCustomFlawCreationFieldChange('costModifier', '');
+ } else
+ if (isNaN(value) || value >= 0) {
+ onCustomFlawCreationFieldChange('costModifier', 0);
+ } else {
+ onCustomFlawCreationFieldChange('costModifier', value);
+ }
+          }}
+        />
+      </div>
+      <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={onExportCustomFlaw}>Export Custom Flaw</Button>
+      </div>
+    </CardContent>
+  </Card>
+</CollapsibleSectionItem>
     </Accordion>
   );
 }

@@ -55,15 +55,15 @@ export const calculateTotalSkillPoints = (skills: SkillInstance[]): number => {
 };
 
 // Calculate Miracle Quality Cost (dependent on miracle's dice)
-export const calculateSingleMiracleQualityCost = (quality: MiracleQualityDef, miracle: MiracleDefinition, allSkills: SkillInstance[]): number => {
-  const NDice = parseInt(miracle.dice.replace('D', '')) || 0;
-  const HDice = parseInt(miracle.hardDice.replace('HD', '')) || 0;
-  const WDice = parseInt(miracle.wiggleDice.replace('WD', '')) || 0;
-
-  const allPowerQualityDefinitions = getDynamicPowerQualityDefinitions(allSkills);
+export const calculateSingleMiracleQualityCost = (quality: MiracleQualityDef, miracle: MiracleDefinition, allSkills: SkillInstance[] | undefined): number => {
+  const NDice = (miracle && miracle.dice) ? parseInt(miracle.dice.replace('D', '')) || 0 : 0;
+  const HDice = (miracle && miracle.hardDice) ? parseInt(miracle.hardDice.replace('HD', '')) || 0 : 0;
+  const WDice = (miracle && miracle.wiggleDice) ? parseInt(miracle.wiggleDice.replace('WD', '')) || 0 : 0;
+  const powerQualitySkills = allSkills || [];
+  const allPowerQualityDefinitions = getDynamicPowerQualityDefinitions(powerQualitySkills);
   const qualityDef = allPowerQualityDefinitions.find(def => def.key === quality.type);
   if (!qualityDef) return 0;
-
+  
   const baseCostFactor = qualityDef.baseCostFactor;
   let totalExtrasCostModifier = quality.extras.reduce((sum, ex) => sum + ex.costModifier, 0);
   let totalFlawsCostModifier = quality.flaws.reduce((sum, fl) => sum + fl.costModifier, 0);

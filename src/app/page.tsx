@@ -316,6 +316,113 @@ const handleExportCustomExtra = () => {
   }));
 };
 
+  const handleCustomFlawCreationFieldChange = (field, value) => {
+  setCustomFlawCreationData(prevData => {
+    if (field === 'costModifier') {
+      // Ensure costModifier is not positive
+      const newCostModifier = value > 0 ? 0 : value;
+      return {
+        ...prevData,
+        [field]: newCostModifier,
+      };
+    } else {
+      return {
+        ...prevData,
+        [field]: value,
+      };
+    }
+  });
+};
+
+
+    // Inside the HomePage component in src/app/page.tsx
+const [customFlawCreationData, setCustomFlawCreationData] = useState({
+      name: '',
+      description: '',
+      costModifier: 0, // Flaws typically have negative cost modifiers
+    });
+
+
+
+// ... rest of your state declarations
+
+
+
+  // Inside the HomePage component in src/app/page.tsx
+    const handleExportCustomFlaw = () => {
+      // Generate a unique ID for the custom flaw
+      const id = `custom-flaw-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      // Create the object to be exported
+      const exportedFlaw = {
+        id: id,
+        name: customFlawCreationData.name || 'Unnamed Custom Flaw', // Use the name or a default
+        description: customFlawCreationData.description || '', // Include description
+        costModifier: customFlawCreationData.costModifier || 0, // Include cost modifier (should be negative for flaws)
+        isCustom: true, // Add a flag to indicate it's a custom flaw
+      };
+
+      const jsonData = JSON.stringify(exportedFlaw, null, 2);
+
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Use the custom flaw name for the filename, with a fallback
+      a.download = `${customFlawCreationData.name.replace(/\s+/g, '_').toLowerCase() || 'custom_flaw'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log('Exported custom flaw:', exportedFlaw);
+    };
+
+    // ... other handler functions
+
+
+  // Inside the HomePage component in src/app/page.tsx
+
+const handleExportPower = (powerToExport: MiracleDefinition) => {
+  try {
+    // Convert the MiracleDefinition object to a JSON string with pretty printing
+    const jsonString = JSON.stringify(powerToExport, null, 2);
+
+    // Create a Blob from the JSON string
+    const blob = new Blob([jsonString], { type: "application/json" });
+
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary anchor element for the download
+    const a = document.createElement("a");
+    a.href = url;
+
+    // Determine the filename (use the miracle name, replacing spaces with underscores)
+    const fileName = powerToExport.name ? `${powerToExport.name.replace(/\s+/g, '_').toLowerCase()}_miracle.json` : "custom_miracle.json";
+    a.download = fileName;
+
+    // Append the anchor to the body, click it to trigger download, and then remove it
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Clean up the object URL
+    URL.revokeObjectURL(url);
+
+    // Show a success toast notification
+    toast({ title: "Miracle Exported", description: `Miracle definition downloaded as ${fileName}.` });
+
+  } catch (error) {
+    // Log the error and show a destructive toast notification
+    console.error("Failed to export miracle:", error);
+    toast({ title: "Export Error", description: "Could not export miracle data.", variant: "destructive" });
+  }
+};
+
+// ... rest of your HomePage component code (state declarations, other handlers, return statement)
+
+
   const handleBasicInfoChange = (field: keyof Omit<BasicInfo, 'motivations' | 'inhumanStatsSettings'>, value: any) => {
     let potentialArchetypeCost = 0;
     const currentCharacterState = characterData; 
@@ -2267,7 +2374,12 @@ const handleExportCustomExtra = () => {
                   // Add the missing props here
                   customExtraCreationData={customExtraCreationData} 
                   onExportCustomExtra={handleExportCustomExtra} 
-                  onCustomExtraCreationFieldChange={handleCustomExtraCreationFieldChange} 
+                  onCustomExtraCreationFieldChange={handleCustomExtraCreationFieldChange}
+                  allSkills={characterData.skills}
+                  onExportPower={handleExportPower} 
+                  customFlawCreationData={customFlawCreationData}
+                  onCustomFlawCreationFieldChange={handleCustomFlawCreationFieldChange}
+                  onExportCustomFlaw={handleExportCustomFlaw}
                 />
               </TabsContent>
 
