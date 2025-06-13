@@ -215,7 +215,7 @@ export function AppHeader({
                     <Button
                       variant="ghost"
                       onClick={() => setSettingsView('main')}
-                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground"
+                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground hover:text-white"
                       aria-label="Back to main settings"
                     >
                       <ChevronLeft className="mr-1 h-4 w-4" />
@@ -237,7 +237,7 @@ export function AppHeader({
                     <Button
                       variant="ghost"
                       onClick={() => setSettingsView('main')}
-                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground"
+                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground hover:text-white"
                       aria-label="Back to main settings"
                     >
                       <ChevronLeft className="mr-1 h-4 w-4" />
@@ -266,7 +266,7 @@ export function AppHeader({
                     <Button
                       variant="ghost"
                       onClick={() => setSettingsView('main')}
-                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground"
+                      className="justify-start px-1 mb-2 text-sm text-muted-foreground hover:text-foreground hover:text-white"
                       aria-label="Back to main settings"
                     >
                       <ChevronLeft className="mr-1 h-4 w-4" />
